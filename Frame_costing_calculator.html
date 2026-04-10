@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metal Frame Costing Calculation v4</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--border:#2a3349;--accent:#00c896;--accent2:#0082ff;--warn:#ff6b35;--text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;--green:#00c896;--red:#ff4d6d;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;display:flex;}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.hbadge{background:var(--accent);color:#000;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:3px;letter-spacing:1px;}
+.header h1{font-size:20px;font-weight:500;letter-spacing:-0.3px;}
+.hsub{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:20px;}
+.sidebar{width:220px;min-width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;overflow-y:auto;}
+.sb-header{padding:16px 14px 10px;border-bottom:1px solid var(--border);}
+.sb-title{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;}
+.sb-new{width:100%;background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px;cursor:pointer;transition:opacity 0.15s;}
+.sb-new:hover{opacity:0.85;}
+.sb-list{flex:1;overflow-y:auto;padding:8px 0;}
+.sb-item{display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;position:relative;}
+.sb-item:hover{background:var(--surface2);}
+.sb-item.active{background:var(--surface2);border-left-color:var(--accent);}
+.sb-item-name{flex:1;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-item.active .sb-item-name{color:var(--text);}
+.sb-item-date{font-family:var(--mono);font-size:9px;color:var(--text3);}
+.sb-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;opacity:0;transition:opacity 0.15s;}
+.sb-item:hover .sb-del{opacity:1;}
+.sb-del:hover{color:var(--red);}
+.sb-rename-input{background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:12px;padding:2px 6px;width:100%;outline:none;}
+.main-content{flex:1;padding:24px;overflow-y:auto;min-width:0;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;}
+.ph{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;}
+.pd{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+.pb{padding:14px;}
+.f{margin-bottom:12px;}
+.f label{display:block;font-size:10px;font-weight:500;color:var(--text2);margin-bottom:4px;letter-spacing:0.3px;text-transform:uppercase;}
+.f input,.f select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;transition:border-color 0.15s;}
+.f input:focus,.f select:focus{border-color:var(--accent);}
+.f select option{background:var(--surface2);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.sec{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.hwt{width:100%;border-collapse:collapse;}
+.hwt td{padding:4px 3px;font-size:12px;}
+.hwt td:first-child{color:var(--text2);}
+.hwt input{width:76px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:4px 6px;text-align:right;outline:none;}
+.hwt input:focus{border-color:var(--accent);}
+.pr{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;}
+.pr .lbl{color:var(--text2);flex:1;}
+.pr input{width:66px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:4px 6px;text-align:right;outline:none;}
+.pr input:focus{border-color:var(--accent);}
+.pru{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.btn-calc{width:100%;background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:13px;font-weight:600;padding:11px;cursor:pointer;letter-spacing:0.5px;transition:opacity 0.15s,transform 0.1s;margin-top:14px;}
+.btn-calc:hover{opacity:0.85;}
+.btn-calc:active{transform:scale(0.99);}
+.btn-add{background:transparent;border:1px dashed var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:12px;padding:7px;cursor:pointer;width:100%;transition:all 0.15s;margin-top:8px;}
+.btn-add:hover{border-color:var(--accent);color:var(--accent);}
+.dr{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;}
+.drh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.drn{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600;letter-spacing:1px;}
+.brm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;transition:color 0.15s;}
+.brm:hover{color:var(--red);}
+/* cutting preview chip */
+.cut-chip{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-top:6px;font-family:var(--mono);font-size:11px;}
+.cut-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.cut-row:last-child{margin-bottom:0;}
+.cut-label{color:var(--text2);font-size:10px;}
+.cut-val{color:var(--accent);font-weight:600;}
+.cut-note{color:var(--text3);font-size:10px;}
+/* labour tag */
+.ltag{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;margin-left:4px;}
+.la{background:rgba(0,200,150,0.1);color:var(--accent);}
+.lm{background:rgba(255,107,53,0.12);color:var(--warn);}
+/* results */
+.rempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:var(--text3);font-family:var(--mono);font-size:12px;gap:8px;}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;}
+.sc.hi{border-color:var(--accent);}
+.sl{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;}
+.sv{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text);}
+.sc.hi .sv{color:var(--accent);}
+.ss{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px;}
+.pres{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tabs{display:flex;gap:2px;padding:10px 16px 0;background:var(--surface2);border-bottom:1px solid var(--border);}
+.tb{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;padding:6px 14px 8px;cursor:pointer;transition:color 0.15s;}
+.tb.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tc{display:none;}
+.tc.active{display:block;}
+.rt{width:100%;border-collapse:collapse;}
+.rt th{font-family:var(--mono);font-size:10px;color:var(--text3);font-weight:500;letter-spacing:0.4px;text-transform:uppercase;padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);}
+.rt th:first-child,.rt th:nth-child(2){text-align:left;}
+.rt td{padding:8px 10px;font-family:var(--mono);font-size:12px;text-align:right;border-bottom:1px solid rgba(42,51,73,0.5);color:var(--text2);}
+.rt td:first-child,.rt td:nth-child(2){text-align:left;color:var(--text);}
+.rt tr:hover td{background:rgba(255,255,255,0.02);}
+.vg{color:var(--green)!important;font-weight:600;}
+.vr{color:var(--red)!important;font-weight:600;}
+.va{color:var(--accent2)!important;}
+.pill{display:inline-block;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:11px;font-weight:600;}
+.pill.g{background:rgba(0,200,150,0.15);color:var(--green);}
+.pill.o{background:rgba(0,130,255,0.15);color:var(--accent2);}
+.pill.r{background:rgba(255,77,109,0.15);color:var(--red);}
+.bdc{background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.bdh{padding:10px 14px;border-bottom:1px solid var(--border);}
+.brw{display:flex;justify-content:space-between;padding:6px 14px;font-size:12px;border-top:1px solid var(--border);}
+.brw .bn{color:var(--text2);}
+.brw .bv{font-family:var(--mono);}
+.brw.tot{background:rgba(0,200,150,0.06);}
+.brw.tot .bn{color:var(--text);font-weight:500;}
+.brw.tot .bv{color:var(--accent);font-size:13px;font-weight:600;}
+.bar-row{display:flex;align-items:center;gap:10px;padding:0 14px;margin-bottom:6px;font-size:11px;}
+.bl{color:var(--text2);width:120px;flex-shrink:0;}
+.btr{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.bf{height:100%;border-radius:3px;}
+.bv2{font-family:var(--mono);font-size:10px;color:var(--text3);width:60px;text-align:right;}
+.lt2{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+.lt2 th{background:var(--surface2);color:var(--text2);padding:6px 10px;text-align:center;border:1px solid var(--border);font-weight:500;}
+.lt2 td{padding:4px 10px;text-align:center;border:1px solid var(--border);color:var(--text2);}
+.lt2 td:first-child{text-align:left;color:var(--text);font-weight:500;}
+.lt2 td.hi{background:rgba(0,200,150,0.15);color:var(--accent);font-weight:600;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="sidebar" class="sidebar">
+  <div class="sb-header">
+    <div class="sb-title">Saved Profiles</div>
+    <button class="sb-new" onclick="newProfile()">+ New Profile</button>
+  </div>
+  <div class="sb-list" id="sbList"></div>
+</div>
+<div class="main-content">
+<div style="max-width:1400px;margin:0 auto;">
+<div class="header">
+  <h1>Metal Frame Costing Calculation</h1>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button onclick="importJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬆ Import</button>
+    <button onclick="exportJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬇ Export</button>
+    <span id="autosave_tag" style="font-family:var(--mono);font-size:10px;color:var(--text3);"></span>
+  </div>
+</div>
+<div class="layout">
+  <!-- LEFT -->
+  <div>
+    <div class="panel">
+      <div class="ph"><span class="pd"></span>MATERIAL SETTINGS</div>
+      <div class="pb">
+        <div class="fr">
+          <div class="f"><label>Material Type</label>
+            <select id="matType" onchange="updateMatPrice()">
+              <option value="EG">EG</option><option value="GI">GI</option>
+              <option value="Aluzinc" selected>Aluzinc</option>
+              <option value="GA">GA</option><option value="Zincalume">Zincalume</option>
+            </select></div>
+          <div class="f"><label>Thickness (mm)</label>
+            <select id="matThick">
+              <option value="0.9">0.9</option><option value="0.95">0.95</option>
+              <option value="1.0" selected>1.0</option><option value="1.1">1.1</option>
+              <option value="1.15">1.15</option><option value="1.2">1.2</option>
+            </select></div>
+        </div>
+        <div class="f"><label>Price (RM / ton)</label>
+          <input type="number" id="matPrice" value="3500" step="50"></div>
+        <div class="f"><label>Laser Kerf per side (mm)</label>
+          <input type="number" id="kerf" value="2" step="0.5" min="0">
+          <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block;">Border loss only: top + bottom + left + right = kerf × 2 each</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span class="pd" style="background:var(--accent2)"></span>HARDWARE UNIT COST (RM)</div>
+      <div class="pb">
+        <table class="hwt">
+          <tr><td>Hinges (pcs)</td><td style="text-align:right"><input type="number" id="hw_hinge" value="4.00" step="0.1"></td></tr>
+          <tr><td>Striker Plate</td><td style="text-align:right"><input type="number" id="hw_striker" value="0.00" step="0.1"></td></tr>
+          <tr><td>Spreader Bar</td><td style="text-align:right"><input type="number" id="hw_spreader" value="2.00" step="0.1"></td></tr>
+          <tr><td>Wire Ties</td><td style="text-align:right"><input type="number" id="hw_wire" value="1.00" step="0.1"></td></tr>
+          <tr><td>Column / Stiffner Strap</td><td style="text-align:right"><input type="number" id="hw_strap" value="1.20" step="0.1"></td></tr>
+          <tr><td>Morter Box</td><td style="text-align:right"><input type="number" id="hw_morter" value="0.50" step="0.1"></td></tr>
+          <tr><td>Transport Fee (per frame)</td><td style="text-align:right"><input type="number" id="hw_transport" value="3.30" step="0.1"></td></tr>
+        </table>
+        <div class="sec">Overhead %</div>
+        <div class="pr"><span class="lbl">Rejection</span><input type="number" id="pct_r" value="2" step="0.1"><span class="pru">%</span></div>
+        <div class="pr"><span class="lbl">Admin Cost</span><input type="number" id="pct_a" value="11" step="0.5"><span class="pru">%</span></div>
+        <div class="pr"><span class="lbl">Overhead</span><input type="number" id="pct_o" value="12" step="0.5"><span class="pru">%</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span class="pd" style="background:var(--warn)"></span>DOOR ORDERS</div>
+      <div class="pb">
+        <div id="doorRows"></div>
+        <button class="btn-add" onclick="addDoorRow()">+ Add Door Type</button>
+        <button class="btn-add" onclick="clearAllDoors()" style="color:var(--red);border-color:var(--red);margin-top:4px;">Clear All</button>
+        <button class="btn-calc" onclick="calculate()">CALCULATE COSTING</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <div id="resultsArea">
+      <div class="rempty"><span style="font-size:32px;">⚡</span><span>Fill in door specs and click Calculate</span></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const DENSITY={EG:0.000007888336532,GI:0.000008230354593,Aluzinc:0.000008143290141,GA:0.000008143290141,Zincalume:0.000008143290141};
+const MAT_PRICES={EG:3850,GI:3500,Aluzinc:3500,GA:3000,Zincalume:4950};
+const SHEET_W=[1100,1219,1250];
+const SHEET_H=[1510,1810,2010,2134,2438,2710,3048];
+const LABOUR={
+  APF1:{2130:12.4,2430:13.9,3000:15.6},APF2:{2130:13.8,2430:15.2,3000:16.9},
+  APF3:{2130:13.8,2430:15.2,3000:16.9},APF4:{2130:13.1,2430:14.6,3000:16.2},
+  APF5:{2130:15.1,2430:16.6,3000:18.3},APF6:{2130:15.1,2430:16.6,3000:18.3},
+  APF7:{2130:16.5,2430:17.9,3000:19.6},APF8:{2130:16.5,2430:17.9,3000:19.6},
+  APF9:{2130:15.1,2430:16.6,3000:18.3},APF10:{2130:13.8,2430:15.2,3000:16.9},
+  APF11:{2130:19.2,2430:20.6,3000:22.3},APF12:{2130:16.5,2430:17.9,3000:19.6},
+  APF13:{2130:15.1,2430:16.6,3000:18.3},APF14:{2130:12.4,2430:12.8,3000:15.6},
+  APF15:{2130:null,2430:null,3000:null},APF16:{2130:null,2430:null,3000:null},
+  APF17:{2130:null,2430:null,3000:null},APF18:{2130:null,2430:null,3000:null},
+  APF19:{2130:null,2430:null,3000:null},
+  APFD1:{2130:12.4,2430:13.9,3000:15.6},APFD2:{2130:13.8,2430:15.2,3000:16.9},
+  APFD3:{2130:16.5,2430:17.9,3000:19.6},APFD4:{2130:15.1,2430:16.6,3000:18.3},
+  APFD5:{2130:null,2430:null,3000:null},APFD6:{2130:null,2430:null,3000:null},
+  APFD7:{2130:null,2430:null,3000:null},APFD8:{2130:16.5,2430:17.9,3000:19.6}
+};
+const HB=[2130,2430,3000];
+const PROFS=Object.keys(LABOUR);
+let dc=0;
+
+function updateMatPrice(){document.getElementById('matPrice').value=MAT_PRICES[gs('matType')]||3500;}
+function gv(id){return parseFloat(document.getElementById(id).value)||0;}
+function gs(id){return document.getElementById(id).value;}
+function hKey(h){const b=HB.filter(x=>x>=h);return b.length?b[0]:HB[HB.length-1];}
+function getLabour(p,h){const r=LABOUR[p];if(!r)return null;return r[hKey(h)];}
+
+// ─── CUTTING OPTIMISER ────────────────────────────────────────────────────────
+// piece = cutting size (mm), kerfTotal = kerf * 2
+// find sheet spec that maximises utilisation for given direction
+function calcCutting(cuttingSize, frameW, frameH, qty, matType, thick, pricePerTon, kerfPerSide) {
+  // kerfPerSide applied as total border trim on each sheet
+  const avail = (sw, sh) => ({ w: sw - kerfPerSide*2, h: sh - kerfPerSide*2 });
+
+  function oneSheetRM(sw, sh) {
+    const d = DENSITY[matType] || 0.000008143290141;
+    return d * sw * sh * thick * (pricePerTon / 1000);
+  }
+
+  // Kerf logic:
+  //   Sheet border: top+bottom = kerf×2, left+right = kerf×2  → avail = sheet - kerf×2 each axis
+  //   Between pieces: each cut adds kerf×2 loss
+  //   So nW pieces across needs: nW×pw + (nW-1)×kerf×2
+  //   And nH pieces down needs:  nH×ph + (nH-1)×kerf×2
+  function bestForPiece(pieceW, pieceH) {
+    let best = null;
+    let minWastePerPiece = Infinity;
+
+    SHEET_W.forEach(sw => {
+      SHEET_H.forEach(sh => {
+        const a = avail(sw, sh);
+        // Try both orientations
+        [[pieceW, pieceH], [pieceH, pieceW]].forEach(([pw, ph]) => {
+          // Kerf only on sheet border (top/bottom/left/right = kerf×2 each axis)
+          // No inter-piece kerf — internal cuts don't add loss
+          const maxW = Math.floor(a.w / pw);
+          const maxH = Math.floor(a.h / ph);
+          if (maxW < 1 || maxH < 1) return;
+
+          for (let nW = 1; nW <= maxW; nW++) {
+            for (let nH = 1; nH <= maxH; nH++) {
+              const total = nW * nH;
+              const usedArea = nW * pw * nH * ph;
+              const sheetArea = sw * sh;
+              const wastePerPiece = (sheetArea - usedArea) / total;
+              const eff = usedArea / sheetArea;
+
+              const isBetter = wastePerPiece < minWastePerPiece ||
+                (wastePerPiece === minWastePerPiece && best && (sw*sh) < (best.sw*best.sh)) ||
+                (wastePerPiece === minWastePerPiece && best && (sw*sh) === (best.sw*best.sh) && eff > best.eff);
+              if (isBetter) {
+                minWastePerPiece = wastePerPiece;
+                const sheetRM = oneSheetRM(sw, sh);
+                best = {
+                  sw, sh,
+                  pcsW: nW, pcsH: nH,
+                  pcsPerSheet: total,
+                  pieceW: pw, pieceH: ph,
+                  eff, wastePerPiece,
+                  sheetRM,
+                  costPerPiece: sheetRM / total
+                };
+              }
+            }
+          }
+        });
+      });
+    });
+    return best;
+  }
+
+  // TOP: piece = cuttingSize × frameW  (1 per door)
+  const topBest = bestForPiece(cuttingSize, frameW);
+  // L/R: piece = cuttingSize × frameH  (2 per door)
+  const lrBest  = bestForPiece(cuttingSize, frameH);
+
+  const topCostPerDoor = topBest ? topBest.costPerPiece * 1 : 0;
+  const lrCostPerDoor  = lrBest  ? lrBest.costPerPiece  * 2 : 0;
+  const metalPerDoor   = topCostPerDoor + lrCostPerDoor;
+  const totalMetalRM   = metalPerDoor * qty;
+
+  const effective = cuttingSize + kerfPerSide * 2;
+  return { topBest, lrBest, topCostPerDoor, lrCostPerDoor, metalPerDoor, totalMetalRM, effective };
+}
+
+// ─── LIVE PREVIEW ─────────────────────────────────────────────────────────────
+function previewCut(n) {
+  const cs  = gv('d'+n+'_cs');
+  const fw  = gv('d'+n+'_fw');
+  const fh  = gv('d'+n+'_fh');
+  const qty = gv('d'+n+'_qty');
+  const kerf = gv('kerf');
+  const matType = gs('matType');
+  const thick   = gv('matThick');
+  const price   = gv('matPrice');
+  const chip    = document.getElementById('d'+n+'_chip');
+  if (!chip || !cs || !fw || !fh || qty < 1) return;
+
+  const r = calcCutting(cs, fw, fh, qty, matType, thick, price, kerf);
+  const top = r.topBest, lr = r.lrBest;
+  if (!top || !lr) { chip.innerHTML='<span style="color:var(--warn);font-size:11px;">No valid sheet found — check dimensions</span>'; return; }
+
+  chip.innerHTML=`
+    <div style="font-size:10px;color:var(--accent);font-weight:600;margin-bottom:6px;letter-spacing:0.5px;">AUTO CUT PLAN · piece=${r.effective}mm (cut+kerf)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:var(--bg);border-radius:4px;padding:7px;">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">TOP — 1 pc/door</div>
+        <div style="font-family:var(--mono);color:var(--text);font-size:12px;font-weight:600;">${top.sw}×${top.sh}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">开 ${top.pcsW}×${top.pcsH} = <strong>${top.pcsPerSheet} pcs</strong>/sheet · ${(top.eff*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">1 sheet = RM ${top.sheetRM.toFixed(2)}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;font-weight:600;">1 pc = RM ${top.costPerPiece.toFixed(2)}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:4px;padding:7px;">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">L/R — 2 pcs/door</div>
+        <div style="font-family:var(--mono);color:var(--text);font-size:12px;font-weight:600;">${lr.sw}×${lr.sh}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">开 ${lr.pcsW}×${lr.pcsH} = <strong>${lr.pcsPerSheet} pcs</strong>/sheet · ${(lr.eff*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">1 sheet = RM ${lr.sheetRM.toFixed(2)}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;font-weight:600;">2 pcs = RM ${(lr.costPerPiece*2).toFixed(2)}</div>
+      </div>
+    </div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:11px;color:var(--text2);">Metal cost / door</span>
+      <span style="font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;">RM ${r.metalPerDoor.toFixed(2)}</span>
+    </div>`;
+}
+
+// ─── ADD DOOR ROW ─────────────────────────────────────────────────────────────
+function addDoorRow(def={}) {
+  dc++;const n=dc;
+  const profOpts = PROFS.map(p=>`<option value="${p}"${p===(def.profile||'APF1')?' selected':''}>${p}</option>`).join('');
+  const d = document.createElement('div');
+  d.className='dr'; d.id='door_'+n;
+  d.innerHTML=`
+    <div class="drh">
+      <span class="drn">DOOR #${n}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button onclick="copyDoor(${n})" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);font-family:var(--mono);font-size:10px;padding:2px 8px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Copy</button>
+        <button class="brm" onclick="removeDoor(${n})">✕</button>
+      </div>
+    </div>
+    <div class="fr">
+      <div class="f"><label>Door Type</label>
+        <input type="text" id="d${n}_dtype" value="${def.dtype||''}" placeholder="e.g. D1, D2, APF1..."></div>
+      <div class="f"><label>APF Profile</label>
+        <select id="d${n}_profile" onchange="onPC(${n})">${profOpts}</select></div>
+    </div>
+    <div class="fr">
+      <div class="f"><label>Hinges (pcs)</label>
+        <select id="d${n}_hinges"><option value="3" selected>3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></div>
+    </div>
+
+    <div class="sec">Cutting Dimensions</div>
+    <div class="fr3">
+      <div class="f">
+        <label>Cutting Size (mm) <span style="color:var(--warn);font-size:9px;">e.g. 233</span></label>
+        <input type="number" id="d${n}_cs" value="${def.cs||233}" step="0.5" onchange="previewCut(${n})">
+      </div>
+      <div class="f">
+        <label>Frame W (mm)</label>
+        <input type="number" id="d${n}_fw" value="${def.fw||800}" step="1" onchange="previewCut(${n})">
+      </div>
+      <div class="f">
+        <label>Frame H (mm)</label>
+        <input type="number" id="d${n}_fh" value="${def.fh||2130}" step="1" onchange="onHC(${n})">
+      </div>
+    </div>
+    <!-- Auto cut plan preview -->
+    <div class="cut-chip" id="d${n}_chip" style="margin-bottom:10px;">
+      <span style="font-size:11px;color:var(--text3);">Fill cutting size + frame dimensions to see auto cut plan</span>
+    </div>
+
+    <div class="sec">Quantity & Pricing</div>
+    <div class="fr3">
+      <div class="f"><label>Quantity</label>
+        <input type="number" id="d${n}_qty" value="${def.qty||10}" min="1" onchange="previewCut(${n})"></div>
+      <div class="f">
+        <label>Labour (RM/door) <span id="d${n}_tag" class="ltag"></span></label>
+        <input type="number" id="d${n}_lab" value="12.40" step="0.1">
+      </div>
+      <div class="f"><label>Selling Price (RM)</label>
+        <input type="number" id="d${n}_sell" value="${def.sell||81}" step="0.5"></div>
+    </div>
+`;
+  document.getElementById('doorRows').appendChild(d);
+  onPC(n);
+  previewCut(n);
+}
+
+function onPC(n){onHC(n);}
+function onHC(n){
+  const p=gs('d'+n+'_profile'), h=gv('d'+n+'_fh');
+  const lab=getLabour(p,h);
+  const tag=document.getElementById('d'+n+'_tag');
+  if(lab!==null&&lab!==undefined){
+    document.getElementById('d'+n+'_lab').value=lab;
+    tag.textContent='AUTO·'+p+'≤'+hKey(h);
+    tag.className='ltag la';
+  } else {
+    tag.textContent='manual';
+    tag.className='ltag lm';
+  }
+  previewCut(n);
+}
+function removeDoor(n){const e=document.getElementById('door_'+n);if(e)e.remove();}
+function copyDoor(n){
+  addDoorRow({
+    dtype:   gs('d'+n+'_dtype'),
+    profile: gs('d'+n+'_profile'),
+    cs:      gs('d'+n+'_cs'),
+    fw:      gs('d'+n+'_fw'),
+    fh:      gs('d'+n+'_fh'),
+    qty:     gs('d'+n+'_qty'),
+    sell:    gs('d'+n+'_sell')
+  });
+  const newN = dc;
+  document.getElementById('d'+newN+'_hinges').value = gs('d'+n+'_hinges');
+  document.getElementById('d'+newN+'_lab').value    = gs('d'+n+'_lab');
+}
+function clearAllDoors(){
+  if(!confirm('Clear all door types?')) return;
+  document.getElementById('doorRows').innerHTML='';
+  dc=0;
+  document.getElementById('resultsArea').innerHTML='<div class="rempty"><span style="font-size:32px;">⚡</span><span>Fill in door specs and click Calculate</span></div>';
+  autoSave();
+}
+
+// ─── CALCULATE ────────────────────────────────────────────────────────────────
+function calculate(){
+  const matType=gs('matType'), thick=gv('matThick'), price=gv('matPrice'), kerf=gv('kerf');
+  const hwH=gv('hw_hinge'),hwSt=gv('hw_striker'),hwSp=gv('hw_spreader');
+  const hwW=gv('hw_wire'),hwSr=gv('hw_strap'),hwMo=gv('hw_morter'),hwTr=gv('hw_transport');
+  const pR=gv('pct_r')/100,pA=gv('pct_a')/100,pO=gv('pct_o')/100;
+  const rows=document.querySelectorAll('.dr');
+  if(!rows.length){alert('Add at least one door!');return;}
+  const R=[];
+  rows.forEach(row=>{
+    const n=row.id.replace('door_','');
+    const dtype=gs('d'+n+'_dtype'), prof=gs('d'+n+'_profile'), hinges=gv('d'+n+'_hinges');
+    const cs=gv('d'+n+'_cs'), fw=gv('d'+n+'_fw'), fh=gv('d'+n+'_fh');
+    const qty=gv('d'+n+'_qty'), lab=gv('d'+n+'_lab'), sell=gv('d'+n+'_sell');
+
+    const cut = calcCutting(cs, fw, fh, qty, matType, thick, price, kerf);
+    const metalCost = cut.metalPerDoor;
+
+    const hw=(hinges*hwH)+hwSt+hwSp+hwW+hwSr+hwMo;
+    const frame=metalCost+hw+lab+hwTr;
+    const rej=frame*pR;
+    const adm=frame*pA, ohd=frame*pO;
+    const total=frame+rej+adm+ohd;
+    const profit=sell-total, pct=sell>0?(profit/sell)*100:0;
+
+    R.push({n,dtype,prof,hinges,cs,fw,fh,qty,lab,sell,
+            cut, metalCost, hw, hwTr, frame, rej, adm, ohd, total,
+            profit, pct, hk:hKey(fh),
+            tR:sell*qty, tC:total*qty, tP:profit*qty});
+  });
+  render(R);
+}
+
+function rm(v){return'RM '+(v||0).toFixed(2);}
+function pc(v){return(v||0).toFixed(2)+'%';}
+function pill(v){const c=v>=10?'g':v>=7?'o':'r';return`<span class="pill ${c}">${pc(v)}</span>`;}
+
+function render(R){ _lastResults = R;
+  const tQ=R.reduce((s,r)=>s+r.qty,0);
+  const tHinges=R.reduce((s,r)=>s+(r.hinges*r.qty),0);
+  const tR=R.reduce((s,r)=>s+r.tR,0);
+  const tC=R.reduce((s,r)=>s+r.tC,0);
+  const tP=R.reduce((s,r)=>s+r.tP,0);
+  const avg=tR>0?(tP/tR)*100:0;
+
+  let h=`
+  <div class="sgrid" style="grid-template-columns:repeat(5,1fr);">
+    <div class="sc"><div class="sl">Total Doors</div><div class="sv">${tQ}</div><div class="ss">units</div></div>
+    <div class="sc"><div class="sl">Total Hinges</div><div class="sv">${tHinges}</div><div class="ss">pcs needed</div></div>
+    <div class="sc"><div class="sl">Total Revenue</div><div class="sv" style="font-size:14px;">RM ${tR.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="ss">sell × qty</div></div>
+    <div class="sc"><div class="sl">Total Cost</div><div class="sv" style="font-size:14px;">RM ${tC.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="ss">all door types</div></div>
+    <div class="sc hi"><div class="sl">Total Profit</div><div class="sv" style="font-size:14px;">RM ${tP.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="ss">${pc(avg)} avg margin</div></div>
+  </div>
+  <div class="pres">
+    <div class="tabs" style="justify-content:space-between;">
+      <div style="display:flex;gap:2px;">
+        <button class="tb active" onclick="sw('summary',event)">SUMMARY</button>
+        <button class="tb" onclick="sw('cutting',event)">CUT PLAN</button>
+        <button class="tb" onclick="sw('breakdown',event)">BREAKDOWN</button>
+        <button class="tb" onclick="sw('pricing',event)">PRICING GUIDE</button>
+        <button class="tb" onclick="sw('labourtable',event)">LABOUR TABLE</button>
+      </div>
+      <button onclick="exportExcel()" style="background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;margin:8px 0 0;">⬇ Export Excel</button>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="tc active" id="tab_summary" style="padding:16px;overflow-x:auto;">
+      <table class="rt">
+        <thead><tr>
+          <th>Door Type</th><th>Profile</th><th>Cut Size</th><th>Frame</th><th>Qty</th>
+          <th>Frame Cost</th><th>HW</th><th>Labour</th>
+          <th>Rej+OH</th><th>Total/frame</th><th>Sell</th><th>Profit</th><th>Margin</th>
+        </tr></thead><tbody>`;
+  R.forEach(r=>{
+    h+=`<tr>
+      <td>${r.dtype||'—'}</td><td>${r.prof}</td><td>${r.cs}mm</td><td>${r.fw}×${r.fh}</td><td>${r.qty}</td>
+      <td>${rm(r.metalCost)}</td><td>${rm(r.hw)}</td><td>${rm(r.lab)}</td>
+      <td>${rm(r.rej+r.adm+r.ohd)}</td><td class="va">${rm(r.total)}</td>
+      <td>${rm(r.sell)}</td>
+      <td class="${r.profit>=0?'vg':'vr'}">${rm(r.profit)}</td>
+      <td>${pill(r.pct)}</td>
+    </tr>`;
+  });
+  h+=`</tbody>
+    <tfoot><tr style="background:var(--surface2);">
+      <td colspan="4" style="color:var(--text);font-weight:600;">TOTAL</td>
+      <td style="color:var(--text);font-weight:600;">${tQ}</td>
+      <td colspan="4"></td>
+      <td class="va" style="font-weight:600;">${rm(tC)}</td>
+      <td style="color:var(--text);font-weight:600;">${rm(tR)}</td>
+      <td class="${tP>=0?'vg':'vr'}" style="font-weight:600;">${rm(tP)}</td>
+      <td>${pill(avg)}</td>
+    </tr></tfoot></table></div>
+
+    <!-- CUT PLAN -->
+    <div class="tc" id="tab_cutting" style="padding:16px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">`;
+  R.forEach(r=>{
+    const top=r.cut.topBest, lr=r.cut.lrBest;
+    if(!top||!lr){h+=`<div class="bdc"><div class="bdh"><span style="font-family:var(--mono);font-size:12px;font-weight:600;">${r.prof}</span></div><div style="padding:12px;font-size:11px;color:var(--warn);">No valid sheet found</div></div>`;return;}
+    h+=`<div class="bdc">
+      <div class="bdh">
+        <div>
+          <span style="font-family:var(--mono);font-size:12px;font-weight:600;">${r.dtype||r.prof} · ${r.prof} · cut ${r.cs}mm · frame ${r.fw}×${r.fh}</span><br>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">×${r.qty} doors · effective piece = ${(r.cs + parseFloat(document.getElementById('kerf').value||2)*2).toFixed(1)}mm</span>
+        </div>
+      </div>
+      <div style="padding:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:var(--bg);border-radius:4px;padding:8px;">
+            <div style="font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">TOP — 1 pc/door</div>
+            <div style="font-family:var(--mono);font-size:14px;font-weight:600;">${top.sw}×${top.sh}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;">开 ${top.pcsW}×${top.pcsH} = <strong style="color:var(--text);">${top.pcsPerSheet} pcs</strong>/sheet</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">利用率 ${(top.eff*100).toFixed(1)}%</div>
+            <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">1 sheet = RM ${top.sheetRM.toFixed(2)}</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-top:2px;">1 pc = RM ${top.costPerPiece.toFixed(2)}</div>
+            </div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:8px;">
+            <div style="font-size:9px;color:var(--warn);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">L/R — 2 pcs/door</div>
+            <div style="font-family:var(--mono);font-size:14px;font-weight:600;">${lr.sw}×${lr.sh}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;">开 ${lr.pcsW}×${lr.pcsH} = <strong style="color:var(--text);">${lr.pcsPerSheet} pcs</strong>/sheet</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);">利用率 ${(lr.eff*100).toFixed(1)}%</div>
+            <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">1 sheet = RM ${lr.sheetRM.toFixed(2)}</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-top:2px;">2 pcs = RM ${(lr.costPerPiece*2).toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="brw tot"><span class="bn">Metal cost / door (1 TOP + 2 L/R)</span><span class="bv">${rm(r.metalCost)}</span></div>
+      <div class="brw" style="background:var(--bg);"><span class="bn">Total metal × ${r.qty} doors</span><span class="bv">${rm(r.cut.totalMetalRM)}</span></div>
+    </div>`;
+  });
+  h+=`</div></div>
+
+    <!-- BREAKDOWN -->
+    <div class="tc" id="tab_breakdown" style="padding:16px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;">`;
+  const PIE_COLORS=['#00c896','#0082ff','#ff9f43','#a29bfe','#fd79a8','#fdcb6e','#e17055'];
+  R.forEach((r,ri)=>{
+    const items=[
+      {l:'Metal Sheet',v:r.metalCost},{l:'Hardware',v:r.hw},
+      {l:'Labour',v:r.lab},{l:'Transport',v:r.hwTr},
+      {l:'Rejection',v:r.rej},{l:'Admin (5%)',v:r.adm},
+      {l:'Overhead (10%)',v:r.ohd}
+    ];
+    const chartId='pie_'+ri;
+    h+=`<div class="bdc">
+      <div class="bdh">
+        <span style="font-family:var(--mono);font-size:12px;font-weight:600;">${r.dtype?r.dtype+' · ':''}${r.prof} · ${r.fw}×${r.fh}</span><br>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">Total cost: ${rm(r.total)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:14px;">
+        <div style="position:relative;width:120px;height:120px;flex-shrink:0;">
+          <canvas id="${chartId}" width="120" height="120"></canvas>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+            <div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);">${rm(r.total).replace('RM ','RM ')}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">/ frame</div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px;">
+          ${items.map((it,i)=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+            <span style="display:flex;align-items:center;gap:5px;color:var(--text2);">
+              <span style="width:8px;height:8px;border-radius:2px;background:${PIE_COLORS[i]};display:inline-block;flex-shrink:0;"></span>${it.l}
+            </span>
+            <span style="font-family:var(--mono);color:var(--text);">${rm(it.v)} <span style="color:var(--text3);font-size:10px;">${r.total>0?(it.v/r.total*100).toFixed(1):'0'}%</span></span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="brw tot"><span class="bn">Total cost / frame</span><span class="bv">${rm(r.total)}</span></div>
+      <div class="brw" style="background:var(--bg);"><span class="bn">Selling price</span><span class="bv">${rm(r.sell)}</span></div>
+      <div class="brw" style="background:var(--bg);">
+        <span class="bn">Profit / frame</span>
+        <span class="bv ${r.profit>=0?'vg':'vr'}">${rm(r.profit)} &nbsp;${pill(r.pct)}</span>
+      </div>
+      <div class="brw" style="background:var(--bg);border-top:1px solid var(--border);">
+        <span class="bn">Total profit ×${r.qty}</span>
+        <span class="bv ${r.tP>=0?'vg':'vr'}">${rm(r.tP)}</span>
+      </div>
+    </div>`;
+  });
+  setTimeout(()=>{
+    R.forEach((r,ri)=>{
+      const el=document.getElementById('pie_'+ri);
+      if(!el)return;
+      new Chart(el,{
+        type:'doughnut',
+        data:{datasets:[{
+          data:[r.metalCost,r.hw,r.lab,r.hwTr,r.rej,r.adm,r.ohd],
+          backgroundColor:PIE_COLORS,
+          borderWidth:2,
+          borderColor:'transparent',
+          hoverOffset:4
+        }]},
+        options:{
+          responsive:false,cutout:'68%',
+          plugins:{legend:{display:false},tooltip:{enabled:false}},
+          animation:{animateRotate:true,duration:700}
+        }
+      });
+    });
+  },100);
+
+  // Labour table
+  // Populate pricing guide table
+  setTimeout(function(){
+    var tbody = document.getElementById('pricingBody');
+    if (!tbody) return;
+    var rows = '';
+    R.forEach(function(r){
+      var p7  = r.total / 0.93;
+      var p10 = r.total / 0.90;
+      var p13 = r.total / 0.87;
+      var actualMargin = r.sell > 0 ? ((r.sell - r.total) / r.sell * 100) : 0;
+      var d7 = Math.abs(p7-r.sell), d10 = Math.abs(p10-r.sell), d13 = Math.abs(p13-r.sell);
+      var min = Math.min(d7,d10,d13);
+      var s7  = min===d7  ? 'color:var(--accent2);font-weight:600;' : '';
+      var s10 = min===d10 ? 'color:var(--accent);font-weight:600;'  : '';
+      var s13 = min===d13 ? 'color:var(--warn);font-weight:600;'    : '';
+      rows += '<tr>'
+        + '<td style="text-align:left;font-weight:500;">'+(r.dtype||'—')+'</td>'
+        + '<td style="text-align:left;">'+r.prof+'</td>'
+        + '<td>'+r.fw+'×'+r.fh+'</td>'
+        + '<td style="font-family:var(--mono);">'+rm(r.total)+'</td>'
+        + '<td style="background:rgba(0,130,255,0.06);font-family:var(--mono);'+s7+'">'+rm(p7)+'</td>'
+        + '<td style="background:rgba(0,200,150,0.06);font-family:var(--mono);'+s10+'">'+rm(p10)+'</td>'
+        + '<td style="background:rgba(255,107,53,0.06);font-family:var(--mono);'+s13+'">'+rm(p13)+'</td>'
+        + '<td style="font-family:var(--mono);color:var(--text);">'+rm(r.sell)+'</td>'
+        + '<td>'+pill(actualMargin)+'</td>'
+        + '</tr>';
+    });
+    tbody.innerHTML = rows;
+  }, 50);
+
+  const activeMap={};R.forEach(r=>{activeMap[r.prof+'-'+r.hk]=true;});
+  h+=`</div></div>
+  <div class="tc" id="tab_pricing" style="padding:16px;">
+    <p style="font-size:11px;color:var(--text2);margin-bottom:16px;font-family:var(--mono);">Suggested selling price by customer type. Highlighted = closest to your entered selling price.</p>
+    <div style="overflow-x:auto;"><table class="lt2" id="pricingTable">
+      <thead><tr>
+        <th style="text-align:left;">Door Type</th>
+        <th style="text-align:left;">Profile</th>
+        <th>Frame</th>
+        <th>Total Cost</th>
+        <th style="background:rgba(0,130,255,0.1);">VIP 7%</th>
+        <th style="background:rgba(0,200,150,0.1);">Normal 10%</th>
+        <th style="background:rgba(255,107,53,0.1);">Difficult 13%</th>
+        <th>Your Price</th>
+        <th>Actual Margin</th>
+      </tr></thead>
+      <tbody id="pricingBody"></tbody>
+    </table></div>
+  </div>
+  <div class="tc" id="tab_labourtable" style="padding:16px;">
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;font-family:var(--mono);">Labour RM/door by profile × door height. Highlighted = currently in use.</p>
+    <div style="overflow-x:auto;"><table class="lt2">
+      <thead><tr><th>Profile</th><th>≤ 2130mm</th><th>≤ 2430mm</th><th>≤ 3000mm</th></tr></thead>
+      <tbody>`;
+  PROFS.forEach(p=>{
+    const row=LABOUR[p];
+    h+=`<tr><td>${p}</td>`;
+    HB.forEach(hb=>{const v=row[hb],act=activeMap[p+'-'+hb];h+=`<td class="${act?'hi':''}">${v!==null&&v!==undefined?v.toFixed(1):'—'}</td>`;});
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div></div></div>`;
+  document.getElementById('resultsArea').innerHTML=h;
+}
+
+function sw(name,e){
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab_'+name).classList.add('active');
+  if(e)e.target.classList.add('active');
+}
+
+let _lastResults = [];
+
+function exportExcel() {
+  if (!_lastResults.length) { alert('Please calculate first!'); return; }
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Summary
+  const summaryData = [
+    ['Door Type','Profile','Cut Size (mm)','Frame W','Frame H','Qty',
+     'Frame Cost (RM)','Hardware (RM)','Labour (RM)','Rejection+OH (RM)',
+     'Total Cost/door (RM)','Selling Price (RM)','Profit/door (RM)','Margin %',
+     'Total Revenue (RM)','Total Cost (RM)','Total Profit (RM)']
+  ];
+  _lastResults.forEach(r => {
+    summaryData.push([
+      r.dtype||'', r.prof, r.cs, r.fw, r.fh, r.qty,
+      +r.metalCost.toFixed(2), +r.hw.toFixed(2), +r.lab.toFixed(2),
+      +(r.rej+r.adm+r.ohd).toFixed(2),
+      +r.total.toFixed(2), +r.sell.toFixed(2),
+      +r.profit.toFixed(2), +r.pct.toFixed(2),
+      +r.tR.toFixed(2), +r.tC.toFixed(2), +r.tP.toFixed(2)
+    ]);
+  });
+  // Totals row
+  const tQ=_lastResults.reduce((s,r)=>s+r.qty,0);
+  const tR=_lastResults.reduce((s,r)=>s+r.tR,0);
+  const tC=_lastResults.reduce((s,r)=>s+r.tC,0);
+  const tP=_lastResults.reduce((s,r)=>s+r.tP,0);
+  summaryData.push(['TOTAL','','','','',tQ,'','','','','','','',(tR>0?(tP/tR)*100:0).toFixed(2),+tR.toFixed(2),+tC.toFixed(2),+tP.toFixed(2)]);
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws1['!cols'] = [{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:6},
+                  {wch:14},{wch:12},{wch:12},{wch:14},{wch:16},{wch:16},{wch:14},{wch:10},{wch:14},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  // Sheet 2: Cut Plan
+  const cutData = [
+    ['Door Type','Profile','Cut Size','Frame W','Frame H','Effective (mm)',
+     'TOP Sheet','TOP pcsW','TOP pcsH','TOP pcs/sheet','TOP util%','TOP sheet RM','TOP cost/pc',
+     'LR Sheet','LR pcsW','LR pcsH','LR pcs/sheet','LR util%','LR sheet RM','LR cost/pc',
+     'Frame Cost (RM)']
+  ];
+  _lastResults.forEach(r => {
+    const top=r.cut.topBest, lr=r.cut.lrBest;
+    cutData.push([
+      r.dtype||'', r.prof, r.cs, r.fw, r.fh, r.cut.effective,
+      top ? `${top.sw}x${top.sh}` : '', top?top.pcsW:'', top?top.pcsH:'', top?top.pcsPerSheet:'',
+      top ? +(top.eff*100).toFixed(1) : '', top ? +top.sheetRM.toFixed(2) : '', top ? +top.costPerPiece.toFixed(2) : '',
+      lr  ? `${lr.sw}x${lr.sh}`  : '', lr?lr.pcsW:'',  lr?lr.pcsH:'',  lr?lr.pcsPerSheet:'',
+      lr  ? +(lr.eff*100).toFixed(1)  : '', lr  ? +lr.sheetRM.toFixed(2)  : '', lr  ? +lr.costPerPiece.toFixed(2)  : '',
+      +r.metalCost.toFixed(2)
+    ]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(cutData);
+  ws2['!cols'] = Array(21).fill({wch:14});
+  XLSX.utils.book_append_sheet(wb, ws2, 'Cut Plan');
+
+  // Sheet 3: Cost Breakdown
+  const bdData = [
+    ['Door Type','Profile','Qty','Metal','Hardware','Labour','Transport',
+     'Frame Cost','Rejection','Admin','Overhead','Total Cost','Sell','Profit','Margin%']
+  ];
+  _lastResults.forEach(r => {
+    bdData.push([
+      r.dtype||'', r.prof, r.qty,
+      +r.metalCost.toFixed(2), +r.hw.toFixed(2), +r.lab.toFixed(2), +r.hwTr.toFixed(2),
+      +r.frame.toFixed(2), +r.rej.toFixed(2), +r.adm.toFixed(2), +r.ohd.toFixed(2),
+      +r.total.toFixed(2), +r.sell.toFixed(2), +r.profit.toFixed(2), +r.pct.toFixed(2)
+    ]);
+  });
+  const ws3 = XLSX.utils.aoa_to_sheet(bdData);
+  ws3['!cols'] = Array(15).fill({wch:13});
+  XLSX.utils.book_append_sheet(wb, ws3, 'Cost Breakdown');
+
+  const profiles = loadProfiles();
+  const activeId = getActiveId();
+  const pname = (profiles[activeId] ? profiles[activeId].name : 'Export').replace(/[^a-zA-Z0-9]/g,'_');
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, 'MFCC_'+pname+'_'+date+'.xlsx');
+}
+
+// ─── PROFILE SYSTEM ──────────────────────────────────────────────────────────
+const STORE_KEY = 'mfcc_profiles';
+const ACTIVE_KEY = 'mfcc_active';
+
+function getSettings() {
+  return {
+    matType:  gs('matType'),
+    matThick: gs('matThick'),
+    matPrice: gs('matPrice'),
+    kerf:     gs('kerf'),
+    hw_hinge: gs('hw_hinge'), hw_striker: gs('hw_striker'),
+    hw_spreader: gs('hw_spreader'), hw_wire: gs('hw_wire'),
+    hw_strap: gs('hw_strap'), hw_morter: gs('hw_morter'),
+    hw_transport: gs('hw_transport'),
+    pct_r: gs('pct_r'), pct_a: gs('pct_a'), pct_o: gs('pct_o')
+  };
+}
+
+function getDoors() {
+  const doors = [];
+  document.querySelectorAll('.dr').forEach(row => {
+    const n = row.id.replace('door_','');
+    doors.push({
+      dtype:   gs('d'+n+'_dtype'),
+      profile: gs('d'+n+'_profile'),
+      hinges:  gs('d'+n+'_hinges'),
+      cs:      gs('d'+n+'_cs'),
+      fw:      gs('d'+n+'_fw'),
+      fh:      gs('d'+n+'_fh'),
+      qty:     gs('d'+n+'_qty'),
+      lab:     gs('d'+n+'_lab'),
+      sell:    gs('d'+n+'_sell')
+    });
+  });
+  return doors;
+}
+
+function applySettings(s) {
+  if (!s) return;
+  const ids = ['matType','matThick','matPrice','kerf',
+    'hw_hinge','hw_striker','hw_spreader','hw_wire','hw_strap','hw_morter','hw_transport',
+    'pct_r','pct_a','pct_o'];
+  ids.forEach(id => { if (s[id]!==undefined) document.getElementById(id).value = s[id]; });
+}
+
+function applyDoors(doors) {
+  if (!doors || !doors.length) return;
+  document.getElementById('doorRows').innerHTML = '';
+  dc = 0;
+  doors.forEach(d => addDoorRow({
+    dtype: d.dtype, profile: d.profile,
+    cs: d.cs, fw: d.fw, fh: d.fh,
+    qty: d.qty, sell: d.sell
+  }));
+  // restore hinges & labour after rows created
+  const rows = document.querySelectorAll('.dr');
+  rows.forEach((row, i) => {
+    const n = row.id.replace('door_','');
+    const d = doors[i];
+    if (!d) return;
+    document.getElementById('d'+n+'_hinges').value = d.hinges;
+    document.getElementById('d'+n+'_lab').value    = d.lab;
+  });
+}
+
+// ── Profile helpers ──────────────────────────────────────────────────────────
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveProfiles(profiles) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(profiles)); } catch(e) {}
+}
+function getActiveId() {
+  return localStorage.getItem(ACTIVE_KEY) || null;
+}
+function setActiveId(id) {
+  localStorage.setItem(ACTIVE_KEY, id);
+}
+
+function autoSave() {
+  const id = getActiveId();
+  if (!id) return;
+  const profiles = loadProfiles();
+  if (!profiles[id]) return;
+  profiles[id].settings = getSettings();
+  profiles[id].doors    = getDoors();
+  profiles[id].updated  = new Date().toISOString();
+  saveProfiles(profiles);
+  const tag = document.getElementById('autosave_tag');
+  if (tag) { tag.textContent = 'Saved'; setTimeout(()=>{ tag.textContent=''; }, 1500); }
+}
+
+function defaultSettings() {
+  return {
+    matType:'Aluzinc', matThick:'1.0', matPrice:'3500', kerf:'2',
+    hw_hinge:'4.00', hw_striker:'0.00', hw_spreader:'2.00',
+    hw_wire:'1.00', hw_strap:'1.20', hw_morter:'0.50', hw_transport:'3.30',
+    pct_r:'2', pct_a:'11', pct_o:'12'
+  };
+}
+
+function newProfile(name) {
+  autoSave();
+  const profiles = loadProfiles();
+  const id = 'p_' + Date.now();
+  const pname = name || ('Profile ' + (Object.keys(profiles).length + 1));
+  profiles[id] = {
+    id, name: pname,
+    settings: defaultSettings(),
+    doors: [],
+    created: new Date().toISOString(),
+    updated: new Date().toISOString()
+  };
+  saveProfiles(profiles);
+  setActiveId(id);
+  applySettings(defaultSettings());
+  document.getElementById('doorRows').innerHTML = '';
+  dc = 0;
+  addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
+  document.getElementById('resultsArea').innerHTML = '<div class="rempty"><span style="font-size:32px;">⚡</span><span>Fill in door specs and click Calculate</span></div>';
+  renderSidebar();
+  showTag('New profile created');
+}
+
+function switchProfile(id) {
+  autoSave(); // save current before switching
+  const profiles = loadProfiles();
+  const p = profiles[id];
+  if (!p) return;
+  setActiveId(id);
+  applySettings(p.settings || {});
+  applyDoors(p.doors || []);
+  if (!p.doors || !p.doors.length) addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
+  renderSidebar();
+  document.getElementById('resultsArea').innerHTML = '<div class="rempty"><span style="font-size:32px;">⚡</span><span>Fill in door specs and click Calculate</span></div>';
+}
+
+function deleteProfile(id, e) {
+  e.stopPropagation();
+  const profiles = loadProfiles();
+  const name = profiles[id] ? profiles[id].name : 'this profile';
+  if (!confirm('Delete "' + name + '"?')) return;
+  delete profiles[id];
+  saveProfiles(profiles);
+  const keys = Object.keys(profiles);
+  if (getActiveId() === id) {
+    if (keys.length > 0) {
+      setActiveId(keys[keys.length-1]);
+      switchProfile(keys[keys.length-1]);
+    } else {
+      localStorage.removeItem(ACTIVE_KEY);
+      newProfile('Profile 1');
+    }
+  }
+  renderSidebar();
+}
+
+function startRename(id, e) {
+  e.stopPropagation();
+  const item = document.querySelector('[data-id="'+id+'"]');
+  if (!item) return;
+  const nameEl = item.querySelector('.sb-item-name');
+  const profiles = loadProfiles();
+  const cur = profiles[id] ? profiles[id].name : '';
+  const input = document.createElement('input');
+  input.className = 'sb-rename-input';
+  input.value = cur;
+  nameEl.replaceWith(input);
+  input.focus(); input.select();
+  const finish = () => {
+    const val = input.value.trim() || cur;
+    const p2 = loadProfiles();
+    if (p2[id]) { p2[id].name = val; saveProfiles(p2); }
+    renderSidebar();
+  };
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', ev => { if(ev.key==='Enter') input.blur(); if(ev.key==='Escape'){ input.value=cur; input.blur(); }});
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return (d.getMonth()+1)+'/'+ d.getDate() + ' ' + d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+function renderSidebar() {
+  const profiles = loadProfiles();
+  const activeId = getActiveId();
+  const list = document.getElementById('sbList');
+  if (!list) return;
+  const keys = Object.keys(profiles).sort((a,b) => (profiles[a].updated||'') < (profiles[b].updated||'') ? 1 : -1);
+  if (keys.length === 0) {
+    list.innerHTML = '<div style="padding:12px 14px;font-size:11px;color:var(--text3);">No profiles yet</div>';
+    return;
+  }
+  list.innerHTML = '';
+  keys.forEach(function(id) {
+    const p = profiles[id];
+    const isActive = id === activeId;
+    const div = document.createElement('div');
+    div.className = 'sb-item' + (isActive ? ' active' : '');
+    div.setAttribute('data-id', id);
+    div.innerHTML = '<div style="flex:1;min-width:0;">'
+      + '<div class="sb-item-name">' + p.name + '</div>'
+      + '<div class="sb-item-date">' + fmtDate(p.updated) + '</div>'
+      + '</div>'
+      + '<button class="sb-del" title="Delete">✕</button>';
+    div.addEventListener('click', function() { switchProfile(id); });
+    div.addEventListener('dblclick', function(e) { startRename(id, e); });
+    div.querySelector('.sb-del').addEventListener('click', function(e) { deleteProfile(id, e); });
+    list.appendChild(div);
+  });
+}
+
+function showTag(msg) {
+  const tag = document.getElementById('autosave_tag');
+  if (tag) { tag.textContent = msg; setTimeout(()=>{ tag.textContent=''; }, 2000); }
+}
+
+// Hook auto-save to all inputs
+document.addEventListener('input',  () => setTimeout(autoSave, 500));
+document.addEventListener('change', () => setTimeout(autoSave, 500));
+
+// ── Export JSON ───────────────────────────────────────────────────────────────
+function exportJSON() {
+  const data = { settings: getSettings(), doors: getDoors(), saved: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'MFCC_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+}
+
+// ── Import JSON ───────────────────────────────────────────────────────────────
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.settings) applySettings(data.settings);
+        if (data.doors)    applyDoors(data.doors);
+        autoSave();
+        alert('Data loaded successfully!');
+      } catch(err) {
+        alert('Invalid file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function(){
+  const profiles = loadProfiles();
+  const keys = Object.keys(profiles);
+  renderSidebar();
+  if (keys.length === 0) {
+    newProfile('Profile 1');
+  } else {
+    const activeId = getActiveId() || keys[keys.length-1];
+    setActiveId(activeId);
+    const p = profiles[activeId];
+    if (p) {
+      applySettings(p.settings || {});
+      applyDoors(p.doors || []);
+      if (!p.doors || !p.doors.length) addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
+    }
+    renderSidebar();
+  }
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</div></div>
+</body>
+</html>
