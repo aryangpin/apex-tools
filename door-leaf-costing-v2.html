@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Door Leaf Costing v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --s1: #161b22;
+  --s2: #1c2128;
+  --s3: #21262d;
+  --b1: #30363d;
+  --b2: #3d444d;
+  --green: #2ea043;
+  --green2: #3fb950;
+  --blue: #58a6ff;
+  --orange: #f0883e;
+  --red: #f85149;
+  --yellow: #d29922;
+  --purple: #bc8cff;
+  --t1: #e6edf3;
+  --t2: #8b949e;
+  --t3: #6e7681;
+  --mono: 'Space Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--t1);font-family:var(--sans);font-size:13px;min-height:100vh;}
+
+/* HEADER */
+.hdr{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200;}
+.hdr-logo{width:30px;height:30px;background:linear-gradient(135deg,var(--green),var(--blue));border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;flex-shrink:0;}
+.hdr-title{font-size:14px;font-weight:600;}
+.hdr-badge{font-size:10px;font-family:var(--mono);color:var(--t3);background:var(--s3);border:1px solid var(--b1);border-radius:4px;padding:2px 7px;}
+.hdr-sep{flex:1;}
+.hdr-actions{display:flex;gap:6px;}
+
+/* BUTTONS */
+.btn{padding:5px 12px;border-radius:6px;border:1px solid var(--b2);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap;}
+.btn-ghost{background:transparent;color:var(--t2);}
+.btn-ghost:hover{background:var(--s3);color:var(--t1);}
+.btn-green{background:var(--green);border-color:var(--green);color:#fff;}
+.btn-green:hover{background:var(--green2);}
+.btn-blue{background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);}
+.btn-blue:hover{background:rgba(88,166,255,.25);}
+.btn-orange{background:var(--orange);border-color:var(--orange);color:#0d1117;}
+.btn-orange:hover{opacity:.9;}
+.btn-red{background:rgba(248,81,73,.15);border-color:rgba(248,81,73,.4);color:var(--red);}
+.btn-red:hover{background:rgba(248,81,73,.25);}
+.btn-sm{padding:3px 8px;font-size:11px;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 52px);}
+
+/* SIDEBAR */
+.sidebar{background:var(--s1);border-right:1px solid var(--b1);overflow-y:auto;display:flex;flex-direction:column;}
+.sb-sec{padding:14px 16px;border-bottom:1px solid var(--b1);}
+.sb-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-bottom:10px;}
+.field{margin-bottom:8px;}
+.field label{display:block;font-size:11px;color:var(--t2);margin-bottom:3px;}
+.field input{width:100%;padding:6px 9px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;color:var(--t1);font-family:var(--sans);font-size:12px;}
+.field input:focus{outline:none;border-color:var(--blue);}
+
+/* DOOR TYPES */
+.door-list{display:flex;flex-direction:column;gap:6px;}
+.door-row{display:grid;grid-template-columns:1fr 80px 28px;gap:5px;align-items:center;}
+.door-name{padding:5px 8px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;color:var(--blue);font-family:var(--mono);font-size:11px;font-weight:700;width:100%;}
+.door-name:focus{outline:none;border-color:var(--blue);}
+.door-qty{padding:5px 8px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;color:var(--t1);font-family:var(--mono);font-size:12px;text-align:center;width:100%;}
+.door-qty:focus{outline:none;border-color:var(--blue);}
+.door-del{background:none;border:1px solid transparent;border-radius:4px;color:var(--t3);cursor:pointer;font-size:12px;padding:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;}
+.door-del:hover{border-color:var(--red);color:var(--red);}
+.door-add-row{display:flex;gap:6px;margin-top:8px;}
+
+/* COST PARAMS */
+.param-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.param-row label{font-size:11px;color:var(--t2);flex:1;}
+.param-input{width:72px;padding:4px 7px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;color:var(--t1);font-family:var(--mono);font-size:12px;text-align:right;}
+.param-input:focus{outline:none;border-color:var(--blue);}
+.param-unit{font-size:10px;color:var(--t3);width:22px;}
+
+/* PRICE LIST IMPORT */
+.drop-zone{border:1px dashed var(--b2);border-radius:6px;padding:14px;text-align:center;cursor:pointer;transition:all .15s;color:var(--t3);font-size:11px;}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);color:var(--blue);background:rgba(88,166,255,.05);}
+.drop-zone.loaded{border-color:var(--green);color:var(--green);background:rgba(46,160,67,.05);}
+.pl-stat{margin-top:8px;font-size:10px;color:var(--t3);text-align:center;line-height:1.6;}
+
+/* SUMMARY */
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.sum-card{background:var(--bg);border:1px solid var(--b1);border-radius:5px;padding:8px 10px;}
+.sum-card-lbl{font-size:9px;color:var(--t3);margin-bottom:3px;}
+.sum-card-val{font-family:var(--mono);font-size:13px;font-weight:700;}
+.sum-total{margin-top:10px;padding-top:10px;border-top:1px solid var(--b1);}
+.sum-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.sum-total-row span:first-child{font-size:11px;color:var(--t3);}
+.sum-total-row span:last-child{font-family:var(--mono);font-size:13px;font-weight:700;}
+
+/* MAIN */
+.main{display:flex;flex-direction:column;overflow:hidden;}
+
+/* TABS */
+.tabs{background:var(--s1);border-bottom:1px solid var(--b1);display:flex;padding:0 16px;gap:2px;}
+.tab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab:hover{color:var(--t1);}
+.tab.active{color:var(--blue);border-color:var(--blue);}
+
+/* TAB PANELS */
+.panel{flex:1;overflow:hidden;display:none;flex-direction:column;}
+.panel.active{display:flex;}
+
+/* TOOLBAR */
+.tbar{padding:8px 14px;background:var(--s1);border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.search-box{position:relative;flex:1;max-width:260px;}
+.search-box input{width:100%;padding:5px 9px 5px 26px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;color:var(--t1);font-size:12px;}
+.search-box input:focus{outline:none;border-color:var(--blue);}
+.search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:11px;pointer-events:none;}
+.tbar-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.chip{padding:2px 8px;border-radius:10px;font-size:10px;font-family:var(--mono);background:var(--s3);color:var(--t2);border:1px solid var(--b1);}
+.chip.green{background:rgba(46,160,67,.15);color:var(--green);border-color:rgba(46,160,67,.3);}
+.chip.orange{background:rgba(240,136,62,.15);color:var(--orange);border-color:rgba(240,136,62,.3);}
+.chip.red{background:rgba(248,81,73,.15);color:var(--red);border-color:rgba(248,81,73,.3);}
+
+/* TABLE */
+.tbl-wrap{flex:1;overflow:auto;}
+table{width:100%;border-collapse:collapse;}
+thead{position:sticky;top:0;z-index:10;}
+thead tr{background:var(--s2);}
+th{padding:7px 10px;text-align:left;font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--b1);white-space:nowrap;}
+th.r{text-align:right;}
+th.c{text-align:center;}
+tbody tr{border-bottom:1px solid var(--b1);transition:background .1s;}
+tbody tr:hover{background:var(--s2);}
+td{padding:5px 10px;vertical-align:middle;}
+td.r{text-align:right;font-family:var(--mono);font-size:12px;}
+td.c{text-align:center;}
+td.mono{font-family:var(--mono);}
+
+/* EDITABLE CELLS */
+.cell-edit{
+  padding:4px 7px;background:transparent;border:1px solid transparent;
+  border-radius:4px;color:var(--t1);font-family:var(--sans);font-size:12px;
+  width:100%;transition:all .15s;
+}
+.cell-edit:hover{border-color:var(--b2);}
+.cell-edit:focus{outline:none;border-color:var(--blue);background:var(--s2);}
+.cell-edit.mono{font-family:var(--mono);}
+.cell-edit.r{text-align:right;}
+
+/* QTY INPUTS per door */
+.qty-cell{padding:4px 6px;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--t1);font-family:var(--mono);font-size:12px;width:70px;text-align:center;transition:all .15s;}
+.qty-cell:hover{border-color:var(--b2);}
+.qty-cell:focus{outline:none;border-color:var(--blue);background:var(--s2);}
+.qty-cell.filled{border-color:rgba(88,166,255,.25);background:rgba(88,166,255,.05);}
+
+/* STATUS INDICATORS */
+.match-ok{color:var(--green);font-size:10px;}
+.match-warn{color:var(--yellow);font-size:10px;}
+.match-none{color:var(--red);font-size:10px;}
+.total-qty-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--orange);}
+.total-qty-zero{color:var(--t3);font-weight:400;}
+
+/* ROW DRAG HANDLE */
+.drag-handle{color:var(--t3);cursor:grab;font-size:11px;padding:0 4px;user-select:none;}
+.drag-handle:active{cursor:grabbing;}
+
+/* DELETE ROW BTN */
+.del-row{opacity:0;background:none;border:1px solid transparent;border-radius:4px;color:var(--red);cursor:pointer;font-size:11px;padding:3px 6px;transition:all .15s;}
+tbody tr:hover .del-row{opacity:1;}
+.del-row:hover{background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);}
+
+/* ADD ROW */
+.add-row-tr td{padding:8px 14px !important;background:var(--s1) !important;}
+.add-row-tr:hover{background:var(--s1) !important;}
+.add-row-btn{background:none;border:1px dashed var(--b2);border-radius:5px;padding:5px 14px;color:var(--t3);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;}
+.add-row-btn:hover{border-color:var(--blue);color:var(--blue);}
+
+/* SELLING PRICE INPUT in table */
+.sp-input{padding:4px 6px;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--t1);font-family:var(--mono);font-size:12px;width:80px;text-align:right;transition:all .15s;}
+.sp-input:hover{border-color:var(--b2);}
+.sp-input:focus{outline:none;border-color:var(--green);background:var(--s2);}
+
+/* PROFIT DISPLAY */
+.profit-pos{color:var(--green);font-family:var(--mono);font-size:11px;}
+.profit-neg{color:var(--red);font-family:var(--mono);font-size:11px;}
+.profit-none{color:var(--t3);font-size:11px;}
+
+/* PURCHASE TAB */
+.purchase-grid{padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;}
+.pur-card{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.pur-info{flex:1;min-width:0;}
+.pur-code{font-family:var(--mono);font-size:9px;color:var(--t3);margin-bottom:2px;}
+.pur-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pur-right{text-align:right;flex-shrink:0;}
+.pur-qty{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--orange);}
+.pur-unit{font-size:9px;color:var(--t3);}
+.pur-cost{font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:2px;}
+
+/* COST BREAKDOWN TAB */
+.cost-cards{padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+.cost-card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;overflow:hidden;}
+.cost-card-head{background:var(--s2);padding:10px 12px;border-bottom:1px solid var(--b1);}
+.cost-card-door{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);}
+.cost-card-qty{font-size:10px;color:var(--t3);}
+.cost-card-body{padding:10px 12px;}
+.cc-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;}
+.cc-row span:first-child{color:var(--t2);}
+.cc-row span:last-child{font-family:var(--mono);}
+.cc-divider{border-top:1px solid var(--b1);margin:6px 0;}
+.cc-total{font-weight:700;font-size:13px;}
+.cc-sp{margin-top:8px;}
+.cc-sp label{font-size:10px;color:var(--t3);display:block;margin-bottom:3px;}
+.cc-sp-input{width:100%;padding:5px 8px;background:var(--bg);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-family:var(--mono);font-size:13px;text-align:right;}
+.cc-sp-input:focus{outline:none;border-color:var(--green);}
+.cc-profit{margin-top:6px;padding:6px 8px;border-radius:4px;font-family:var(--mono);font-size:12px;text-align:center;}
+.cc-profit.pos{background:rgba(46,160,67,.15);color:var(--green);}
+.cc-profit.neg{background:rgba(248,81,73,.15);color:var(--red);}
+.cc-profit.none{background:var(--s3);color:var(--t3);font-size:11px;}
+
+/* EMPTY STATE */
+.empty{padding:60px 20px;text-align:center;color:var(--t3);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+.empty-text{font-size:13px;margin-bottom:14px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--t1);transform:translateY(60px);opacity:0;transition:all .3s;z-index:999;max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity .2s;}
+.overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:22px;width:460px;max-width:95vw;max-height:80vh;overflow-y:auto;}
+.modal-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.modal-body{color:var(--t2);font-size:12px;line-height:1.7;}
+.modal-body code{background:var(--bg);padding:1px 5px;border-radius:3px;font-family:var(--mono);color:var(--blue);}
+.modal-foot{margin-top:18px;display:flex;gap:8px;justify-content:flex-end;}
+
+/* PRINT */
+@media print{
+  .hdr-actions,.sidebar,.tabs,.tbar,.del-row,.drag-handle,.add-row-tr{display:none!important;}
+  .layout{display:block;}
+  .main{height:auto;overflow:visible;}
+  .panel{display:block!important;height:auto;overflow:visible;}
+  .tbl-wrap{overflow:visible;}
+  body{background:#fff;color:#000;font-size:11px;}
+  table{page-break-inside:auto;}
+  thead{display:table-header-group;}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-logo">DL</div>
+  <div class="hdr-title">Door Leaf Costing</div>
+  <div class="hdr-badge" id="projBadge">未设置项目</div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-actions">
+    <button class="btn btn-ghost btn-sm" onclick="openModal('helpModal')">📋 导入说明</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑 清空</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 打印</button>
+    <button class="btn btn-orange btn-sm" onclick="exportExcel()">📊 Excel</button>
+    <button class="btn btn-green btn-sm" onclick="saveProject()">💾 保存</button>
+  </div>
+</div>
+
+<div class="layout">
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar">
+
+  <!-- Project -->
+  <div class="sb-sec">
+    <div class="sb-lbl">项目资料</div>
+    <div class="field"><label>Company</label><input id="iCompany" placeholder="ANEKA SOLUSI" oninput="updateBadge()"></div>
+    <div class="field"><label>SO / Project No.</label><input id="iSO" placeholder="SO-002036" oninput="updateBadge()"></div>
+    <div class="field"><label>Location / Project</label><input id="iLoc" placeholder="LOT 8631, KLANG" oninput="updateBadge()"></div>
+    <div class="field"><label>Date</label><input id="iDate" type="date"></div>
+  </div>
+
+  <!-- Door Types -->
+  <div class="sb-sec">
+    <div class="sb-lbl">门型 &amp; 数量</div>
+    <div class="door-list" id="doorList"></div>
+    <div class="door-add-row">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="addDoor()">＋ 加门型</button>
+      <button class="btn btn-ghost btn-sm" onclick="removeDoor()">－</button>
+    </div>
+  </div>
+
+  <!-- Cost Params -->
+  <div class="sb-sec">
+    <div class="sb-lbl">成本参数</div>
+    <div class="param-row"><label>Labour Cost</label><input class="param-input" id="pLabour" type="number" value="2" step="0.01" oninput="recalc()"><span class="param-unit">RM</span></div>
+    <div class="param-row"><label>Transport Fee</label><input class="param-input" id="pTransport" type="number" value="2" step="0.01" oninput="recalc()"><span class="param-unit">RM</span></div>
+    <div class="param-row"><label>Rejection</label><input class="param-input" id="pRejection" type="number" value="2" step="0.1" oninput="recalc()"><span class="param-unit">%</span></div>
+    <div class="param-row"><label>Admin Cost</label><input class="param-input" id="pAdmin" type="number" value="5" step="0.1" oninput="recalc()"><span class="param-unit">%</span></div>
+    <div class="param-row"><label>Overhead</label><input class="param-input" id="pOverhead" type="number" value="10" step="0.1" oninput="recalc()"><span class="param-unit">%</span></div>
+  </div>
+
+  <!-- Price List -->
+  <div class="sb-sec">
+    <div class="sb-lbl">材料单价库</div>
+    <div class="drop-zone" id="dropZone"
+      onclick="document.getElementById('fileIn').click()"
+      ondragover="ev.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="onDrop(event)">
+      <div style="font-size:22px;margin-bottom:5px">📂</div>
+      <div>点击或拖拽导入</div>
+      <div style="font-size:10px;margin-top:2px;color:var(--t3)">CSV · XLSX · XLS</div>
+    </div>
+    <input type="file" id="fileIn" accept=".csv,.xlsx,.xls" style="display:none" onchange="onFileInput(event)">
+    <div class="pl-stat" id="plStat">未导入 — 可手动填单价</div>
+    <div style="margin-top:8px;display:flex;gap:6px;">
+      <button class="btn btn-ghost btn-sm" style="flex:1;font-size:10px;" onclick="openModal('helpModal')">查看格式要求</button>
+      <button class="btn btn-blue btn-sm" style="font-size:10px;" onclick="rematchAll()">🔄 重新匹配</button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="sb-sec" style="flex:1">
+    <div class="sb-lbl">成本摘要</div>
+    <div class="sum-grid" id="sumGrid"></div>
+    <div class="sum-total" id="sumTotal"></div>
+  </div>
+
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('bom')">📋 BOM 用量表</div>
+    <div class="tab" onclick="switchTab('cost')">💰 成本明细</div>
+    <div class="tab" onclick="switchTab('purchase')">📦 采购清单</div>
+  </div>
+
+  <!-- BOM TAB -->
+  <div class="panel active" id="tab-bom">
+    <div class="tbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input id="searchIn" placeholder="搜索材料..." oninput="filterRows()">
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="addRowManual()">＋ 手动添加</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearQty()">清空用量</button>
+      <div class="tbar-right">
+        <span class="chip" id="chipTotal">0 种</span>
+        <span class="chip green" id="chipUsed">0 已用</span>
+        <span class="chip red" id="chipUnmatched" style="display:none">0 未匹配</span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="bomTable">
+        <thead><tr id="bomHead"></tr></thead>
+        <tbody id="bomBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- COST TAB -->
+  <div class="panel" id="tab-cost">
+    <div class="cost-cards" id="costCards"></div>
+  </div>
+
+  <!-- PURCHASE TAB -->
+  <div class="panel" id="tab-purchase">
+    <div class="tbar">
+      <span style="font-size:12px;color:var(--t2)">仅显示有用量的材料</span>
+      <div class="tbar-right">
+        <span class="chip orange" id="chipPurchase">0 种需采购</span>
+      </div>
+    </div>
+    <div class="purchase-grid" id="purchaseGrid"></div>
+  </div>
+</div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="overlay" id="helpModal">
+  <div class="modal">
+    <div class="modal-title">📋 Price List 导入格式</div>
+    <div class="modal-body">
+      <p>系统自动识别列名，支持 CSV 和 Excel。</p><br>
+      <p><strong>必须包含（任意一个）：</strong></p>
+      <p>• 材料名：<code>Drawing Code</code> / <code>Material</code> / <code>Description</code> / <code>Name</code></p>
+      <p>• 单价：<code>Cost</code> / <code>Price</code> / <code>Unit Price</code></p><br>
+      <p><strong>可选列（有则自动带入）：</strong></p>
+      <p>• <code>Item Code</code> / <code>Code</code> — 料号</p>
+      <p>• <code>Unit</code> / <code>UOM</code> / <code>remark</code> — 单位</p><br>
+      <p style="color:var(--orange)">💡 直接从 Google Sheet Price List 导出 CSV 即可</p><br>
+      <p><strong>匹配逻辑：</strong></p>
+      <p>Paste 进 BOM 表的材料名称，系统自动与 Price List 的 Drawing Code 做模糊匹配，匹配成功自动填入 Item Code 和单价。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-green" onclick="closeModal('helpModal')">明白了</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let doors = [
+  {name:'D1', qty:14},
+  {name:'D2', qty:42},
+  {name:'D3', qty:28},
+  {name:'D4', qty:84},
+];
+let rows = []; // {id, name, itemCode, unit, unitPrice, matched, qty:{D1:0,...}, remark}
+let priceLib = []; // {drawingCode, itemCode, unit, cost, remark}
+let selling = {}; // {doorName: price}
+let filterQ = '';
+
+// ═══════════════════════════════════════
+// PRICE LIST AUTO-FETCH
+// ═══════════════════════════════════════
+const PRICE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ66npvLRGY9VZe3PlzlYNfWu4M9P67yNqzlbO9FkKWBf4pvXvg1mcx0z1oYCWDBCKkS2-pq6BEUaPj/pub?gid=1121903570&single=true&output=csv';
+
+async function autoFetchPriceList() {
+  const dz = document.getElementById('dropZone');
+  const stat = document.getElementById('plStat');
+  dz.innerHTML = `<div style="font-size:18px;margin-bottom:4px">⏳</div><div style="font-size:11px">自动载入 Price List...</div>`;
+  stat.textContent = '正在连接 Google Sheet...';
+
+  const proxies = [
+    u => u,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+
+  let csvText = null;
+  for (const makeUrl of proxies) {
+    try {
+      const r = await fetch(makeUrl(PRICE_CSV_URL));
+      if (r.ok) { csvText = await r.text(); break; }
+    } catch { /* try next */ }
+  }
+
+  if (csvText) {
+    try {
+      const parsed = parseCSV(csvText);
+      if (!parsed.length) throw new Error('空数据');
+      loadPriceLib(parsed, 'Google Sheet (自动)');
+      dz.innerHTML = `<div style="font-size:18px;margin-bottom:4px">✅</div><div style="font-size:11px">Price List 已自动载入</div><div style="font-size:10px;margin-top:2px;color:var(--green)">${priceLib.length} 种材料</div>`;
+      stat.textContent = `✅ 自动载入 ${priceLib.length} 种材料 · 来自 Google Sheet`;
+      return;
+    } catch(e) { /* fall through */ }
+  }
+
+  // All failed — show manual import option
+  dz.innerHTML = `<div style="font-size:18px;margin-bottom:4px">⚠️</div><div style="font-size:11px;color:var(--yellow)">自动载入失败</div><div style="font-size:10px;margin-top:3px;color:var(--t3)">点击手动导入 CSV</div>`;
+  stat.textContent = '请手动导入 Price List CSV 文件';
+  dz.onclick = () => document.getElementById('fileIn').click();
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('iDate').value = new Date().toISOString().slice(0,10);
+  renderDoors();
+  renderHead();
+  renderBody();
+  renderSummary();
+  renderCostCards();
+  renderPurchase();
+  loadSaved();
+  autoFetchPriceList();
+});
+
+// ═══════════════════════════════════════
+// DOORS
+// ═══════════════════════════════════════
+function renderDoors() {
+  document.getElementById('doorList').innerHTML = doors.map((d,i) => `
+    <div class="door-row">
+      <input class="door-name" value="${d.name}" onchange="renameDoor(${i},this.value)" placeholder="D${i+1}">
+      <input class="door-qty" type="number" min="0" value="${d.qty}" onchange="doors[${i}].qty=+this.value||0;renderHead();recalc()">
+      <button class="door-del" onclick="delDoor(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addDoor() {
+  const n = `D${doors.length+1}`;
+  doors.push({name:n, qty:0});
+  rows.forEach(r => r.qty[n]=0);
+  renderDoors(); renderHead(); renderBody(); renderSummary();
+}
+
+function removeDoor() {
+  if(doors.length<=1) return toast('至少保留一种门型');
+  const removed = doors.pop();
+  rows.forEach(r => delete r.qty[removed.name]);
+  delete selling[removed.name];
+  renderDoors(); renderHead(); renderBody(); renderSummary(); renderCostCards();
+}
+
+function delDoor(i) {
+  if(doors.length<=1) return toast('至少保留一种门型');
+  const removed = doors.splice(i,1)[0];
+  rows.forEach(r => delete r.qty[removed.name]);
+  delete selling[removed.name];
+  renderDoors(); renderHead(); renderBody(); renderSummary(); renderCostCards();
+}
+
+function renameDoor(i, val) {
+  const old = doors[i].name;
+  const nw = val.trim() || `D${i+1}`;
+  doors[i].name = nw;
+  rows.forEach(r => { r.qty[nw] = r.qty[old]||0; delete r.qty[old]; });
+  if(old in selling) { selling[nw] = selling[old]; delete selling[old]; }
+  renderHead(); renderBody(); renderSummary(); renderCostCards();
+}
+
+// ═══════════════════════════════════════
+// TABLE HEAD
+// ═══════════════════════════════════════
+function renderHead() {
+  document.getElementById('bomHead').innerHTML = `
+    <th style="width:22px"></th>
+    <th style="width:28px">#</th>
+    <th style="width:100px">Item Code</th>
+    <th style="min-width:200px">Material Name</th>
+    <th style="width:45px">Unit</th>
+    <th class="r" style="width:85px">Unit Price</th>
+    ${doors.map(d=>`<th class="c" style="width:75px">${d.name}<br><span style="font-size:8px;font-weight:400;color:var(--t3)">${d.qty} pcs</span></th>`).join('')}
+    <th class="r" style="width:80px">Total Qty</th>
+    <th style="width:30px"></th>
+  `;
+}
+
+// ═══════════════════════════════════════
+// TABLE BODY
+// ═══════════════════════════════════════
+function renderBody() {
+  const tbody = document.getElementById('bomBody');
+  const list = filterQ
+    ? rows.filter(r => r.name.toLowerCase().includes(filterQ) || (r.itemCode||'').toLowerCase().includes(filterQ))
+    : rows;
+
+  if(rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${6+doors.length+2}" style="padding:50px;text-align:center;color:var(--t3)">
+      <div style="font-size:32px;margin-bottom:10px">🚪</div>
+      <div style="margin-bottom:12px">从 AutoCAD BOM 复制材料名称，直接 Paste 进任意一格「Material Name」</div>
+      <button class="btn btn-ghost" onclick="addRowManual()" style="margin:0 auto">＋ 手动添加第一行</button>
+    </td></tr>`;
+    updateChips();
+    return;
+  }
+
+  tbody.innerHTML = list.map((r,idx) => {
+    const tq = totalQty(r);
+    const matchIcon = r.matched === 'ok' ? '<span class="match-ok" title="已匹配">✓</span>'
+      : r.matched === 'partial' ? '<span class="match-warn" title="模糊匹配">≈</span>'
+      : r.unitPrice > 0 ? '<span class="match-ok" title="手动填写">✎</span>'
+      : '<span class="match-none" title="未匹配价格">!</span>';
+
+    return `<tr data-id="${r.id}">
+      <td><span class="drag-handle">⠿</span></td>
+      <td style="font-size:10px;color:var(--t3);font-family:var(--mono)">${idx+1}</td>
+      <td>
+        <input class="cell-edit mono" style="font-size:10px;color:var(--t3);width:95px"
+          value="${esc(r.itemCode)}" placeholder="—"
+          onchange="updateRow('${r.id}','itemCode',this.value)">
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:5px">
+          ${matchIcon}
+          <input class="cell-edit" style="flex:1"
+            value="${esc(r.name)}" placeholder="Paste 材料名称..."
+            onchange="updateName('${r.id}',this.value)"
+            onpaste="onPasteName(event,'${r.id}')">
+        </div>
+      </td>
+      <td><input class="cell-edit" style="width:42px;font-size:11px" value="${esc(r.unit)}" placeholder="pcs" onchange="updateRow('${r.id}','unit',this.value)"></td>
+      <td>
+        <input class="cell-edit r" style="width:78px" type="number" step="0.01" min="0"
+          value="${r.unitPrice||''}" placeholder="0.00"
+          onchange="updateRow('${r.id}','unitPrice',+this.value||0);recalc()">
+      </td>
+      ${doors.map(d=>`
+        <td class="c">
+          <input class="qty-cell ${(r.qty[d.name]||0)>0?'filled':''}" type="number" step="0.01" min="0"
+            value="${r.qty[d.name]||''}" placeholder="—"
+            onchange="updateQty('${r.id}','${d.name}',this.value)"
+            oninput="this.className='qty-cell'+(parseFloat(this.value)>0?' filled':'')">
+        </td>
+      `).join('')}
+      <td class="r">
+        <span class="${tq>0?'total-qty-val':'total-qty-zero'}">${tq>0?(tq%1===0?tq:tq.toFixed(2)):'—'}</span>
+      </td>
+      <td><button class="del-row" onclick="deleteRow('${r.id}')">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  // Add row button
+  tbody.innerHTML += `<tr class="add-row-tr"><td colspan="${6+doors.length+2}">
+    <button class="add-row-btn" onclick="addRowManual()">＋ 添加材料行</button>
+  </td></tr>`;
+
+  updateChips();
+}
+
+// ═══════════════════════════════════════
+// PASTE HANDLER — core feature
+// ═══════════════════════════════════════
+function onPasteName(event, rowId) {
+  const text = (event.clipboardData || window.clipboardData).getData('text');
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+
+  if(lines.length <= 1) {
+    // Single line — just update current row
+    setTimeout(() => {
+      updateName(rowId, lines[0] || '');
+    }, 0);
+    return;
+  }
+
+  // Multi-line paste — create new rows for each line
+  event.preventDefault();
+  const idx = rows.findIndex(r => r.id === rowId);
+  
+  // Update current row with first line
+  updateName(rowId, lines[0]);
+
+  // Insert remaining lines as new rows after current
+  lines.slice(1).forEach((name, i) => {
+    const newRow = makeRow(name);
+    rows.splice(idx + 1 + i, 0, newRow);
+  });
+
+  renderBody();
+  renderSummary();
+  toast(`✅ 已添加 ${lines.length} 行材料`);
+}
+
+// ═══════════════════════════════════════
+// ROW OPERATIONS
+// ═══════════════════════════════════════
+function makeRow(name='') {
+  const r = {
+    id: `r_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
+    name, itemCode:'', unit:'pcs', unitPrice:0,
+    matched: 'none', qty:{}, remark:''
+  };
+  doors.forEach(d => r.qty[d.name] = 0);
+  if(name) matchPrice(r);
+  return r;
+}
+
+function addRowManual() {
+  const r = makeRow('');
+  rows.push(r);
+  renderBody();
+  // Focus the name input of last row
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#bomBody .cell-edit');
+    const nameInputs = [...inputs].filter(el => el.placeholder === 'Paste 材料名称...');
+    if(nameInputs.length) nameInputs[nameInputs.length-1].focus();
+  }, 50);
+}
+
+function deleteRow(id) {
+  rows = rows.filter(r => r.id !== id);
+  renderBody(); renderSummary(); renderCostCards(); renderPurchase();
+}
+
+function updateRow(id, key, val) {
+  const r = rows.find(r => r.id === id);
+  if(r) { r[key] = val; recalc(); }
+}
+
+function updateName(id, val) {
+  const r = rows.find(r => r.id === id);
+  if(!r) return;
+  r.name = val.trim();
+  matchPrice(r);
+  renderBody(); renderSummary(); renderCostCards(); renderPurchase();
+}
+
+function updateQty(id, door, val) {
+  const r = rows.find(r => r.id === id);
+  if(r) { r.qty[door] = parseFloat(val)||0; recalc(); }
+}
+
+// ═══════════════════════════════════════
+// PRICE MATCHING
+// ═══════════════════════════════════════
+function matchPrice(row) {
+  if(!priceLib.length || !row.name) { row.matched='none'; return; }
+  
+  const q = row.name.toLowerCase().trim();
+
+  // 1. Exact match
+  let found = priceLib.find(p => p.drawingCode.toLowerCase().trim() === q);
+  if(found) { applyMatch(row, found, 'ok'); return; }
+
+  // 2. Contains match
+  found = priceLib.find(p => {
+    const pc = p.drawingCode.toLowerCase().trim();
+    return pc.includes(q) || q.includes(pc);
+  });
+  if(found) { applyMatch(row, found, 'partial'); return; }
+
+  // 3. Word-level match (≥60% words match)
+  const qWords = q.split(/\s+/);
+  let bestScore = 0, bestMatch = null;
+  priceLib.forEach(p => {
+    const pWords = p.drawingCode.toLowerCase().split(/\s+/);
+    const common = qWords.filter(w => pWords.some(pw => pw.includes(w) || w.includes(pw)));
+    const score = common.length / Math.max(qWords.length, pWords.length);
+    if(score > bestScore) { bestScore = score; bestMatch = p; }
+  });
+  if(bestScore >= 0.6) { applyMatch(row, bestMatch, 'partial'); return; }
+
+  row.matched = 'none';
+}
+
+function applyMatch(row, found, quality) {
+  if(!row.itemCode) row.itemCode = found.itemCode || '';
+  if(!row.unitPrice || row.matched !== 'ok') row.unitPrice = found.cost || 0;
+  if(!row.unit || row.unit === 'pcs') row.unit = found.unit || 'pcs';
+  row.matched = quality;
+}
+
+function rematchAll() {
+  rows.forEach(r => matchPrice(r));
+  renderBody(); renderSummary(); renderCostCards(); renderPurchase();
+  toast('🔄 已重新匹配所有材料');
+}
+
+// ═══════════════════════════════════════
+// CALCULATIONS
+// ═══════════════════════════════════════
+function totalQty(row) {
+  return doors.reduce((s,d) => s + (parseFloat(row.qty[d.name])||0) * (d.qty||0), 0);
+}
+
+function calcDoor(doorName) {
+  const labour = +document.getElementById('pLabour').value || 0;
+  const transport = +document.getElementById('pTransport').value || 0;
+  const rejPct = +document.getElementById('pRejection').value || 0;
+  const adminPct = +document.getElementById('pAdmin').value || 0;
+  const overPct = +document.getElementById('pOverhead').value || 0;
+
+  const matCost = rows.reduce((s,r) => s + (parseFloat(r.qty[doorName])||0) * (parseFloat(r.unitPrice)||0), 0);
+  const sub = matCost + labour + transport;
+  const rej = sub * rejPct / 100;
+  const admin = sub * adminPct / 100;
+  const over = sub * overPct / 100;
+  const total = sub + rej + admin + over;
+  const sp = parseFloat(selling[doorName]) || 0;
+  const profit = sp > 0 ? sp - total : null;
+  const profitPct = sp > 0 ? profit / sp * 100 : null;
+
+  return {matCost, labour, transport, sub, rej, admin, over, total, sp, profit, profitPct};
+}
+
+function recalc() {
+  renderBody();
+  renderSummary();
+  renderCostCards();
+  renderPurchase();
+}
+
+// ═══════════════════════════════════════
+// SUMMARY SIDEBAR
+// ═══════════════════════════════════════
+function renderSummary() {
+  const g = document.getElementById('sumGrid');
+  g.innerHTML = doors.map(d => {
+    const c = calcDoor(d.name);
+    return `<div class="sum-card">
+      <div class="sum-card-lbl">${d.name} / 扇</div>
+      <div class="sum-card-val" style="color:var(--orange)">RM ${c.total.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+
+  let totalCost = 0, totalProfit = 0, hasSP = false;
+  doors.forEach(d => {
+    const c = calcDoor(d.name);
+    totalCost += c.total * d.qty;
+    if(c.profit !== null) { totalProfit += c.profit * d.qty; hasSP = true; }
+  });
+
+  document.getElementById('sumTotal').innerHTML = `
+    <div class="sum-total-row">
+      <span>全项目成本</span>
+      <span style="color:var(--orange)">RM ${totalCost.toFixed(2)}</span>
+    </div>
+    ${hasSP ? `<div class="sum-total-row">
+      <span>总利润</span>
+      <span style="color:${totalProfit>=0?'var(--green)':'var(--red)'}">RM ${totalProfit.toFixed(2)}</span>
+    </div>` : ''}
+  `;
+}
+
+// ═══════════════════════════════════════
+// COST CARDS TAB
+// ═══════════════════════════════════════
+function renderCostCards() {
+  const el = document.getElementById('costCards');
+  if(!rows.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><div class="empty-text">先在 BOM 表添加材料</div></div>`;
+    return;
+  }
+  el.innerHTML = doors.map(d => {
+    const c = calcDoor(d.name);
+    const profitClass = c.profit === null ? 'none' : c.profit >= 0 ? 'pos' : 'neg';
+    const profitText = c.profit === null ? '填写报价后显示利润'
+      : `${c.profit>=0?'利润':'亏损'} RM ${Math.abs(c.profit).toFixed(2)} (${c.profitPct.toFixed(1)}%)`;
+    return `
+    <div class="cost-card">
+      <div class="cost-card-head">
+        <div class="cost-card-door">${d.name}</div>
+        <div class="cost-card-qty">${d.qty} 扇</div>
+      </div>
+      <div class="cost-card-body">
+        <div class="cc-row"><span>材料成本</span><span>RM ${c.matCost.toFixed(2)}</span></div>
+        <div class="cc-row"><span>Labour</span><span>RM ${c.labour.toFixed(2)}</span></div>
+        <div class="cc-row"><span>Transport</span><span>RM ${c.transport.toFixed(2)}</span></div>
+        <div class="cc-row" style="color:var(--t3)"><span>Rejection ${document.getElementById('pRejection').value}%</span><span>RM ${c.rej.toFixed(2)}</span></div>
+        <div class="cc-row" style="color:var(--t3)"><span>Admin ${document.getElementById('pAdmin').value}%</span><span>RM ${c.admin.toFixed(2)}</span></div>
+        <div class="cc-row" style="color:var(--t3)"><span>Overhead ${document.getElementById('pOverhead').value}%</span><span>RM ${c.over.toFixed(2)}</span></div>
+        <div class="cc-divider"></div>
+        <div class="cc-row cc-total"><span>Per Door Cost</span><span style="color:var(--orange)">RM ${c.total.toFixed(2)}</span></div>
+        <div class="cc-row" style="margin-top:2px"><span style="font-size:10px;color:var(--t3)">小计 (×${d.qty}扇)</span><span style="font-size:11px;color:var(--t2)">RM ${(c.total*d.qty).toFixed(2)}</span></div>
+        <div class="cc-sp">
+          <label>报价 (RM / 扇)</label>
+          <input class="cc-sp-input" type="number" step="0.01" min="0"
+            placeholder="输入报价..."
+            value="${selling[d.name]||''}"
+            oninput="selling['${d.name}']=this.value;renderSummary();renderCostCards()">
+        </div>
+        <div class="cc-profit ${profitClass}">${profitText}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// PURCHASE TAB
+// ═══════════════════════════════════════
+function renderPurchase() {
+  const grid = document.getElementById('purchaseGrid');
+  const active = rows.filter(r => totalQty(r) > 0);
+  document.getElementById('chipPurchase').textContent = `${active.length} 种需采购`;
+
+  if(!active.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📦</div><div class="empty-text">填写材料用量后，这里显示采购清单</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = active.map(r => {
+    const tq = totalQty(r);
+    const totalCost = tq * (parseFloat(r.unitPrice)||0);
+    return `<div class="pur-card">
+      <div class="pur-info">
+        <div class="pur-code">${r.itemCode||'—'}</div>
+        <div class="pur-name" title="${esc(r.name)}">${esc(r.name)}</div>
+      </div>
+      <div class="pur-right">
+        <div class="pur-qty">${tq%1===0?tq:tq.toFixed(2)}</div>
+        <div class="pur-unit">${r.unit||'pcs'}</div>
+        ${r.unitPrice>0?`<div class="pur-cost">RM ${totalCost.toFixed(2)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// CHIPS / COUNTERS
+// ═══════════════════════════════════════
+function updateChips() {
+  const used = rows.filter(r => doors.some(d => (r.qty[d.name]||0)>0));
+  const unmatched = rows.filter(r => r.name && r.matched==='none' && !r.unitPrice);
+  document.getElementById('chipTotal').textContent = `${rows.length} 种`;
+  document.getElementById('chipUsed').textContent = `${used.length} 已用`;
+  const uc = document.getElementById('chipUnmatched');
+  if(unmatched.length > 0) {
+    uc.style.display=''; uc.textContent=`${unmatched.length} 未匹配`;
+  } else { uc.style.display='none'; }
+}
+
+// ═══════════════════════════════════════
+// PRICE LIST IMPORT
+// ═══════════════════════════════════════
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f) processFile(f);
+}
+function onFileInput(e) {
+  const f = e.target.files[0];
+  if(f) processFile(f);
+  e.target.value='';
+}
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      let data;
+      if(ext==='csv') {
+        data = parseCSV(e.target.result);
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+      }
+      loadPriceLib(data, file.name);
+    } catch(err) { toast('❌ 导入失败：' + err.message); }
+  };
+  ext==='csv' ? reader.readAsText(file) : reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) return [];
+  const hdrs = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+    const obj={}; hdrs.forEach((h,i)=>obj[h]=vals[i]||''); return obj;
+  });
+}
+
+function loadPriceLib(data, filename) {
+  if(!data.length) return toast('❌ 文件没有数据');
+  const keys = Object.keys(data[0]);
+  const fk = (...cands) => keys.find(k => cands.some(c=>k.toLowerCase().replace(/\s/g,'').includes(c.toLowerCase().replace(/\s/g,''))));
+
+  const nameKey = fk('drawingcode','drawing','material','description','name');
+  const priceKey = fk('cost','price','unitprice');
+  const codeKey = fk('itemcode','item_code','code');
+  const unitKey = fk('unit','uom','remark');
+
+  if(!nameKey) return toast('❌ 找不到材料名称列');
+
+  priceLib = data
+    .map(row => ({
+      drawingCode: String(row[nameKey]||'').trim(),
+      itemCode: codeKey ? String(row[codeKey]||'').trim() : '',
+      cost: priceKey ? parseFloat(row[priceKey])||0 : 0,
+      unit: unitKey ? String(row[unitKey]||'pcs').trim() : 'pcs',
+    }))
+    .filter(p => p.drawingCode);
+
+  const dz = document.getElementById('dropZone');
+  dz.classList.add('loaded');
+  dz.innerHTML = `<div style="font-size:20px;margin-bottom:4px">✅</div><div style="font-size:11px">${filename}</div><div style="font-size:10px;margin-top:2px;color:var(--green)">${priceLib.length} 种材料</div>`;
+  document.getElementById('plStat').textContent = `已载入 ${priceLib.length} 种材料单价`;
+
+  // Re-match existing rows
+  rows.forEach(r => matchPrice(r));
+  renderBody(); renderSummary(); renderCostCards(); renderPurchase();
+  toast(`✅ 导入 ${priceLib.length} 种材料，已自动匹配`);
+}
+
+// ═══════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════
+function filterRows() {
+  filterQ = document.getElementById('searchIn').value.trim().toLowerCase();
+  renderBody();
+}
+
+// ═══════════════════════════════════════
+// EXPORT EXCEL
+// ═══════════════════════════════════════
+function exportExcel() {
+  if(!rows.length) return toast('没有数据');
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: BOM
+  const bomData = [
+    [`Door Leaf Costing — ${document.getElementById('iCompany').value} ${document.getElementById('iSO').value}`],
+    [`Project: ${document.getElementById('iLoc').value}  |  Date: ${document.getElementById('iDate').value}`],
+    [],
+    ['#','Item Code','Material','Unit','Unit Price (RM)', ...doors.map(d=>`${d.name} (${d.qty}pcs)`),'Total Qty','Total Cost (RM)'],
+  ];
+  rows.forEach((r,i) => {
+    const tq = totalQty(r);
+    bomData.push([
+      i+1, r.itemCode, r.name, r.unit, r.unitPrice||'',
+      ...doors.map(d => r.qty[d.name]||''),
+      tq>0?tq:'',
+      tq>0&&r.unitPrice ? (tq*r.unitPrice).toFixed(2) : '',
+    ]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(bomData);
+  ws1['!cols']=[{wch:4},{wch:16},{wch:35},{wch:7},{wch:13},...doors.map(()=>({wch:11})),{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'BOM');
+
+  // Sheet 2: Cost Breakdown
+  const costData = [['Cost Breakdown per Door'],[]];
+  costData.push(['',  ...doors.map(d=>d.name)]);
+  costData.push(['Qty (pcs)', ...doors.map(d=>d.qty)]);
+  costData.push([]);
+  [['Material Cost','matCost'],['Labour','labour'],['Transport','transport'],
+   ['Rejection','rej'],['Admin','admin'],['Overhead','over'],
+   ['Per Door Cost','total'],['Selling Price','sp'],['Profit (RM)','profit'],['Profit (%)','profitPct']
+  ].forEach(([label,key]) => {
+    costData.push([label, ...doors.map(d => {
+      const c=calcDoor(d.name);
+      const v=c[key];
+      if(v===null||v===undefined) return '';
+      if(key==='profitPct') return v!==null?v.toFixed(1)+'%':'';
+      return typeof v==='number'?v.toFixed(2):v;
+    })]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(costData);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Cost Breakdown');
+
+  // Sheet 3: Purchase
+  const active = rows.filter(r=>totalQty(r)>0);
+  const purData = [['Purchase List'],[], ['Item Code','Material','Unit','Total Qty','Unit Price','Total Cost']];
+  active.forEach(r => {
+    const tq=totalQty(r);
+    purData.push([r.itemCode,r.name,r.unit,tq,r.unitPrice||'',r.unitPrice?(tq*r.unitPrice).toFixed(2):'']);
+  });
+  const ws3 = XLSX.utils.aoa_to_sheet(purData);
+  ws3['!cols']=[{wch:16},{wch:35},{wch:7},{wch:10},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Purchase List');
+
+  const fname = `DoorLeaf_${document.getElementById('iSO').value||'Costing'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast(`✅ Excel 已导出`);
+}
+
+// ═══════════════════════════════════════
+// SAVE / LOAD
+// ═══════════════════════════════════════
+function saveProject() {
+  localStorage.setItem('dlc_v2', JSON.stringify({
+    company:document.getElementById('iCompany').value,
+    so:document.getElementById('iSO').value,
+    loc:document.getElementById('iLoc').value,
+    date:document.getElementById('iDate').value,
+    labour:document.getElementById('pLabour').value,
+    transport:document.getElementById('pTransport').value,
+    rejection:document.getElementById('pRejection').value,
+    admin:document.getElementById('pAdmin').value,
+    overhead:document.getElementById('pOverhead').value,
+    doors, rows, selling,
+  }));
+  toast('✅ 已保存');
+}
+
+function loadSaved() {
+  try {
+    const d = JSON.parse(localStorage.getItem('dlc_v2'));
+    if(!d) return;
+    document.getElementById('iCompany').value = d.company||'';
+    document.getElementById('iSO').value = d.so||'';
+    document.getElementById('iLoc').value = d.loc||'';
+    document.getElementById('iDate').value = d.date||'';
+    document.getElementById('pLabour').value = d.labour||2;
+    document.getElementById('pTransport').value = d.transport||2;
+    document.getElementById('pRejection').value = d.rejection||2;
+    document.getElementById('pAdmin').value = d.admin||5;
+    document.getElementById('pOverhead').value = d.overhead||10;
+    if(d.doors) doors = d.doors;
+    if(d.rows) rows = d.rows;
+    if(d.selling) selling = d.selling;
+    updateBadge(); renderDoors(); renderHead(); recalc();
+    toast('已恢复上次保存');
+  } catch(e){}
+}
+
+function clearAll() {
+  if(!confirm('清空所有材料数据？（不清空项目信息和成本参数）')) return;
+  rows = []; selling = {};
+  renderBody(); renderSummary(); renderCostCards(); renderPurchase();
+  toast('已清空');
+}
+
+function clearQty() {
+  rows.forEach(r => doors.forEach(d => r.qty[d.name]=0));
+  recalc();
+  toast('已清空所有用量');
+}
+
+// ═══════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names=['bom','cost','purchase'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id===`tab-${name}`);
+  });
+  if(name==='cost') renderCostCards();
+  if(name==='purchase') renderPurchase();
+}
+
+function updateBadge() {
+  const co = document.getElementById('iCompany').value;
+  const so = document.getElementById('iSO').value;
+  document.getElementById('projBadge').textContent = co||so ? `${co} ${so}`.trim() : '未设置项目';
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(el => el.addEventListener('click', e => { if(e.target===el) closeModal(el.id); }));
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
