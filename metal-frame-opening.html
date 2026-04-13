@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metal Frame Opening Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3352;
+    --accent: #4f8ef7;
+    --accent2: #f7a24f;
+    --text: #e8ecf4;
+    --text-dim: #6b7399;
+    --green: #3ecf8e;
+    --red: #f75f5f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    min-height: 100vh;
+    padding: 0 0 40px;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text);
+  }
+  .header p { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 1;
+    min-width: 100px;
+    padding: 14px 12px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: rgba(79,142,247,0.06);
+  }
+  .tab:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.03); }
+
+  /* Content */
+  .content { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
+
+  /* Profile selector */
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+  }
+
+  .profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .profile-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.18s;
+    text-align: center;
+  }
+  .profile-card:hover { border-color: var(--accent); background: var(--surface2); }
+  .profile-card.selected {
+    border-color: var(--accent);
+    background: rgba(79,142,247,0.1);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .profile-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+  .profile-sub { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  /* Profile diagram */
+  .diagram-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+  }
+  .diagram-box svg { max-width: 200px; }
+
+  /* Input fields */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .field input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input[readonly] { color: var(--text-dim); background: var(--bg); cursor: default; }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 4px 0 20px; }
+
+  /* Results */
+  .results { display: flex; flex-direction: column; gap: 10px; }
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+  }
+  .result-card.primary {
+    border-color: var(--accent);
+    background: rgba(79,142,247,0.08);
+  }
+  .result-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 500;
+  }
+  .result-value {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .result-card.primary .result-value { color: var(--accent); }
+  .result-unit {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-left: 4px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 400;
+  }
+
+  /* No selection state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* Formula badge */
+  .formula-hint {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 0.3px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .formula-hint span { color: var(--accent2); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">⬛</div>
+  <div>
+    <h1>METAL FRAME OPENING</h1>
+    <p>Opening Calculator · Apex Jaya</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('single')">Single Return</div>
+  <div class="tab" onclick="switchTab('double')">Double Return</div>
+  <div class="tab" onclick="switchTab('groove')">Groove Line</div>
+  <div class="tab" onclick="switchTab('special')">Special Return</div>
+</div>
+
+<div class="content">
+  <div id="profile-section">
+    <div class="section-label">Select Profile</div>
+    <div class="profile-grid" id="profile-grid"></div>
+  </div>
+
+  <div id="formula-section" style="display:none">
+    <div class="formula-hint" id="formula-hint"></div>
+  </div>
+
+  <div id="input-section" style="display:none">
+    <div class="section-label">Dimensions (mm)</div>
+    <div class="fields" id="fields-container"></div>
+    <div class="divider"></div>
+    <div class="section-label">Results</div>
+    <div class="results" id="results-container"></div>
+  </div>
+
+  <div id="empty-state" class="empty-state" style="display:none">
+    <div class="icon">📐</div>
+    <p>Select a profile above to begin</p>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  single: [
+    { profile: 'APF1/APFD1', Y: 65, X: 165, Return: 10, Deduct: 7 },
+    { profile: 'APF2/APFD7', Y: 65, X: 160, Return: 10, Deduct: 7 },
+    { profile: 'APF3/APFD2', Y: 65, X: 160, Return: 10, Deduct: 8.5 },
+    { profile: 'APF4',        Y: 50, X: 150, Return: 20, Deduct: 0 },
+    { profile: 'APF8/APFD8', Y: 58, X: 170, Return: 10, Deduct: 8.5 },
+    { profile: 'APF10',       Y: 65, X: 135, Return: 10, Deduct: 8.5 },
+    { profile: 'APF13',       Y: 50, X: 175, Return: 10, Deduct: 7 },
+    { profile: 'APF14',       Y: 50, X: 150, Return: 20, Deduct: 0 },
+  ],
+  double: [
+    { profile: 'APF5',         Y: 50, X: 150, Return: 12, Return2: 10, Deduct: 9 },
+    { profile: 'APF6',         Y: 50, X: 168, Return: 10, Return2: 10, Deduct: 10.5 },
+    { profile: 'APF16',        Y: 50, X: 150, Return: 20, Return2: 10, Deduct: 10.5 },
+    { profile: 'APF19/APFD9', Y: 52, X: 200, Return: 10, Return2: 10, Deduct: 9 },
+  ],
+  groove: [
+    { profile: 'APF7/APFD3',  Y: 50, X: 165, Return: 12, Deduct: 15.5 },
+    { profile: 'APF9/APFD4',  Y: 62, X: 180, Return: 12, Deduct: 14 },
+    { profile: 'APF11',        Y: 52, X: 150, Return: 12, Deduct: 15.5 },
+    { profile: 'APF12',        Y: 52, X: 150, Return: 12, Deduct: 14 },
+    { profile: 'APF15',        Y: 50, X: 150, Return: 20, Deduct: 0 },
+  ],
+  special: [
+    { profile: 'APF17/APFD5', Y: 50, X: 185, Return: 10, Return2: 12, Deduct: 10.5 },
+    { profile: 'APF18/APFD6', Y: 52, X: 150, Return: 10, Return2: 12, Deduct: 10.5 },
+    { profile: 'APF20',        Y: 52, X: 150, Return: 10, Return2: 12, Deduct: 10.5 },
+  ],
+};
+
+const FORMULAS = {
+  single:  'Opening = X + Y×2 + Return×2 − Deduct',
+  double:  'Opening = X + Y×2 + Return×2 + Return2×2 − Deduct',
+  groove:  'Opening = X + Y×2 + Return×4 − Deduct',
+  special: 'Opening = X + Y×2 + Return + Return2×2 − Deduct',
+};
+
+// Per-profile SVG cross-sections based on CAD drawings
+// stroke color: #4f8ef7, fill: rgba(79,142,247,0.08), strokeWidth: 1.5
+const S = '#4f8ef7';
+const F = 'rgba(79,142,247,0.10)';
+const W = '1.5';
+
+// Helper: svg wrapper
+function svg(content) {
+  return `<svg viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:260px">${content}</svg>`;
+}
+
+// Single Return profiles - right side has one step down (APF1,2,3,8,10,13)
+// APF4,14 - left bottom open (slanted bottom)
+const PROFILE_SVG = {
+  // ── SINGLE RETURN ──
+  // APF1/APFD1: classic single return, step on right side only
+  'APF1/APFD1': svg(`<polygon points="30,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF2/APFD7: same shape as APF1
+  'APF2/APFD7': svg(`<polygon points="30,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF3/APFD2: same shape
+  'APF3/APFD2': svg(`<polygon points="30,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF4: slanted bottom left, step right — like CAD APF4
+  'APF4': svg(`<polygon points="30,40 55,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF8/APFD8: both sides step (double side return look from CAD APF8)
+  'APF8/APFD8': svg(`<polygon points="30,20 45,20 45,35 190,35 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF10: shorter profile, single step right
+  'APF10': svg(`<polygon points="30,25 190,25 190,58 175,58 175,78 160,78 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF13: single return, slightly taller Y
+  'APF13': svg(`<polygon points="30,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF14: slanted bottom, wider
+  'APF14': svg(`<polygon points="30,40 55,20 190,20 190,55 175,55 175,75 160,75 160,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+
+  // ── DOUBLE RETURN ──
+  // APF5: step both sides, symmetric
+  'APF5': svg(`<polygon points="30,20 190,20 190,95 160,95 160,75 145,75 145,55 75,55 75,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF6: double return symmetric, wider middle
+  'APF6': svg(`<polygon points="30,20 190,20 190,95 160,95 160,75 145,75 145,55 75,55 75,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF16: double return, larger left return
+  'APF16': svg(`<polygon points="30,20 190,20 190,95 160,95 160,75 145,75 145,55 65,55 65,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF19/APFD9: double return, bottom tabs sticking down
+  'APF19/APFD9': svg(`<polygon points="30,20 190,20 190,75 175,75 175,95 155,95 155,75 65,75 65,95 45,95 45,75 30,75" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+
+  // ── GROOVE LINE ──
+  // APF7/APFD3: groove both sides, symmetric notch inside
+  'APF7/APFD3': svg(`<polygon points="30,20 190,20 190,95 165,95 165,75 155,75 155,55 155,45 165,45 165,20 30,20 30,45 40,45 40,55 55,55 55,75 30,75" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF9/APFD4: groove both sides
+  'APF9/APFD4': svg(`<polygon points="30,20 190,20 190,95 165,95 165,75 155,75 155,55 65,55 65,75 55,75 55,95 30,95 30,20" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF11: groove both sides, symmetric
+  'APF11': svg(`<polygon points="30,20 190,20 190,95 165,95 165,75 155,75 155,55 65,55 65,75 55,75 55,95 30,95 30,20" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF12: groove both sides, similar
+  'APF12': svg(`<polygon points="30,20 190,20 190,95 165,95 165,75 155,75 155,55 65,55 65,75 55,75 55,95 30,95 30,20" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF15: groove with slanted left bottom
+  'APF15': svg(`<polygon points="30,40 55,20 190,20 190,95 165,95 165,75 155,75 155,55 65,55 65,75 55,75 55,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+
+  // ── SPECIAL RETURN ──
+  // APF17/APFD5: left small return, right larger return2
+  'APF17/APFD5': svg(`<polygon points="30,20 190,20 190,95 160,95 160,65 145,65 145,50 75,50 75,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF18/APFD6: left small, right bigger step
+  'APF18/APFD6': svg(`<polygon points="30,20 190,20 190,95 160,95 160,65 145,65 145,50 75,50 75,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+  // APF20: asymmetric special return
+  'APF20': svg(`<polygon points="30,20 190,20 190,95 160,95 160,55 145,55 145,45 75,45 75,75 60,75 60,95 30,95" stroke="${S}" stroke-width="${W}" fill="${F}" stroke-linejoin="round"/>`),
+};
+
+let currentTab = 'single';
+let selectedProfile = null;
+let currentData = null;
+
+function calcOpening(tab, d) {
+  if (tab === 'single')  return d.X + d.Y*2 + d.Return*2 - d.Deduct;
+  if (tab === 'double')  return d.X + d.Y*2 + d.Return*2 + d.Return2*2 - d.Deduct;
+  if (tab === 'groove')  return d.X + d.Y*2 + d.Return*4 - d.Deduct;
+  if (tab === 'special') return d.X + d.Y*2 + d.Return + d.Return2*2 - d.Deduct;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  selectedProfile = null;
+  currentData = null;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['single','double','groove','special'][i] === tab);
+  });
+  renderProfiles();
+  renderInputSection();
+}
+
+function renderProfiles() {
+  const grid = document.getElementById('profile-grid');
+  const profiles = DATA[currentTab];
+  grid.innerHTML = profiles.map((p, i) => `
+    <div class="profile-card ${selectedProfile === i ? 'selected' : ''}" onclick="selectProfile(${i})">
+      <div class="profile-name">${p.profile}</div>
+      <div class="profile-sub">Y:${p.Y} X:${p.X}</div>
+    </div>
+  `).join('');
+}
+
+function selectProfile(idx) {
+  selectedProfile = idx;
+  currentData = { ...DATA[currentTab][idx], Y: 65, X: 150 };
+  renderProfiles();
+  renderInputSection();
+}
+
+function renderInputSection() {
+  const formulaSec = document.getElementById('formula-section');
+  const inputSec = document.getElementById('input-section');
+  const emptySec = document.getElementById('empty-state');
+
+  if (selectedProfile === null) {
+    formulaSec.style.display = 'none';
+    inputSec.style.display = 'none';
+    emptySec.style.display = 'block';
+    return;
+  }
+
+  emptySec.style.display = 'none';
+  formulaSec.style.display = 'block';
+  inputSec.style.display = 'block';
+  
+
+  buildFields();
+  updateResults();
+}
+
+function buildFields() {
+  const d = currentData;
+  const tab = currentTab;
+  const container = document.getElementById('fields-container');
+
+  const hasReturn2 = tab === 'double' || tab === 'special';
+
+  let html = `
+    <div class="field">
+      <label>Y (mm)</label>
+      <input type="number" id="f-Y" value="${d.Y}" oninput="onFieldChange('Y', this.value)">
+    </div>
+    <div class="field">
+      <label>X (mm)</label>
+      <input type="number" id="f-X" value="${d.X}" oninput="onFieldChange('X', this.value)">
+    </div>
+    <div class="field">
+      <label>Return</label>
+      <input type="number" id="f-Return" value="${d.Return}" oninput="onFieldChange('Return', this.value)">
+    </div>`;
+
+  if (hasReturn2) {
+    html += `<div class="field">
+      <label>Return 2</label>
+      <input type="number" id="f-Return2" value="${d.Return2}" oninput="onFieldChange('Return2', this.value)">
+    </div>`;
+  }
+
+
+
+  container.innerHTML = html;
+}
+
+function onFieldChange(key, val) {
+  currentData[key] = parseFloat(val) || 0;
+  updateResults();
+}
+
+function updateResults() {
+  const opening = calcOpening(currentTab, currentData);
+  const sheets3 = opening * 3 + 4;
+  const sheets4 = opening * 4 + 4;
+
+  document.getElementById('results-container').innerHTML = `
+    <div class="result-card primary">
+      <div class="result-label">Opening</div>
+      <div><span class="result-value">${opening.toFixed(1)}</span><span class="result-unit">mm</span></div>
+    </div>
+    <div class="result-card">
+      <div class="result-label">3 Sheets</div>
+      <div><span class="result-value">${sheets3.toFixed(1)}</span><span class="result-unit">mm</span></div>
+    </div>
+    <div class="result-card">
+      <div class="result-label">4 Sheets</div>
+      <div><span class="result-value">${sheets4.toFixed(1)}</span><span class="result-unit">mm</span></div>
+    </div>
+  `;
+}
+
+// Init
+renderProfiles();
+document.getElementById('empty-state').style.display = 'block';
+</script>
+</body>
+</html>
