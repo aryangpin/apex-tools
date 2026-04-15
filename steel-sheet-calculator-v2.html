@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steel Sheet Cost Calculator v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --accent: #e8ff00;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #666;
+    --input-bg: #1e1e1e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 6px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .card.full { grid-column: 1 / -1; }
+
+  label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  select:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  .thickness-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .thickness-btn {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .thickness-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .thickness-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .calc-btn {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    border-radius: 3px;
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 16px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .calc-btn:hover {
+    background: #fff;
+    transform: translateY(-1px);
+  }
+
+  .results {
+    display: none;
+    margin-top: 16px;
+  }
+
+  .results.show { display: block; }
+
+  .result-header {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .result-value {
+    font-size: 36px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .result-value.primary { color: var(--accent); }
+  .result-value.secondary { color: var(--accent2); }
+  .result-value.tertiary { color: var(--text); }
+
+  .result-unit {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  @media (max-width: 500px) {
+    .result-grid { grid-template-columns: 1fr; }
+  }
+
+  .divider {
+    width: 1px;
+    background: var(--border);
+  }
+
+  .summary-bar {
+    background: #111;
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-top: 16px;
+    display: none;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.5px;
+  }
+
+  .summary-bar.show { display: block; }
+
+  .summary-bar span { color: var(--text); }
+
+  .error-msg {
+    display: none;
+    background: #1a0a00;
+    border: 1px solid #ff6b35;
+    border-radius: 3px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--accent2);
+    margin-top: 8px;
+  }
+
+  .error-msg.show { display: block; }
+
+  /* Qty section */
+  .qty-result {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .qty-result.show { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+  .qty-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .qty-input-row input {
+    width: 100px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .qty-input-row label {
+    margin: 0;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .qty-total {
+    font-size: 14px;
+    color: var(--accent);
+  }
+
+  .custom-dim-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .custom-dim-row input {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .custom-dim-row input.active-custom {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .or-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  select.dimmed {
+    opacity: 0.4;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Sheet Cost Calculator</h1>
+    <p>Steel Coil → Per Sheet Pricing</p>
+  </div>
+
+  <!-- Material Type -->
+  <div class="grid">
+    <div class="card">
+      <label>Material Type</label>
+      <select id="materialType" onchange="updateDefaults()">
+        <option value="EG">EG (Electro Galvanised)</option>
+        <option value="GI">GI (Hot Dip Galvanised)</option>
+        <option value="Aluzinc">Aluzinc</option>
+        <option value="GA">GA (Galvannealed)</option>
+        <option value="Zincalume">Zincalume</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <label>Per Coil RM (Total Coil Cost)</label>
+      <input type="number" id="coilCost" placeholder="e.g. 3850" min="0" step="10" value="3850">
+    </div>
+
+    <div class="card">
+      <label>Sharing / Transport / Extra (RM)</label>
+      <input type="number" id="extraCost" placeholder="0" min="0" step="10" value="0">
+    </div>
+
+    <div class="card">
+      <label>Coil Weight (kg) — for RM/kg calc</label>
+      <input type="number" id="coilWeight" placeholder="e.g. 1000" min="1" step="1" value="1000">
+    </div>
+  </div>
+
+  <!-- Thickness -->
+  <div class="card" style="margin-bottom:16px;">
+    <label>Thickness (mm)</label>
+    <div class="thickness-grid" id="thicknessGroup">
+      <button class="thickness-btn active" onclick="selectThickness(this, 0.9)">0.90</button>
+      <button class="thickness-btn" onclick="selectThickness(this, 0.95)">0.95</button>
+      <button class="thickness-btn" onclick="selectThickness(this, 1.0)">1.00</button>
+      <button class="thickness-btn" onclick="selectThickness(this, 1.1)">1.10</button>
+      <button class="thickness-btn" onclick="selectThickness(this, 1.15)">1.15</button>
+      <button class="thickness-btn" onclick="selectThickness(this, 1.2)">1.20</button>
+    </div>
+  </div>
+
+  <!-- Dimensions -->
+  <div class="grid">
+    <div class="card">
+      <label>Width — 宽 (mm)</label>
+      <select id="width">
+        <option value="945">945</option>
+        <option value="975">975</option>
+        <option value="1010">1010</option>
+        <option value="1020">1020</option>
+        <option value="1055">1055</option>
+        <option value="1100">1100</option>
+        <option value="1180">1180</option>
+        <option value="1219">1219</option>
+        <option value="1250">1250</option>
+      </select>
+      <div class="custom-dim-row">
+        <span class="or-label">or custom:</span>
+        <input type="number" id="customWidth" placeholder="e.g. 1300" min="1" step="1" oninput="onCustomWidth()">
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Height — 高 (mm)</label>
+      <select id="height">
+        <option value="1510">1510</option>
+        <option value="1810">1810</option>
+        <option value="2010">2010</option>
+        <option value="2134">2134</option>
+        <option value="2438">2438</option>
+        <option value="2710">2710</option>
+        <option value="3048">3048</option>
+      </select>
+      <div class="custom-dim-row">
+        <span class="or-label">or custom:</span>
+        <input type="number" id="customHeight" placeholder="e.g. 2600" min="1" step="1" oninput="onCustomHeight()">
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculate Button -->
+  <button class="calc-btn" onclick="calculate()">CALCULATE →</button>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="card" style="margin-top:0;">
+      <div class="result-header" id="resultTitle">—</div>
+      <div class="result-grid">
+        <div>
+          <div class="result-label">Per Sheet Weight</div>
+          <div class="result-value primary" id="resWeight">—<span class="result-unit">kg</span></div>
+        </div>
+        <div>
+          <div class="result-label">Per Sheet Price</div>
+          <div class="result-value secondary">RM <span id="resPrice">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar" id="summaryBar"></div>
+</div>
+
+<script>
+  let selectedThickness = 0.9;
+
+  // Density constants per material type
+  const DENSITY = {
+    EG:       0.000007888336532,
+    GI:       0.000008230354593,
+    Aluzinc:  0.000008143290141,
+    GA:       0.000008143290141,
+    Zincalume:0.000008143290141
+  };
+
+  // Default coil costs (editable by user)
+  const DEFAULT_COSTS = {
+    EG: 3850, GI: 3500, Aluzinc: 3320, GA: 3000, Zincalume: 4950
+  };
+
+  function onCustomWidth() {
+    const val = document.getElementById('customWidth').value;
+    const sel = document.getElementById('width');
+    const inp = document.getElementById('customWidth');
+    if (val) {
+      sel.classList.add('dimmed');
+      inp.classList.add('active-custom');
+    } else {
+      sel.classList.remove('dimmed');
+      inp.classList.remove('active-custom');
+    }
+  }
+
+  function onCustomHeight() {
+    const val = document.getElementById('customHeight').value;
+    const sel = document.getElementById('height');
+    const inp = document.getElementById('customHeight');
+    if (val) {
+      sel.classList.add('dimmed');
+      inp.classList.add('active-custom');
+    } else {
+      sel.classList.remove('dimmed');
+      inp.classList.remove('active-custom');
+    }
+  }
+
+  function getWidth() {
+    const custom = parseFloat(document.getElementById('customWidth').value);
+    return custom > 0 ? custom : parseInt(document.getElementById('width').value);
+  }
+
+  function getHeight() {
+    const custom = parseFloat(document.getElementById('customHeight').value);
+    return custom > 0 ? custom : parseInt(document.getElementById('height').value);
+  }
+
+  function isCustomW() { return parseFloat(document.getElementById('customWidth').value) > 0; }
+  function isCustomH() { return parseFloat(document.getElementById('customHeight').value) > 0; }
+
+  function selectThickness(btn, val) {
+    document.querySelectorAll('.thickness-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedThickness = val;
+  }
+
+  function updateDefaults() {
+    const mat = document.getElementById('materialType').value;
+    document.getElementById('coilCost').value = DEFAULT_COSTS[mat];
+
+    // GI & Aluzinc have 1055 width; others don't — adjust width options
+    const widthSel = document.getElementById('width');
+    const hasMid = ['GI','Aluzinc','GA','Zincalume'].includes(mat);
+    const opt1055 = widthSel.querySelector('option[value="1055"]');
+    if (hasMid && !opt1055) {
+      const newOpt = new Option('1055','1055');
+      widthSel.insertBefore(newOpt, widthSel.querySelector('option[value="1100"]'));
+    } else if (!hasMid && opt1055) {
+      opt1055.remove();
+    }
+  }
+
+  function calculate() {
+    const errEl = document.getElementById('errorMsg');
+    errEl.className = 'error-msg';
+
+    const mat = document.getElementById('materialType').value;
+    const coilCost = parseFloat(document.getElementById('coilCost').value);
+    const extraCost = parseFloat(document.getElementById('extraCost').value) || 0;
+    const coilWeight = parseFloat(document.getElementById('coilWeight').value);
+    const width = getWidth();
+    const height = getHeight();
+    const widthLabel = isCustomW() ? width + '*' : width;
+    const heightLabel = isCustomH() ? height + '*' : height;
+    const thickness = selectedThickness;
+
+    if (!coilCost || coilCost <= 0) {
+      errEl.textContent = 'Please enter a valid Per Coil RM cost.';
+      errEl.className = 'error-msg show';
+      return;
+    }
+    if (!coilWeight || coilWeight <= 0) {
+      errEl.textContent = 'Please enter a valid Coil Weight (kg).';
+      errEl.className = 'error-msg show';
+      return;
+    }
+
+    const totalCoilCost = coilCost + extraCost;
+    const rmPerKg = totalCoilCost / coilWeight;
+    const density = DENSITY[mat];
+
+    // Core formula
+    const sheetWeightAt1mm = width * height * density;         // kg at 1mm thick
+    const sheetWeight = sheetWeightAt1mm * thickness;          // actual weight
+    const sheetPrice = sheetWeight * rmPerKg;                  // RM per sheet
+    const perMm2 = sheetWeight / 1000;                         // per mm² reference
+
+    // Display
+    document.getElementById('resWeight').innerHTML = sheetWeight.toFixed(2) + '<span class="result-unit">kg</span>';
+    document.getElementById('resPrice').textContent = sheetPrice.toFixed(2);
+
+    document.getElementById('resultTitle').textContent =
+      `${mat} ${thickness}mm · ${widthLabel} × ${heightLabel} mm`;
+
+    document.getElementById('results').className = 'results show';
+
+    // Summary
+    document.getElementById('summaryBar').className = 'summary-bar show';
+    document.getElementById('summaryBar').innerHTML =
+      `Material <span>${mat} ${thickness}mm</span> &nbsp;|&nbsp; ` +
+      `Sheet <span>${widthLabel}×${heightLabel}mm</span> &nbsp;|&nbsp; ` +
+      `Coil Cost <span>RM ${totalCoilCost.toLocaleString()}</span> &nbsp;|&nbsp; ` +
+      `RM/kg <span>${rmPerKg.toFixed(4)}</span> &nbsp;|&nbsp; ` +
+      `Density coeff <span>${density}</span>`;
+
+    // Store for qty calc
+    window._unitPrice = sheetPrice;
+  }
+
+  // Init
+  updateDefaults();
+</script>
+</body>
+</html>
