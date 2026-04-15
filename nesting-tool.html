@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>材料排料工具 | Nesting Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --surface2: #1c2030;
+    --border: #2a3045;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --text: #e8eaf0;
+    --text-dim: #7a8099;
+    --danger: #ff4455;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+    border: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .logo::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background: var(--accent);
+    opacity: 0.15;
+  }
+  .logo svg { z-index: 1; }
+
+  h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  h1 span { color: var(--text-dim); font-weight: 400; font-size: 14px; letter-spacing: 1px; display: block; margin-top: 2px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+
+  .panel-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  label:first-of-type { margin-top: 0; }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  input[type="number"], input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--text-dim); font-weight: 400; font-size: 13px; }
+
+  .sub-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    margin-top: 3px;
+    margin-bottom: 0;
+    text-transform: none;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Parts list */
+  .parts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .parts-list::-webkit-scrollbar { width: 4px; }
+  .parts-list::-webkit-scrollbar-track { background: var(--surface2); }
+  .parts-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .part-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    gap: 8px;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .part-info { font-size: 13px; }
+  .part-name { font-weight: 600; color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 15px; }
+  .part-dims { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  .part-qty { background: var(--accent); color: var(--bg); font-size: 11px; font-weight: 700; padding: 2px 7px; font-family: 'Rajdhani', sans-serif; }
+  .part-delete {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    transition: all 0.2s;
+  }
+  .part-delete:hover { color: var(--danger); border-color: var(--danger); }
+
+  .add-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 60px auto;
+    gap: 8px;
+    align-items: end;
+  }
+
+  button {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    padding: 10px 16px;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+
+  .btn-add {
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 10px 12px;
+  }
+  .btn-add:hover { background: var(--accent); color: var(--bg); }
+
+  .btn-run {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 15px;
+    padding: 14px;
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-run::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn-run:hover::after { opacity: 0.1; }
+  .btn-run:active { transform: scale(0.99); }
+
+  .btn-export {
+    background: var(--surface2);
+    color: var(--accent3);
+    border: 1px solid var(--accent3);
+    font-size: 12px;
+    padding: 8px 14px;
+  }
+  .btn-export:hover { background: var(--accent3); color: var(--bg); }
+
+  /* Canvas panel */
+  .canvas-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+
+  .canvas-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 12px 18px;
+    min-width: 110px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-box.util::before { background: var(--accent3); }
+  .stat-box.placed::before { background: var(--accent); }
+  .stat-box.sheets::before { background: var(--accent2); }
+  .stat-box.waste::before { background: var(--danger); }
+
+  .stat-val {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .stat-box.util .stat-val { color: var(--accent3); }
+  .stat-box.placed .stat-val { color: var(--accent); }
+  .stat-box.sheets .stat-val { color: var(--accent2); }
+  .stat-box.waste .stat-val { color: var(--danger); }
+  .stat-lbl { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+
+  .sheets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sheet-wrapper {
+    border: 1px solid var(--border);
+    padding: 12px;
+    background: var(--surface2);
+  }
+
+  .sheet-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: var(--text-dim);
+    text-align: center;
+    gap: 12px;
+    border: 1px dashed var(--border);
+  }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-text { font-size: 13px; letter-spacing: 1px; }
+
+  .rotation-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    cursor: pointer;
+  }
+  .toggle-track {
+    width: 38px;
+    height: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    position: relative;
+    transition: background 0.2s;
+  }
+  .toggle-track.on { background: rgba(0,229,255,0.2); border-color: var(--accent); }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px;
+    background: var(--text-dim);
+    transition: all 0.2s;
+  }
+  .toggle-track.on .toggle-thumb { left: 21px; background: var(--accent); }
+  .toggle-label { font-size: 12px; color: var(--text-dim); letter-spacing: 0.5px; user-select: none; }
+  .toggle-label.on { color: var(--accent); }
+
+  .kerf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .color-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* Loading */
+  .loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    color: var(--accent);
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 2px;
+    font-size: 14px;
+  }
+  .loading.active { display: flex; }
+  .spin {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tooltip {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect x="1" y="1" width="18" height="18" stroke="#00e5ff" stroke-width="1.5"/>
+        <rect x="3" y="3" width="6" height="8" fill="#00e5ff" opacity="0.7"/>
+        <rect x="11" y="3" width="6" height="5" fill="#ff6b35" opacity="0.7"/>
+        <rect x="11" y="10" width="6" height="7" fill="#7fff6b" opacity="0.7"/>
+        <rect x="3" y="13" width="6" height="4" fill="#00e5ff" opacity="0.4"/>
+      </svg>
+    </div>
+    <div>
+      <h1>NESTING TOOL <span>材料套料排版系统 v1.0</span></h1>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Left Panel -->
+    <div>
+      <!-- Sheet Size -->
+      <div class="panel">
+        <div class="panel-title">板材尺寸 (Sheet)</div>
+        <label>宽度 Width (mm)</label>
+        <input type="number" id="sheetW" value="2440" min="1">
+        <label>高度 Height (mm)</label>
+        <input type="number" id="sheetH" value="1220" min="1">
+
+        <div class="divider"></div>
+
+        <div class="panel-title">切割参数</div>
+        <div class="kerf-row">
+          <div>
+            <label>锯缝 Kerf (mm)</label>
+            <input type="number" id="kerf" value="3" min="0" step="0.5">
+          </div>
+          <div>
+            <label>边距 Margin (mm)</label>
+            <input type="number" id="margin" value="5" min="0">
+          </div>
+        </div>
+
+        <div class="rotation-toggle" onclick="toggleRotation()">
+          <div class="toggle-track" id="rotToggle">
+            <div class="toggle-thumb"></div>
+          </div>
+          <span class="toggle-label" id="rotLabel">允许旋转 90°</span>
+        </div>
+        <p class="tooltip">* 旋转可提升材料利用率，但需确认工艺允许</p>
+      </div>
+
+      <!-- Parts -->
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-title">零件清单 (Parts)</div>
+
+        <div class="parts-list" id="partsList">
+          <div style="color:var(--text-dim);font-size:12px;text-align:center;padding:20px">尚未添加零件</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <label>添加零件</label>
+        <div class="add-row">
+          <div>
+            <input type="number" id="partW" placeholder="宽 W" min="1">
+            <p class="sub-label">宽度 mm</p>
+          </div>
+          <div>
+            <input type="number" id="partH" placeholder="高 H" min="1">
+            <p class="sub-label">高度 mm</p>
+          </div>
+          <div>
+            <input type="number" id="partQty" placeholder="数量" value="1" min="1">
+            <p class="sub-label">数量</p>
+          </div>
+          <button class="btn-add" onclick="addPart()">＋</button>
+        </div>
+
+        <button class="btn-run" onclick="runNesting()">⚡ 开始排料计算</button>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="canvas-panel">
+      <div class="canvas-header">
+        <div class="panel-title" style="margin-bottom:0">排料结果</div>
+        <button class="btn-export" onclick="exportResult()" id="exportBtn" style="display:none">↓ 导出 PNG</button>
+      </div>
+
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-box util">
+          <div class="stat-val" id="statUtil">—</div>
+          <div class="stat-lbl">利用率</div>
+        </div>
+        <div class="stat-box placed">
+          <div class="stat-val" id="statPlaced">—</div>
+          <div class="stat-lbl">已排零件</div>
+        </div>
+        <div class="stat-box sheets">
+          <div class="stat-val" id="statSheets">—</div>
+          <div class="stat-lbl">用板数量</div>
+        </div>
+        <div class="stat-box waste">
+          <div class="stat-val" id="statWaste">—</div>
+          <div class="stat-lbl">废料面积</div>
+        </div>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spin"></div> 计算中...
+      </div>
+
+      <div id="sheetsContainer" class="sheets-container">
+        <div class="empty-state">
+          <div class="empty-icon">⬜</div>
+          <div class="empty-text">添加零件后点击"开始排料计算"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+let parts = [];
+let allowRotation = false;
+const COLORS = [
+  '#00e5ff','#ff6b35','#7fff6b','#ffd700','#c084fc',
+  '#fb7185','#38bdf8','#a3e635','#f97316','#e879f9'
+];
+
+// ===================== UI =====================
+function toggleRotation() {
+  allowRotation = !allowRotation;
+  const t = document.getElementById('rotToggle');
+  const l = document.getElementById('rotLabel');
+  t.classList.toggle('on', allowRotation);
+  l.classList.toggle('on', allowRotation);
+  l.textContent = allowRotation ? '允许旋转 90° ✓' : '允许旋转 90°';
+}
+
+function addPart() {
+  const w = parseFloat(document.getElementById('partW').value);
+  const h = parseFloat(document.getElementById('partH').value);
+  const qty = parseInt(document.getElementById('partQty').value) || 1;
+  if (!w || !h || w <= 0 || h <= 0) {
+    alert('请输入有效的零件尺寸');
+    return;
+  }
+  const sheetW = parseFloat(document.getElementById('sheetW').value);
+  const sheetH = parseFloat(document.getElementById('sheetH').value);
+  if (w > sheetW && h > sheetH) {
+    alert(`零件尺寸 ${w}×${h} 超过板材尺寸 ${sheetW}×${sheetH}`);
+    return;
+  }
+  parts.push({ w, h, qty, color: COLORS[parts.length % COLORS.length], id: Date.now() });
+  document.getElementById('partW').value = '';
+  document.getElementById('partH').value = '';
+  document.getElementById('partQty').value = '1';
+  renderPartsList();
+}
+
+function deletePart(id) {
+  parts = parts.filter(p => p.id !== id);
+  renderPartsList();
+}
+
+function renderPartsList() {
+  const el = document.getElementById('partsList');
+  if (parts.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:12px;text-align:center;padding:20px">尚未添加零件</div>';
+    return;
+  }
+  el.innerHTML = parts.map(p => `
+    <div class="part-item">
+      <div class="part-info">
+        <div class="part-name">
+          <span class="color-swatch" style="background:${p.color}"></span>
+          ${p.w} × ${p.h} mm
+        </div>
+        <div class="part-dims">数量：${p.qty} 件 | 面积：${(p.w*p.h/1000000).toFixed(4)} m²</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="part-qty">×${p.qty}</span>
+        <button class="part-delete" onclick="deletePart(${p.id})">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ===================== NESTING ALGORITHM =====================
+// Bottom-Left Fill with optional 90° rotation
+function nestSheets(sheetW, sheetH, partDefs, kerf, margin, rotate) {
+  // Expand qty into individual rects
+  let items = [];
+  partDefs.forEach(p => {
+    for (let i = 0; i < p.qty; i++) {
+      items.push({ w: p.w, h: p.h, color: p.color, origW: p.w, origH: p.h, rotated: false });
+    }
+  });
+
+  // Sort by area descending for better packing
+  items.sort((a,b) => (b.w*b.h) - (a.w*a.h));
+
+  const usableW = sheetW - margin * 2;
+  const usableH = sheetH - margin * 2;
+
+  let sheets = [];
+  let remaining = [...items];
+
+  while (remaining.length > 0) {
+    const sheet = { placements: [], spaces: [{ x: 0, y: 0, w: usableW, h: usableH }] };
+    let placed = [];
+
+    for (let i = 0; i < remaining.length; i++) {
+      const item = remaining[i];
+      let bestSpace = -1, bestX = -1, bestY = -1, useRotated = false;
+      let bestScore = Infinity;
+
+      // Try both orientations
+      const orientations = [{ w: item.w, h: item.h, rot: false }];
+      if (rotate && item.w !== item.h) orientations.push({ w: item.h, h: item.w, rot: true });
+
+      for (const ori of orientations) {
+        for (let si = 0; si < sheet.spaces.length; si++) {
+          const sp = sheet.spaces[si];
+          if (ori.w <= sp.w && ori.h <= sp.h) {
+            // Bottom-left score: prefer bottom then left
+            const score = sp.y * 10000 + sp.x;
+            if (score < bestScore) {
+              bestScore = score;
+              bestSpace = si;
+              bestX = sp.x;
+              bestY = sp.y;
+              useRotated = ori.rot;
+            }
+          }
+        }
+      }
+
+      if (bestSpace === -1) continue; // doesn't fit
+
+      const fw = useRotated ? item.h : item.w;
+      const fh = useRotated ? item.w : item.h;
+
+      sheet.placements.push({
+        x: bestX + margin, y: bestY + margin,
+        w: fw, h: fh,
+        color: item.color,
+        rotated: useRotated,
+        origW: item.origW, origH: item.origH
+      });
+      placed.push(i);
+
+      // Split space (Guillotine)
+      const sp = sheet.spaces[bestSpace];
+      sheet.spaces.splice(bestSpace, 1);
+      // Right space
+      if (sp.w - fw - kerf > 0 && fh > 0) {
+        sheet.spaces.push({ x: bestX + fw + kerf, y: bestY, w: sp.w - fw - kerf, h: fh });
+      }
+      // Top space
+      if (sp.h - fh - kerf > 0 && sp.w > 0) {
+        sheet.spaces.push({ x: bestX, y: bestY + fh + kerf, w: sp.w, h: sp.h - fh - kerf });
+      }
+    }
+
+    if (placed.length === 0) {
+      // Nothing fits — stop
+      break;
+    }
+
+    sheets.push(sheet);
+    // Remove placed items
+    remaining = remaining.filter((_, i) => !placed.includes(i));
+  }
+
+  return { sheets, unplaced: remaining.length };
+}
+
+// ===================== RENDER =====================
+let allSheets = [], sheetWmm = 0, sheetHmm = 0;
+
+function runNesting() {
+  if (parts.length === 0) { alert('请先添加零件！'); return; }
+
+  const sw = parseFloat(document.getElementById('sheetW').value);
+  const sh = parseFloat(document.getElementById('sheetH').value);
+  const kerf = parseFloat(document.getElementById('kerf').value) || 0;
+  const margin = parseFloat(document.getElementById('margin').value) || 0;
+
+  if (!sw || !sh) { alert('请输入板材尺寸'); return; }
+
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('sheetsContainer').innerHTML = '';
+  document.getElementById('statsRow').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+
+  setTimeout(() => {
+    const result = nestSheets(sw, sh, parts, kerf, margin, allowRotation);
+    sheetWmm = sw; sheetHmm = sh;
+    allSheets = result.sheets;
+
+    // Stats
+    const totalParts = parts.reduce((s,p) => s + p.qty, 0);
+    const placed = totalParts - result.unplaced;
+    const sheetArea = sw * sh;
+    const partArea = parts.reduce((s,p) => s + p.w * p.h * p.qty, 0);
+    const totalSheetArea = result.sheets.length * sheetArea;
+    const util = totalSheetArea > 0 ? (partArea / totalSheetArea * 100).toFixed(1) : 0;
+    const wasteM2 = ((totalSheetArea - partArea) / 1e6).toFixed(3);
+
+    document.getElementById('statUtil').textContent = util + '%';
+    document.getElementById('statPlaced').textContent = placed + '/' + totalParts;
+    document.getElementById('statSheets').textContent = result.sheets.length;
+    document.getElementById('statWaste').textContent = wasteM2 + ' m²';
+    document.getElementById('statsRow').style.display = 'flex';
+    document.getElementById('exportBtn').style.display = '';
+
+    // Draw
+    const container = document.getElementById('sheetsContainer');
+    const maxCanvasW = container.clientWidth - 24;
+    const scale = Math.min(maxCanvasW / sw, 500 / sh, 1);
+
+    result.sheets.forEach((sheet, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'sheet-wrapper';
+      wrap.innerHTML = `<div class="sheet-label">SHEET ${idx+1} / ${result.sheets.length} — ${sw}×${sh}mm</div>`;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(sw * scale);
+      canvas.height = Math.round(sh * scale);
+      canvas.style.border = '1px solid rgba(0,229,255,0.2)';
+      wrap.appendChild(canvas);
+      container.appendChild(wrap);
+
+      drawSheet(canvas, sheet, sw, sh, scale, kerf, margin);
+    });
+
+    document.getElementById('loading').classList.remove('active');
+  }, 30);
+}
+
+function drawSheet(canvas, sheet, sw, sh, scale, kerf, margin) {
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1c2030';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 0.5;
+  const gridStep = 100 * scale;
+  for (let x = 0; x < canvas.width; x += gridStep) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+  for (let y = 0; y < canvas.height; y += gridStep) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+
+  // Margin indicator
+  if (margin > 0) {
+    ctx.strokeStyle = 'rgba(0,229,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.strokeRect(margin*scale, margin*scale, (sw-margin*2)*scale, (sh-margin*2)*scale);
+    ctx.setLineDash([]);
+  }
+
+  // Placements
+  sheet.placements.forEach(p => {
+    const x = p.x * scale, y = p.y * scale;
+    const w = p.w * scale, h = p.h * scale;
+
+    // Fill
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(x, y, w, h);
+
+    // Diagonal pattern for rotated
+    if (p.rotated) {
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x, y, w, h);
+    }
+
+    ctx.globalAlpha = 1;
+
+    // Border
+    ctx.strokeStyle = '#0d0f14';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+
+    // Inner highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(x+1, y+1, w-2, h-2);
+
+    // Label
+    const label = `${p.origW}×${p.origH}${p.rotated?'R':''}`;
+    const minDim = Math.min(w, h);
+    if (minDim > 20) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      const fs = Math.max(8, Math.min(12, minDim * 0.18));
+      ctx.font = `bold ${fs}px Rajdhani, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x + w/2, y + h/2);
+    }
+  });
+
+  // Sheet border
+  ctx.strokeStyle = 'rgba(0,229,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.75, 0.75, canvas.width-1.5, canvas.height-1.5);
+}
+
+// ===================== EXPORT =====================
+function exportResult() {
+  if (allSheets.length === 0) return;
+
+  // Merge all sheets into one tall image
+  const kerf = parseFloat(document.getElementById('kerf').value) || 0;
+  const margin = parseFloat(document.getElementById('margin').value) || 0;
+  const scale = 1; // full res
+  const gap = 20;
+  const cw = sheetWmm * scale;
+  const ch = sheetHmm * scale;
+  const totalH = allSheets.length * ch + (allSheets.length - 1) * gap + 60;
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = cw;
+  exportCanvas.height = totalH;
+  const ctx = exportCanvas.getContext('2d');
+  ctx.fillStyle = '#0d0f14';
+  ctx.fillRect(0, 0, cw, totalH);
+
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = 'bold 14px Rajdhani, sans-serif';
+  ctx.fillText(`NESTING RESULT — ${sheetWmm}×${sheetHmm}mm — ${allSheets.length} sheets`, 10, 20);
+  ctx.fillStyle = '#7a8099';
+  ctx.font = '11px sans-serif';
+  ctx.fillText(`Util: ${document.getElementById('statUtil').textContent}  |  Placed: ${document.getElementById('statPlaced').textContent}  |  Waste: ${document.getElementById('statWaste').textContent}`, 10, 40);
+
+  allSheets.forEach((sheet, idx) => {
+    const offY = 60 + idx * (ch + gap);
+    // Mini draw
+    const tmp = document.createElement('canvas');
+    tmp.width = cw; tmp.height = ch;
+    drawSheet(tmp, sheet, sheetWmm, sheetHmm, scale, kerf, margin);
+    ctx.drawImage(tmp, 0, offY);
+    ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, offY, cw, ch);
+  });
+
+  const link = document.createElement('a');
+  link.download = `nesting_${sheetWmm}x${sheetHmm}_${Date.now()}.png`;
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runNesting();
+});
+</script>
+</body>
+</html>
