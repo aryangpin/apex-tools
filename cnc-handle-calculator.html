@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNC Handle Position Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #141720;
+    --surface2: #1c2030;
+    --border: #2a2f42;
+    --accent: #e8c84a;
+    --accent2: #4a9eff;
+    --text: #e8eaf0;
+    --muted: #6b7494;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Noto Sans SC', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  .header { text-align: center; margin-bottom: 40px; }
+  .header h1 {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .header h2 { font-size: 28px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+  .header h2 span { color: var(--accent); }
+
+  .container { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .selector-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .selector-grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .sel-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  .sel-btn:hover { border-color: var(--accent); color: var(--text); }
+  .sel-btn.active { background: var(--accent); border-color: var(--accent); color: #0d0f12; }
+  .sel-btn.mode-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  .sel-btn .sub { display: block; font-size: 10px; font-weight: 400; margin-top: 3px; opacity: 0.7; }
+
+  .input-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .input-group { display: flex; flex-direction: column; gap: 8px; }
+  .input-group label { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .input-row:focus-within { border-color: var(--accent2); }
+  .input-row input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px 14px;
+  }
+  .input-row .unit { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 0 14px 0 0; }
+  .input-row.auto-fill { border-color: var(--accent); opacity: 0.85; }
+  .input-row.auto-fill input { color: var(--accent); }
+  .auto-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    background: var(--accent);
+    color: #0d0f12;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 8px;
+    letter-spacing: 1px;
+  }
+
+  .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .results-grid.two-col { grid-template-columns: repeat(2, 1fr); }
+
+  .result-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .result-card.highlight { border-color: var(--accent); background: rgba(232,200,74,0.06); }
+  .result-card .r-label { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; line-height: 1.5; }
+  .result-card .r-value { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; }
+  .result-card.highlight .r-value { color: var(--accent); font-size: 38px; }
+  .result-card .r-unit { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .formula-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 2;
+    margin-top: 16px;
+  }
+  .f-line { display: flex; align-items: center; gap: 8px; }
+  .f-key { color: var(--accent2); min-width: 180px; }
+  .f-val { color: var(--text); font-weight: 700; }
+
+  .tol-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .tol-table th { text-align: left; padding: 8px 12px; font-size: 10px; letter-spacing: 2px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .tol-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,47,66,0.5); }
+  .tol-table tr.active-row td { color: var(--accent); background: rgba(232,200,74,0.05); }
+  .tol-table .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  .tag-1hr { background: rgba(255,77,77,0.15); color: #ff8080; }
+  .tag-2hr { background: rgba(74,158,255,0.15); color: #7ab8ff; }
+  .tag-nor { background: rgba(77,255,145,0.15); color: #80ffb0; }
+  .tag-sl  { background: rgba(180,130,255,0.15); color: #c9a0ff; }
+  .tag-dl  { background: rgba(255,165,74,0.15); color: #ffb080; }
+
+  .hidden { display: none; }
+
+  @media (max-width: 600px) {
+    .results-grid, .results-grid.two-col { grid-template-columns: 1fr; }
+    .input-grid { grid-template-columns: 1fr; }
+    .selector-grid { grid-template-columns: repeat(3,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>APEX JAYA · CNC MACHINING</h1>
+  <h2>Handle Position <span>Calculator</span></h2>
+</div>
+
+<div class="container">
+
+  <!-- Mode Toggle -->
+  <div class="card">
+    <div class="card-label">模式 · Mode</div>
+    <div class="selector-grid2">
+      <button class="sel-btn mode-btn active" id="btn-mode-frame" onclick="selectMode('frame')">
+        门框 + 门
+        <span class="sub">Frame + Door</span>
+      </button>
+      <button class="sel-btn mode-btn" id="btn-mode-door" onclick="selectMode('door')">
+        只有门
+        <span class="sub">Door Only</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Door Type -->
+  <div class="card">
+    <div class="card-label">① 选择门的类型 · Door Type</div>
+    <div class="selector-grid">
+      <button class="sel-btn" id="btn-1hr" onclick="selectType('1hr')">1HR<span class="sub">1小时防火门</span></button>
+      <button class="sel-btn" id="btn-2hr" onclick="selectType('2hr')">2HR<span class="sub">2小时防火门</span></button>
+      <button class="sel-btn" id="btn-nor" onclick="selectType('nor')">Normal<span class="sub">普通门框</span></button>
+    </div>
+    <div class="selector-grid2">
+      <button class="sel-btn" id="btn-sl" onclick="selectLeaf('sl')">SL<span class="sub">Single Leaf 单门</span></button>
+      <button class="sel-btn" id="btn-dl" onclick="selectLeaf('dl')">DL<span class="sub">Double Leaf 双门</span></button>
+    </div>
+  </div>
+
+  <!-- Inputs -->
+  <div class="card">
+    <div class="card-label">② 输入数据 · Input Values</div>
+    <div class="input-grid">
+
+      <!-- Frame mode inputs -->
+      <div class="input-group" id="grp-frameHeight">
+        <label>Frame Height without Embedment</label>
+        <div class="input-row"><input type="number" id="frameHeight" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group" id="grp-locksetFrame">
+        <label>Lockset Height</label>
+        <div class="input-row"><input type="number" id="locksetFrame" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group" id="grp-profileY">
+        <label>Profile Y</label>
+        <div class="input-row"><input type="number" id="profileY" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group" id="grp-profileX">
+        <label>Profile X</label>
+        <div class="input-row"><input type="number" id="profileX" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+
+      <!-- Door Only inputs -->
+      <div class="input-group hidden" id="grp-doorH">
+        <label>Door Height 门的高度</label>
+        <div class="input-row"><input type="number" id="doorH" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group hidden" id="grp-locksetDoor">
+        <label>Lockset Height</label>
+        <div class="input-row"><input type="number" id="locksetDoor" oninput="calculate()"><span class="unit">mm</span></div>
+      </div>
+
+      <!-- Auto gap (always visible) -->
+      <div class="input-group" id="grp-topGap">
+        <label>Tolerance / TOP Gap <span style="color:var(--accent);font-size:9px;margin-left:4px;">AUTO</span></label>
+        <div class="input-row auto-fill"><input type="number" id="topGap" readonly><span class="auto-badge">AUTO</span><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group">
+        <label>Tolerance / 底部 Gap <span style="color:var(--accent);font-size:9px;margin-left:4px;">AUTO</span></label>
+        <div class="input-row auto-fill"><input type="number" id="btmGap" readonly><span class="auto-badge">AUTO</span><span class="unit">mm</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="card">
+    <div class="card-label">③ 计算结果 · Results</div>
+
+    <div class="results-grid" id="results-frame">
+      <div class="result-card">
+        <div class="r-label">门的高度<br>Door Height</div>
+        <div class="r-value" id="r-doorH">—</div>
+        <div class="r-unit">mm</div>
+      </div>
+      <div class="result-card">
+        <div class="r-label">门底部到 Handle<br>Floor to Handle</div>
+        <div class="r-value" id="r-floorFrame">—</div>
+        <div class="r-unit">mm</div>
+      </div>
+      <div class="result-card highlight">
+        <div class="r-label">CNC Top 到 Handle<br>CNC Position</div>
+        <div class="r-value" id="r-cncFrame">—</div>
+        <div class="r-unit">mm</div>
+      </div>
+    </div>
+
+    <div class="results-grid two-col hidden" id="results-door">
+      <div class="result-card">
+        <div class="r-label">门底部到 Handle<br>Floor to Handle</div>
+        <div class="r-value" id="r-floorDoor">—</div>
+        <div class="r-unit">mm</div>
+      </div>
+      <div class="result-card highlight">
+        <div class="r-label">CNC Top 到 Handle<br>CNC Position</div>
+        <div class="r-value" id="r-cncDoor">—</div>
+        <div class="r-unit">mm</div>
+      </div>
+    </div>
+
+    <div id="formulaSection" class="hidden">
+      <div class="formula-box">
+        <div class="f-line" id="fline1"><span class="f-key">门的高度</span><span style="color:var(--muted)">=</span><span class="f-val" id="f1">—</span></div>
+        <div class="f-line"><span class="f-key">门底部到 Handle</span><span style="color:var(--muted)">=</span><span class="f-val" id="f2">—</span></div>
+        <div class="f-line"><span class="f-key">CNC Top 到 Handle</span><span style="color:var(--muted)">=</span><span class="f-val" id="f3">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tolerance Reference -->
+  <div class="card">
+    <div class="card-label">参考表 · Tolerance Reference</div>
+    <table class="tol-table">
+      <thead><tr><th>Type</th><th>Leaf</th><th>Direction</th><th>Total</th><th>Split</th></tr></thead>
+      <tbody id="tolTableBody">
+        <tr data-key="1hr-sl-w"><td><span class="tag tag-1hr">1HR</span></td><td><span class="tag tag-sl">SL</span></td><td>Width</td><td>7mm</td><td>3.5 + 3.5</td></tr>
+        <tr data-key="1hr-sl-h"><td><span class="tag tag-1hr">1HR</span></td><td><span class="tag tag-sl">SL</span></td><td>Height</td><td>10mm</td><td>3 + 7</td></tr>
+        <tr data-key="1hr-dl-w"><td><span class="tag tag-1hr">1HR</span></td><td><span class="tag tag-dl">DL</span></td><td>Width</td><td>12mm</td><td>4 + 4 + 4</td></tr>
+        <tr data-key="1hr-dl-h"><td><span class="tag tag-1hr">1HR</span></td><td><span class="tag tag-dl">DL</span></td><td>Height</td><td>12mm</td><td>4 + 8</td></tr>
+        <tr data-key="2hr-sl-w"><td><span class="tag tag-2hr">2HR</span></td><td><span class="tag tag-sl">SL</span></td><td>Width</td><td>9mm</td><td>4.5 + 4.5</td></tr>
+        <tr data-key="2hr-sl-h"><td><span class="tag tag-2hr">2HR</span></td><td><span class="tag tag-sl">SL</span></td><td>Height</td><td>12mm</td><td>4.5 + 7.5</td></tr>
+        <tr data-key="2hr-dl-w"><td><span class="tag tag-2hr">2HR</span></td><td><span class="tag tag-dl">DL</span></td><td>Width</td><td>15mm</td><td>4.5 + 4.5 + 6</td></tr>
+        <tr data-key="2hr-dl-h"><td><span class="tag tag-2hr">2HR</span></td><td><span class="tag tag-dl">DL</span></td><td>Height</td><td>12mm</td><td>4.5 + 7.5</td></tr>
+        <tr data-key="nor-sl-w"><td><span class="tag tag-nor">Normal</span></td><td><span class="tag tag-sl">SL</span></td><td>Width</td><td>6mm</td><td>3 + 3</td></tr>
+        <tr data-key="nor-sl-h"><td><span class="tag tag-nor">Normal</span></td><td><span class="tag tag-sl">SL</span></td><td>Height</td><td>10mm</td><td>3 + 7</td></tr>
+        <tr data-key="nor-dl-w"><td><span class="tag tag-nor">Normal</span></td><td><span class="tag tag-dl">DL</span></td><td>Width</td><td>10mm</td><td>4 + 3 + 3</td></tr>
+        <tr data-key="nor-dl-h"><td><span class="tag tag-nor">Normal</span></td><td><span class="tag tag-dl">DL</span></td><td>Height</td><td>10mm</td><td>3 + 7</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const TOL = {
+    '1hr-sl': [3, 7], '1hr-dl': [4, 8],
+    '2hr-sl': [4.5, 7.5], '2hr-dl': [4.5, 7.5],
+    'nor-sl': [3, 7], 'nor-dl': [3, 7],
+  };
+
+  let selectedType = null, selectedLeaf = null, mode = 'frame';
+
+  function selectMode(m) {
+    mode = m;
+    ['frame','door'].forEach(k => document.getElementById('btn-mode-'+k).classList.remove('active'));
+    document.getElementById('btn-mode-'+m).classList.add('active');
+
+    const frameOnly = ['grp-frameHeight','grp-locksetFrame','grp-profileY','grp-profileX','grp-topGap'];
+    const doorOnly  = ['grp-doorH','grp-locksetDoor'];
+
+    if (m === 'frame') {
+      frameOnly.forEach(id => document.getElementById(id).classList.remove('hidden'));
+      doorOnly.forEach(id => document.getElementById(id).classList.add('hidden'));
+      document.getElementById('results-frame').classList.remove('hidden');
+      document.getElementById('results-door').classList.add('hidden');
+      document.getElementById('fline1').classList.remove('hidden');
+    } else {
+      frameOnly.forEach(id => document.getElementById(id).classList.add('hidden'));
+      doorOnly.forEach(id => document.getElementById(id).classList.remove('hidden'));
+      document.getElementById('results-frame').classList.add('hidden');
+      document.getElementById('results-door').classList.remove('hidden');
+      document.getElementById('fline1').classList.add('hidden');
+    }
+    calculate();
+  }
+
+  function selectType(t) {
+    selectedType = t;
+    ['1hr','2hr','nor'].forEach(k => document.getElementById('btn-'+k).classList.remove('active'));
+    document.getElementById('btn-'+t).classList.add('active');
+    updateTolerance();
+  }
+
+  function selectLeaf(l) {
+    selectedLeaf = l;
+    ['sl','dl'].forEach(k => document.getElementById('btn-'+k).classList.remove('active'));
+    document.getElementById('btn-'+l).classList.add('active');
+    updateTolerance();
+  }
+
+  function updateTolerance() {
+    if (!selectedType || !selectedLeaf) return;
+    const key = selectedType + '-' + selectedLeaf;
+    const data = TOL[key];
+    if (!data) return;
+    document.getElementById('topGap').value = data[0];
+    document.getElementById('btmGap').value = data[1];
+    document.querySelectorAll('#tolTableBody tr').forEach(row => {
+      row.classList.remove('active-row');
+      const rKey = row.getAttribute('data-key');
+      if (rKey && rKey.startsWith(key)) row.classList.add('active-row');
+    });
+    calculate();
+  }
+
+  function calculate() {
+    const bg = parseFloat(document.getElementById('btmGap').value);
+    if (isNaN(bg)) { clearResults(); return; }
+
+    if (mode === 'frame') {
+      const fh = parseFloat(document.getElementById('frameHeight').value);
+      const lh = parseFloat(document.getElementById('locksetFrame').value);
+      const py = parseFloat(document.getElementById('profileY').value);
+      const tg = parseFloat(document.getElementById('topGap').value);
+      if (isNaN(fh) || isNaN(lh) || isNaN(py) || isNaN(tg)) { clearResults(); return; }
+
+      const doorH  = fh - py - tg - bg;
+      const floorH = lh - bg;
+      const cncPos = doorH - floorH;
+
+      document.getElementById('r-doorH').textContent    = doorH;
+      document.getElementById('r-floorFrame').textContent = floorH;
+      document.getElementById('r-cncFrame').textContent = cncPos;
+      document.getElementById('f1').textContent = `${fh} − ${py} − ${tg} − ${bg} = ${doorH} mm`;
+      document.getElementById('f2').textContent = `${lh} − ${bg} = ${floorH} mm`;
+      document.getElementById('f3').textContent = `${doorH} − ${floorH} = ${cncPos} mm`;
+
+    } else {
+      const dh = parseFloat(document.getElementById('doorH').value);
+      const lh = parseFloat(document.getElementById('locksetDoor').value);
+      if (isNaN(dh) || isNaN(lh)) { clearResults(); return; }
+
+      const floorH = lh - bg;
+      const cncPos = dh - floorH;
+
+      document.getElementById('r-floorDoor').textContent = floorH;
+      document.getElementById('r-cncDoor').textContent   = cncPos;
+      document.getElementById('f2').textContent = `${lh} − ${bg} = ${floorH} mm`;
+      document.getElementById('f3').textContent = `${dh} − ${floorH} = ${cncPos} mm`;
+    }
+
+    document.getElementById('formulaSection').classList.remove('hidden');
+  }
+
+  function clearResults() {
+    ['r-doorH','r-floorFrame','r-cncFrame','r-floorDoor','r-cncDoor']
+      .forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('formulaSection').classList.add('hidden');
+  }
+</script>
+</body>
+</html>
