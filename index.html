@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>APEX JAYA — Internal Tools</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AJ Tools">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#8B6914">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('[PWA] SW registered'))
+        .catch(err => console.error('[PWA] SW failed:', err));
+    });
+  }
+</script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--border:#2a3349;--accent:#00c896;--text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
