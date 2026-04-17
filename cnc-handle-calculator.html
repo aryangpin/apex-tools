@@ -214,11 +214,15 @@
       </div>
       <div class="input-group" id="grp-profileY">
         <label>Profile Y</label>
-        <div class="input-row"><input type="number" id="profileY" oninput="calculate()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="profileYInput" oninput="calcFrameBalance()"><span class="unit">mm</span></div>
       </div>
-      <div class="input-group" id="grp-profileX">
-        <label>Profile X</label>
-        <div class="input-row"><input type="number" id="profileX" oninput="calculate()"><span class="unit">mm</span></div>
+      <div class="input-group" id="grp-stopGap">
+        <label>Stop Gap</label>
+        <div class="input-row"><input type="number" id="stopGap" oninput="calcFrameBalance()"><span class="unit">mm</span></div>
+      </div>
+      <div class="input-group" id="grp-frameBalance">
+        <label>Frame Balance <span style="color:var(--accent);font-size:9px;margin-left:4px;">AUTO</span></label>
+        <div class="input-row auto-fill"><input type="number" id="profileY" readonly><span class="auto-badge">AUTO</span><span class="unit">mm</span></div>
       </div>
 
       <!-- Door Only inputs -->
@@ -326,7 +330,7 @@
     ['frame','door'].forEach(k => document.getElementById('btn-mode-'+k).classList.remove('active'));
     document.getElementById('btn-mode-'+m).classList.add('active');
 
-    const frameOnly = ['grp-frameHeight','grp-locksetFrame','grp-profileY','grp-profileX','grp-topGap'];
+    const frameOnly = ['grp-frameHeight','grp-locksetFrame','grp-profileY','grp-stopGap','grp-frameBalance','grp-topGap'];
     const doorOnly  = ['grp-doorH','grp-locksetDoor'];
 
     if (m === 'frame') {
@@ -413,6 +417,17 @@
     document.getElementById('formulaSection').classList.remove('hidden');
   }
 
+
+  function calcFrameBalance() {
+    const py = parseFloat(document.getElementById('profileYInput').value);
+    const sg = parseFloat(document.getElementById('stopGap').value);
+    if (!isNaN(py) && !isNaN(sg)) {
+      document.getElementById('profileY').value = py - sg;
+    } else {
+      document.getElementById('profileY').value = '';
+    }
+    calculate();
+  }
   function clearResults() {
     ['r-doorH','r-floorFrame','r-cncFrame','r-floorDoor','r-cncDoor']
       .forEach(id => document.getElementById(id).textContent = '—');
