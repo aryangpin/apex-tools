@@ -8,28 +8,12 @@
 <style>
 :root{--bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--border:#2a3349;--accent:#00c896;--accent2:#0082ff;--warn:#ff6b35;--text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;--green:#00c896;--red:#ff4d6d;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;display:flex;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
 .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border);}
 .hbadge{background:var(--accent);color:#000;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:3px;letter-spacing:1px;}
 .header h1{font-size:20px;font-weight:500;letter-spacing:-0.3px;}
 .hsub{font-family:var(--mono);font-size:11px;color:var(--text3);}
 .layout{display:grid;grid-template-columns:340px 1fr;gap:20px;}
-.sidebar{width:220px;min-width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;overflow-y:auto;}
-.sb-header{padding:16px 14px 10px;border-bottom:1px solid var(--border);}
-.sb-title{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;}
-.sb-new{width:100%;background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px;cursor:pointer;transition:opacity 0.15s;}
-.sb-new:hover{opacity:0.85;}
-.sb-list{flex:1;overflow-y:auto;padding:8px 0;}
-.sb-item{display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;position:relative;}
-.sb-item:hover{background:var(--surface2);}
-.sb-item.active{background:var(--surface2);border-left-color:var(--accent);}
-.sb-item-name{flex:1;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sb-item.active .sb-item-name{color:var(--text);}
-.sb-item-date{font-family:var(--mono);font-size:9px;color:var(--text3);}
-.sb-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;opacity:0;transition:opacity 0.15s;}
-.sb-item:hover .sb-del{opacity:1;}
-.sb-del:hover{color:var(--red);}
-.sb-rename-input{background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:12px;padding:2px 6px;width:100%;outline:none;}
 .main-content{flex:1;padding:24px;overflow-y:auto;min-width:0;}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;}
 .ph{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;}
@@ -127,13 +111,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 </style>
 </head>
 <body>
-<div id="sidebar" class="sidebar">
-  <div class="sb-header">
-    <div class="sb-title">Saved Profiles</div>
-    <button class="sb-new" onclick="newProfile()">+ New Profile</button>
-  </div>
-  <div class="sb-list" id="sbList"></div>
-</div>
 <div class="main-content">
 <div style="max-width:1400px;margin:0 auto;">
 <div class="header">
@@ -219,20 +196,20 @@ const MAT_PRICES={EG:3850,GI:3500,Aluzinc:3500,GA:3000,Zincalume:4950};
 const SHEET_W=[1100,1219,1250];
 const SHEET_H=[1510,1810,2010,2134,2438,2710,3048];
 const LABOUR={
-  APF1:{2130:12.4,2430:13.9,3000:15.6},APF2:{2130:13.8,2430:15.2,3000:16.9},
-  APF3:{2130:13.8,2430:15.2,3000:16.9},APF4:{2130:13.1,2430:14.6,3000:16.2},
-  APF5:{2130:15.1,2430:16.6,3000:18.3},APF6:{2130:15.1,2430:16.6,3000:18.3},
-  APF7:{2130:16.5,2430:17.9,3000:19.6},APF8:{2130:16.5,2430:17.9,3000:19.6},
-  APF9:{2130:15.1,2430:16.6,3000:18.3},APF10:{2130:13.8,2430:15.2,3000:16.9},
-  APF11:{2130:19.2,2430:20.6,3000:22.3},APF12:{2130:16.5,2430:17.9,3000:19.6},
-  APF13:{2130:15.1,2430:16.6,3000:18.3},APF14:{2130:12.4,2430:12.8,3000:15.6},
+  APF1:{2130:12,2430:12,3000:12},APF2:{2130:12,2430:12,3000:12},
+  APF3:{2130:12,2430:12,3000:12},APF4:{2130:12,2430:12,3000:12},
+  APF5:{2130:12,2430:12,3000:12},APF6:{2130:12,2430:12,3000:12},
+  APF7:{2130:12,2430:12,3000:12},APF8:{2130:12,2430:12,3000:12},
+  APF9:{2130:12,2430:12,3000:12},APF10:{2130:12,2430:12,3000:12},
+  APF11:{2130:12,2430:12,3000:12},APF12:{2130:12,2430:12,3000:12},
+  APF13:{2130:12,2430:12,3000:12},APF14:{2130:12,2430:12,3000:12},
   APF15:{2130:null,2430:null,3000:null},APF16:{2130:null,2430:null,3000:null},
   APF17:{2130:null,2430:null,3000:null},APF18:{2130:null,2430:null,3000:null},
   APF19:{2130:null,2430:null,3000:null},
-  APFD1:{2130:12.4,2430:13.9,3000:15.6},APFD2:{2130:13.8,2430:15.2,3000:16.9},
-  APFD3:{2130:16.5,2430:17.9,3000:19.6},APFD4:{2130:15.1,2430:16.6,3000:18.3},
+  APFD1:{2130:12,2430:12,3000:12},APFD2:{2130:12,2430:12,3000:12},
+  APFD3:{2130:12,2430:12,3000:12},APFD4:{2130:12,2430:12,3000:12},
   APFD5:{2130:null,2430:null,3000:null},APFD6:{2130:null,2430:null,3000:null},
-  APFD7:{2130:null,2430:null,3000:null},APFD8:{2130:16.5,2430:17.9,3000:19.6}
+  APFD7:{2130:null,2430:null,3000:null},APFD8:{2130:12,2430:12,3000:12}
 };
 const HB=[2130,2430,3000];
 const PROFS=Object.keys(LABOUR);
@@ -608,8 +585,8 @@ function render(R){ _lastResults = R;
     const items=[
       {l:'Metal Sheet',v:r.metalCost},{l:'Hardware',v:r.hw},
       {l:'Labour',v:r.lab},{l:'Transport',v:r.hwTr},
-      {l:'Rejection',v:r.rej},{l:'Admin (5%)',v:r.adm},
-      {l:'Overhead (10%)',v:r.ohd}
+      {l:'Rejection',v:r.rej},{l:'Admin',v:r.adm},
+      {l:'Overhead',v:r.ohd}
     ];
     const chartId='pie_'+ri;
     h+=`<div class="bdc">
@@ -1080,22 +1057,7 @@ function importJSON() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (function(){
-  const profiles = loadProfiles();
-  const keys = Object.keys(profiles);
-  renderSidebar();
-  if (keys.length === 0) {
-    newProfile('Profile 1');
-  } else {
-    const activeId = getActiveId() || keys[keys.length-1];
-    setActiveId(activeId);
-    const p = profiles[activeId];
-    if (p) {
-      applySettings(p.settings || {});
-      applyDoors(p.doors || []);
-      if (!p.doors || !p.doors.length) addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
-    }
-    renderSidebar();
-  }
+  addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
