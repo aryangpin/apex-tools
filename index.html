@@ -4,23 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>APEX JAYA — Internal Tools</title>
-
-<!-- PWA -->
-<link rel="manifest" href="/manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AJ Tools">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#8B6914">
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('[PWA] SW registered'))
-        .catch(err => console.error('[PWA] SW failed:', err));
-    });
-  }
-</script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--border:#2a3349;--accent:#00c896;--text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
@@ -125,6 +108,11 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="tool-icon">🗂️</div>
       <div><div class="tool-name">Nesting Tool</div><div class="tool-desc">钢材套料排版系统，自动优化切割方案，减少废料损耗。</div></div>
       <div class="tool-tag">NESTING</div>
+    </a>
+    <a class="tool-card" href="./Door-width-calculator.html">
+      <div class="tool-icon">🚪</div>
+      <div><div class="tool-name">Frame Width Calculator</div><div class="tool-desc">输入 Frame Width、Profile Y/X、Stop Gap 自动计算门框净宽。</div></div>
+      <div class="tool-tag">CALCULATOR</div>
     </a>
     <div class="tool-card soon">
       <div class="tool-icon">➕</div>
