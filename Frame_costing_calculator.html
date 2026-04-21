@@ -193,7 +193,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 <script>
 const DENSITY={EG:0.000007888336532,GI:0.000008230354593,Aluzinc:0.000008143290141,GA:0.000008143290141,Zincalume:0.000008143290141};
 const MAT_PRICES={EG:3850,GI:3500,Aluzinc:3500,GA:3000,Zincalume:4950};
-const SHEET_W=[1100,1219,1250];
+const SHEET_W={EG:[1100,1219,1250],GI:[1100,1219,1250],Aluzinc:[1100,1219,1250],GA:[1100,1219,1250],Zincalume:[1219]};
 const SHEET_H=[1510,1810,2010,2134,2438,2710,3048];
 const LABOUR={
   APF1:{2130:12,2430:12,3000:12},APF2:{2130:12,2430:12,3000:12},
@@ -242,7 +242,7 @@ function calcCutting(cuttingSize, frameW, frameH, qty, matType, thick, pricePerT
     let best = null;
     let minWastePerPiece = Infinity;
 
-    SHEET_W.forEach(sw => {
+    (SHEET_W[matType]||SHEET_W['Aluzinc']).forEach(sw => {
       SHEET_H.forEach(sh => {
         const a = avail(sw, sh);
         // Try both orientations
