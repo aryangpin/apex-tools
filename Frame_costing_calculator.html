@@ -458,7 +458,8 @@ function calculate(){
     const cut = calcCutting(cs, fw, fh, qty, matType, thick, price, kerf);
     const metalCost = cut.metalPerDoor;
 
-    const hw=(hinges*hwH)+hwSt+hwSp+hwW+hwSr+hwMo;
+    const morter=(hinges<=4)?hwMo:0;
+    const hw=(hinges*hwH)+hwSt+hwSp+hwW+hwSr+morter;
     const frame=metalCost+hw+lab+hwTr;
     const rej=frame*pR;
     const adm=frame*pA, ohd=frame*pO;
