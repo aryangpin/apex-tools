@@ -511,13 +511,13 @@ function render(R){ _lastResults = R;
       <table class="rt">
         <thead><tr>
           <th>Door Type</th><th>Profile</th><th>Cut Size</th><th>Frame</th><th>Qty</th>
-          <th>Frame Cost</th><th>HW</th><th>Labour</th>
+          <th>Frame Cost</th><th>HW</th><th>Transport</th><th>Labour</th>
           <th>Rej+OH</th><th>Total/frame</th><th>Sell</th><th>Profit</th><th>Margin</th>
         </tr></thead><tbody>`;
   R.forEach(r=>{
     h+=`<tr>
       <td>${r.dtype||'—'}</td><td>${r.prof}</td><td>${r.cs}mm</td><td>${r.fw}×${r.fh}</td><td>${r.qty}</td>
-      <td>${rm(r.metalCost)}</td><td>${rm(r.hw)}</td><td>${rm(r.lab)}</td>
+      <td>${rm(r.metalCost)}</td><td>${rm(r.hw)}</td><td>${rm(r.hwTr)}</td><td>${rm(r.lab)}</td>
       <td>${rm(r.rej+r.adm+r.ohd)}</td><td class="va">${rm(r.total)}</td>
       <td>${rm(r.sell)}</td>
       <td class="${r.profit>=0?'vg':'vr'}">${rm(r.profit)}</td>
@@ -528,7 +528,7 @@ function render(R){ _lastResults = R;
     <tfoot><tr style="background:var(--surface2);">
       <td colspan="4" style="color:var(--text);font-weight:600;">TOTAL</td>
       <td style="color:var(--text);font-weight:600;">${tQ}</td>
-      <td colspan="4"></td>
+      <td colspan="5"></td>
       <td class="va" style="font-weight:600;">${rm(tC)}</td>
       <td style="color:var(--text);font-weight:600;">${rm(tR)}</td>
       <td class="${tP>=0?'vg':'vr'}" style="font-weight:600;">${rm(tP)}</td>
