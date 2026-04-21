@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nesting</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --surface2: #1c1c26;
+  --border: #2a2a3d;
+  --accent: #00e5a0;
+  --accent2: #5b6af0;
+  --warn: #ff6b35;
+  --red: #ff3d6b;
+  --text: #e8e8f0;
+  --text2: #7a7a9a;
+  --text3: #3a3a5a;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+
+/* header */
+.header { padding:28px 32px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; }
+.header-badge { background:var(--accent); color:#000; font-family:var(--mono); font-size:9px; font-weight:700; padding:3px 8px; border-radius:2px; letter-spacing:2px; }
+.header h1 { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
+.header-sub { font-family:var(--mono); font-size:10px; color:var(--text3); margin-left:auto; }
+
+.wrap { max-width:1300px; margin:0 auto; padding:24px 32px; }
+
+/* board section */
+.board-panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+.panel-title { font-family:var(--mono); font-size:10px; font-weight:600; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
+.board-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.field label { display:block; font-family:var(--mono); font-size:9px; color:var(--text2); margin-bottom:5px; letter-spacing:0.5px; text-transform:uppercase; }
+.field input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; outline:none; transition:border-color 0.15s; }
+.field input:focus { border-color:var(--accent); }
+
+/* specs table */
+.specs-panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+.specs-table { width:100%; border-collapse:collapse; }
+.specs-table th { font-family:var(--mono); font-size:9px; color:var(--text3); font-weight:600; letter-spacing:0.8px; text-transform:uppercase; padding:6px 10px; text-align:left; border-bottom:1px solid var(--border); }
+.specs-table td { padding:5px 6px; }
+.specs-table td input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); font-family:var(--mono); font-size:12px; padding:6px 8px; outline:none; transition:border-color 0.15s; text-align:center; }
+.specs-table td input:focus { border-color:var(--accent); }
+.spec-label { display:inline-block; width:22px; height:22px; border-radius:4px; font-family:var(--mono); font-size:10px; font-weight:700; text-align:center; line-height:22px; }
+.btn-row { display:flex; gap:10px; margin-top:14px; }
+.btn { font-family:var(--mono); font-size:11px; font-weight:600; padding:8px 16px; border-radius:6px; cursor:pointer; border:none; transition:all 0.15s; letter-spacing:0.5px; }
+.btn-add { background:transparent; border:1px dashed var(--border); color:var(--text2); }
+.btn-add:hover { border-color:var(--accent); color:var(--accent); }
+.btn-del { background:none; border:none; color:var(--text3); font-size:15px; cursor:pointer; padding:0 4px; transition:color 0.15s; line-height:1; }
+.btn-del:hover { color:var(--red); }
+.btn-calc { background:var(--accent); color:#000; font-weight:700; font-size:13px; padding:12px 32px; }
+.btn-calc:hover { opacity:0.88; transform:translateY(-1px); }
+
+/* results */
+.results-wrap { margin-top:24px; }
+.summary-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px; }
+.stat-card.hi { border-color:var(--accent); }
+.stat-label { font-family:var(--mono); font-size:9px; color:var(--text2); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+.stat-val { font-family:var(--mono); font-size:22px; font-weight:700; }
+.stat-card.hi .stat-val { color:var(--accent); }
+.stat-sub { font-family:var(--mono); font-size:9px; color:var(--text3); margin-top:3px; }
+
+/* sheet cards */
+.sheets-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+.sheet-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.sheet-header { background:var(--surface2); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+.sheet-num { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--accent2); letter-spacing:1px; }
+.sheet-util { font-family:var(--mono); font-size:12px; font-weight:700; }
+.sheet-body { padding:14px; }
+
+/* visual board */
+.board-vis { width:100%; aspect-ratio:1219/2438; background:var(--bg); border:1px solid var(--border); border-radius:6px; position:relative; overflow:hidden; margin-bottom:12px; }
+.piece-rect { position:absolute; border-radius:2px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:9px; font-weight:700; overflow:hidden; cursor:default; transition:opacity 0.15s; border:1px solid rgba(255,255,255,0.08); }
+.piece-rect:hover { opacity:0.85; z-index:10; }
+
+.pieces-list { display:flex; flex-wrap:wrap; gap:5px; }
+.piece-tag { display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:10px; padding:3px 7px; border-radius:3px; }
+
+.empty { text-align:center; padding:60px; color:var(--text3); font-family:var(--mono); font-size:12px; }
+
+/* unmet */
+.unmet-panel { background:rgba(255,61,107,0.06); border:1px solid rgba(255,61,107,0.2); border-radius:8px; padding:14px; margin-bottom:16px; }
+.unmet-title { font-family:var(--mono); font-size:10px; color:var(--red); letter-spacing:1px; margin-bottom:8px; }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-badge">NESTING</span>
+  <h1>Nesting</h1>
+  <span class="header-sub">2D Cutting Stock · Greedy Algorithm</span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <button onclick="importJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬆ Import</button>
+    <button onclick="exportJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬇ Export</button>
+    <span id="autosave_tag" style="font-family:var(--mono);font-size:10px;color:var(--text3);"></span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Board Settings -->
+  <div class="board-panel">
+    <div class="panel-title">Board Size Settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+      <div class="field"><label>Kerf Left/Right (mm)</label><input type="number" id="kerfW" value="4"></div>
+      <div class="field"><label>Kerf Top/Bottom (mm)</label><input type="number" id="kerfH" value="4"></div>
+    </div>
+    <table class="specs-table">
+      <thead>
+        <tr>
+          <th>Width (mm)</th>
+          <th>Length (mm)</th>
+          <th style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="boardsBody"></tbody>
+    </table>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn btn-add" onclick="addBoardRow()">+ Add Board</button>
+      <button class="btn btn-add" onclick="clearBoards()" style="border-color:rgba(255,61,107,0.3);color:#ff6b6b;" onmouseover="this.style.borderColor='#ff3d6b';this.style.color='#ff3d6b'" onmouseout="this.style.borderColor='rgba(255,61,107,0.3)';this.style.color='#ff6b6b'">✕ Clear Boards</button>
+    </div>
+  </div>
+
+  <!-- Specs -->
+  <div class="specs-panel">
+    <div class="panel-title">Parts List</div>
+    <table class="specs-table">
+      <thead>
+        <tr>
+          <th style="width:36px"></th>
+          <th>Part Name</th>
+          <th>Width (mm)</th>
+          <th>Length (mm)</th>
+          <th>Qty (pcs)</th>
+          <th style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="specsBody"></tbody>
+    </table>
+    <div class="btn-row">
+      <button class="btn btn-add" onclick="addRow()">+ Add Part</button>
+      <button class="btn btn-add" onclick="clearSpecs()" style="border-color:rgba(255,61,107,0.3);color:#ff6b6b;" onmouseover="this.style.borderColor='#ff3d6b';this.style.color='#ff3d6b'" onmouseout="this.style.borderColor='rgba(255,61,107,0.3)';this.style.color='#ff6b6b'">✕ Clear Parts</button>
+      <button class="btn btn-calc" onclick="runOptimize()">⚡ Run Optimize</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-wrap" id="resultsWrap" style="display:none;"></div>
+</div>
+
+<script>
+// ── Colors ────────────────────────────────────────────────────────────────────
+const COLORS = [
+  '#00e5a0','#5b6af0','#ff6b35','#f0c040','#e05bf0',
+  '#3dc8f0','#f05b7a','#7af05b','#f09c3d','#3d8af0',
+  '#c0f040','#f040c0','#40f0c0','#f07040','#4070f0'
+];
+
+let boardRowId = 0;
+
+function addBoardRow(w='', h='') {
+  boardRowId++;
+  const id = boardRowId;
+  const tbody = document.getElementById('boardsBody');
+  const tr = document.createElement('tr');
+  tr.id = 'brow_' + id;
+  tr.innerHTML = `
+    <td><input type="number" id="bw_${id}" value="${w}" placeholder="1219"></td>
+    <td><input type="number" id="bh_${id}" value="${h}" placeholder="2438"></td>
+    <td><button class="btn-del" onclick="delBoardRow(${id})">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function delBoardRow(id) {
+  const el = document.getElementById('brow_' + id);
+  if (el) el.remove();
+}
+
+function getBoardSpecs() {
+  const rows = document.querySelectorAll('#boardsBody tr');
+  const boards = [];
+  rows.forEach(row => {
+    const id = row.id.replace('brow_','');
+    const w = parseFloat(document.getElementById('bw_'+id)?.value) || 0;
+    const h = parseFloat(document.getElementById('bh_'+id)?.value) || 0;
+    if (w > 0 && h > 0) boards.push({ name: `${w}×${h}`, w, h });
+  });
+  return boards;
+}
+
+function getRawBoards() {
+  const rows = document.querySelectorAll('#boardsBody tr');
+  const out = [];
+  rows.forEach(row => {
+    const id = row.id.replace('brow_','');
+    out.push({
+      w: document.getElementById('bw_'+id)?.value || '',
+      h: document.getElementById('bh_'+id)?.value || ''
+    });
+  });
+  return out;
+}
+
+let rowId = 0;
+
+function addRow(name='', w='', h='', qty='') {
+  rowId++;
+  const id = rowId;
+  const idx = (id-1) % COLORS.length;
+  const color = COLORS[idx];
+  const letter = String.fromCharCode(64 + id);
+  const tbody = document.getElementById('specsBody');
+  const tr = document.createElement('tr');
+  tr.id = 'row_' + id;
+  tr.innerHTML = `
+    <td><span class="spec-label" style="background:${color}22;color:${color};">${letter}</span></td>
+    <td><input type="text" id="name_${id}" value="${name}" placeholder="P204-D1" style="text-align:left;"></td>
+    <td><input type="number" id="w_${id}" value="${w}" placeholder="263"></td>
+    <td><input type="number" id="h_${id}" value="${h}" placeholder="2130"></td>
+    <td><input type="number" id="qty_${id}" value="${qty}" placeholder="10"></td>
+    <td><button class="btn-del" onclick="delRow(${id})">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function delRow(id) {
+  const el = document.getElementById('row_' + id);
+  if (el) el.remove();
+}
+
+function clearBoards() {
+  if (!confirm('Clear all boards?')) return;
+  document.getElementById('boardsBody').innerHTML = '';
+  boardRowId = 0;
+  autoSave();
+}
+
+function clearSpecs() {
+  if (!confirm('Clear all parts?')) return;
+  document.getElementById('specsBody').innerHTML = '';
+  rowId = 0;
+  document.getElementById('resultsWrap').style.display = 'none';
+  autoSave();
+}
+
+function getSpecs() {
+  const rows = document.querySelectorAll('#specsBody tr');
+  const specs = [];
+  rows.forEach(row => {
+    const id = row.id.replace('row_','');
+    const name = document.getElementById('name_'+id)?.value || '';
+    const w = parseFloat(document.getElementById('w_'+id)?.value) || 0;
+    const h = parseFloat(document.getElementById('h_'+id)?.value) || 0;
+    const qty = parseInt(document.getElementById('qty_'+id)?.value) || 0;
+    if (w > 0 && h > 0 && qty > 0) {
+      const idx = (parseInt(id)-1) % COLORS.length;
+      specs.push({ id, name: name || ('Part'+id), w, h, qty, color: COLORS[idx] });
+    }
+  });
+  return specs;
+}
+
+// ── Core Algorithm ────────────────────────────────────────────────────────────
+// Strip packing greedy:
+// For each sheet, try to place pieces using guillotine shelf approach.
+// Each shelf has a fixed height (tallest piece in that row).
+// Try both orientations for each piece.
+
+function tryPlace(pieces, boardW, boardH) {
+  const placed = [];
+  const unplaced = [];
+
+  // Free Rectangle (GUILLOTINE) packing
+  // Track all free rectangles on the board
+  let freeRects = [{ x: 0, y: 0, w: boardW, h: boardH }];
+
+  function splitRect(rect, pw, ph) {
+    // Split free rect into two after placing piece (pw×ph) at rect origin
+    // Horizontal split: right rectangle + bottom rectangle
+    const results = [];
+    if (rect.w - pw > 0)
+      results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: ph });
+    if (rect.h - ph > 0)
+      results.push({ x: rect.x, y: rect.y + ph, w: rect.w, h: rect.h - ph });
+    return results;
+  }
+
+  function splitRectV(rect, pw, ph) {
+    // Vertical split variant
+    const results = [];
+    if (rect.h - ph > 0)
+      results.push({ x: rect.x, y: rect.y + ph, w: pw, h: rect.h - ph });
+    if (rect.w - pw > 0)
+      results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: rect.h });
+    return results;
+  }
+
+  function removeContained() {
+    // Remove free rects fully contained within another
+    freeRects = freeRects.filter((r, i) =>
+      !freeRects.some((other, j) => j !== i &&
+        other.x <= r.x && other.y <= r.y &&
+        other.x + other.w >= r.x + r.w &&
+        other.y + other.h >= r.y + r.h
+      )
+    );
+  }
+
+  for (const piece of pieces) {
+    const orients = [
+      { pw: piece.w, ph: piece.h },
+      { pw: piece.h, ph: piece.w }
+    ];
+
+    let bestRect = -1;
+    let bestOrient = null;
+    let bestScore = Infinity; // Best Fit: minimize leftover area
+
+    for (const o of orients) {
+      for (let ri = 0; ri < freeRects.length; ri++) {
+        const r = freeRects[ri];
+        if (o.pw <= r.w && o.ph <= r.h) {
+          // Score: area of free rect minus piece area (smaller = tighter fit)
+          const score = r.w * r.h - o.pw * o.ph;
+          if (score < bestScore) {
+            bestScore = score;
+            bestRect = ri;
+            bestOrient = o;
+          }
+        }
+      }
+    }
+
+    if (bestRect === -1) {
+      unplaced.push(piece);
+      continue;
+    }
+
+    const r = freeRects[bestRect];
+    placed.push({
+      specId: piece.specId,
+      x: r.x, y: r.y,
+      w: bestOrient.pw, h: bestOrient.ph,
+      color: piece.color, name: piece.name
+    });
+
+    // Split free rect both ways, keep both splits for maximum coverage
+    const splitsH = splitRect(r, bestOrient.pw, bestOrient.ph);
+    const splitsV = splitRectV(r, bestOrient.pw, bestOrient.ph);
+    // Use the split that produces larger free rectangles
+    const areaH = splitsH.reduce((s, x) => s + x.w * x.h, 0);
+    const areaV = splitsV.reduce((s, x) => s + x.w * x.h, 0);
+    const newRects = areaH >= areaV ? splitsH : splitsV;
+
+    freeRects.splice(bestRect, 1);
+    freeRects.push(...newRects);
+    removeContained();
+  }
+
+  return { placed, unplaced, freeRects };
+}
+
+function runOptimize() {
+  const kerfW  = parseFloat(document.getElementById('kerfW').value)  || 0;
+  const kerfH  = parseFloat(document.getElementById('kerfH').value)  || 0;
+
+  const boardSpecs = getBoardSpecs();
+  if (!boardSpecs.length) { alert('Please add at least one board!'); return; }
+
+  const specs = getSpecs();
+  if (!specs.length) { alert('Please add at least one part!'); return; }
+
+  let remaining = {};
+  specs.forEach(s => { remaining[s.id] = s.qty; });
+
+  const sheets = [];
+  let safetyCounter = 0;
+  const maxSheets = specs.reduce((s,x) => s + x.qty, 0) + 10;
+
+  while (true) {
+    const anyLeft = specs.some(s => remaining[s.id] > 0);
+    if (!anyLeft) break;
+    if (safetyCounter++ > maxSheets) break;
+
+    const activeSpecs = specs.filter(s => remaining[s.id] > 0);
+
+    let bestResult = null;
+    let bestUtil = -1;
+    let bestBoard = null;
+
+    for (const board of boardSpecs) {
+      const usableW = board.w - kerfW;
+      const usableH = board.h - kerfH;
+      const boardArea = usableW * usableH;
+
+      // Try each spec as primary, fillers fill the rest
+      // Pieces list: primary spec first (all qty), then fillers sorted large→small
+      for (const primary of activeSpecs) {
+        const fillers = activeSpecs
+          .filter(s => s.id !== primary.id)
+          .sort((a,b) => (b.w*b.h) - (a.w*a.h));
+
+        const pieces = [];
+        for (let i = 0; i < remaining[primary.id]; i++)
+          pieces.push({ specId: primary.id, w: primary.w, h: primary.h, color: primary.color, name: primary.name });
+        fillers.forEach(s => {
+          for (let i = 0; i < remaining[s.id]; i++)
+            pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+        });
+
+        const result = tryPlace(pieces, usableW, usableH);
+        const usedArea = result.placed.reduce((s,p) => s + p.w*p.h, 0);
+        const util = usedArea / boardArea;
+
+        // Utilization is the ONLY scoring criterion — no variety penalty
+        if (util > bestUtil) {
+          bestUtil = util;
+          bestResult = result;
+          bestBoard = { ...board, usableW, usableH, boardArea };
+        }
+      }
+
+      // Also try all specs mixed (large first) as a candidate
+      const allLargeFirst = [...activeSpecs].sort((a,b) => (b.w*b.h)-(a.w*a.h));
+      const mixedPieces = [];
+      allLargeFirst.forEach(s => {
+        for (let i = 0; i < remaining[s.id]; i++)
+          mixedPieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+      });
+      const mixedResult = tryPlace(mixedPieces, usableW, usableH);
+      const mixedUsed = mixedResult.placed.reduce((s,p) => s + p.w*p.h, 0);
+      const mixedUtil = mixedUsed / boardArea;
+      if (mixedUtil > bestUtil) {
+        bestUtil = mixedUtil;
+        bestResult = mixedResult;
+        bestBoard = { ...board, usableW, usableH, boardArea };
+      }
+    }
+
+    if (!bestResult || bestResult.placed.length === 0) break;
+
+    const placedCounts = {};
+    bestResult.placed.forEach(p => {
+      placedCounts[p.specId] = (placedCounts[p.specId] || 0) + 1;
+    });
+
+    Object.entries(placedCounts).forEach(([sid, cnt]) => {
+      remaining[sid] = Math.max(0, (remaining[sid] || 0) - cnt);
+    });
+
+    const usedArea = bestResult.placed.reduce((s,p) => s + p.w*p.h, 0);
+    sheets.push({
+      placed: bestResult.placed,
+      placedCounts,
+      usedArea,
+      util: usedArea / bestBoard.boardArea,
+      boardW: bestBoard.usableW,
+      boardH: bestBoard.usableH,
+      boardArea: bestBoard.boardArea,
+      boardName: bestBoard.name,
+      freeRects: bestResult.freeRects  // keep free space for backfill
+    });
+  }
+
+  // ── BACKFILL PHASE ────────────────────────────────────────────────────────────
+  // Any remaining pieces: try to squeeze into existing sheets' free space
+  // before opening a new sheet
+  function placeSingleIntoFreeRects(piece, freeRects) {
+    const orients = [
+      { pw: piece.w, ph: piece.h },
+      { pw: piece.h, ph: piece.w }
+    ];
+    let bestRect = -1, bestOrient = null, bestScore = Infinity;
+    for (const o of orients) {
+      for (let ri = 0; ri < freeRects.length; ri++) {
+        const r = freeRects[ri];
+        if (o.pw <= r.w && o.ph <= r.h) {
+          const score = r.w * r.h - o.pw * o.ph;
+          if (score < bestScore) { bestScore = score; bestRect = ri; bestOrient = o; }
+        }
+      }
+    }
+    if (bestRect === -1) return null;
+    const r = freeRects[bestRect];
+    const placed = { specId: piece.specId, x: r.x, y: r.y, w: bestOrient.pw, h: bestOrient.ph, color: piece.color, name: piece.name };
+    // Split
+    const splitsH = [
+      { x: r.x + bestOrient.pw, y: r.y, w: r.w - bestOrient.pw, h: bestOrient.ph },
+      { x: r.x, y: r.y + bestOrient.ph, w: r.w, h: r.h - bestOrient.ph }
+    ].filter(s => s.w > 0 && s.h > 0);
+    const splitsV = [
+      { x: r.x, y: r.y + bestOrient.ph, w: bestOrient.pw, h: r.h - bestOrient.ph },
+      { x: r.x + bestOrient.pw, y: r.y, w: r.w - bestOrient.pw, h: r.h }
+    ].filter(s => s.w > 0 && s.h > 0);
+    const aH = splitsH.reduce((s,x)=>s+x.w*x.h,0);
+    const aV = splitsV.reduce((s,x)=>s+x.w*x.h,0);
+    freeRects.splice(bestRect, 1, ...(aH >= aV ? splitsH : splitsV));
+    // Remove contained
+    const cleaned = freeRects.filter((r,i) =>
+      !freeRects.some((o,j) => j!==i && o.x<=r.x && o.y<=r.y && o.x+o.w>=r.x+r.w && o.y+o.h>=r.y+r.h)
+    );
+    freeRects.length = 0; freeRects.push(...cleaned);
+    return placed;
+  }
+
+  // Backfill: for each remaining piece, try all existing sheets first
+  specs.forEach(s => {
+    while (remaining[s.id] > 0) {
+      const piece = { specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name };
+      let filled = false;
+      for (const sheet of sheets) {
+        const result = placeSingleIntoFreeRects(piece, sheet.freeRects);
+        if (result) {
+          sheet.placed.push(result);
+          sheet.placedCounts[s.id] = (sheet.placedCounts[s.id] || 0) + 1;
+          sheet.usedArea += result.w * result.h;
+          sheet.util = sheet.usedArea / sheet.boardArea;
+          remaining[s.id]--;
+          filled = true;
+          break;
+        }
+      }
+      if (!filled) break; // needs new sheet — handled by unmet
+    }
+  });
+
+  const unmet = specs.filter(s => remaining[s.id] > 0).map(s => ({ ...s, leftover: remaining[s.id] }));
+  renderResults(sheets, specs, unmet);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderResults(sheets, specs, unmet) {
+  const totalPieces = specs.reduce((s,x) => s + x.qty, 0);
+  const placedPieces = sheets.reduce((s,sh) => s + sh.placed.length, 0);
+  const avgUtil = sheets.length ? (sheets.reduce((s,sh) => s + sh.util, 0) / sheets.length * 100).toFixed(1) : 0;
+  const totalUsed = sheets.reduce((s,sh) => s + sh.usedArea, 0);
+  const totalBoard = sheets.reduce((s,sh) => s + sh.boardW * sh.boardH, 0);
+  const overallUtil = totalBoard ? (totalUsed / totalBoard * 100).toFixed(1) : 0;
+  
+  let h = `
+  <div class="summary-grid">
+    <div class="stat-card"><div class="stat-label">Sheets Required</div><div class="stat-val">${sheets.length}</div><div class="stat-sub">pcs</div></div>
+    <div class="stat-card"><div class="stat-label">Part Types</div><div class="stat-val">${specs.length}</div><div class="stat-sub">types</div></div>
+    <div class="stat-card"><div class="stat-label">Total Parts</div><div class="stat-val">${totalPieces}</div><div class="stat-sub">pcs</div></div>
+    <div class="stat-card"><div class="stat-label">Parts Placed</div><div class="stat-val">${placedPieces}</div><div class="stat-sub">pcs</div></div>
+    <div class="stat-card hi"><div class="stat-label">Overall Utilization</div><div class="stat-val">${overallUtil}%</div><div class="stat-sub">avg ${avgUtil}%/sheet</div></div>
+  </div>`;
+  
+  if (unmet.length) {
+    h += `<div class="unmet-panel"><div class="unmet-title">⚠ Parts below could not be fully placed (board may be too small)</div>`;
+    unmet.forEach(u => {
+      h += `<span class="piece-tag" style="background:${u.color}22;color:${u.color};">${u.name} missing ${u.leftover} pcs</span>`;
+    });
+    h += `</div>`;
+  }
+  
+  // ── 采购清单 ──
+  const purchaseMap = {};
+  sheets.forEach(sh => {
+    const key = sh.boardName;
+    purchaseMap[key] = (purchaseMap[key] || 0) + 1;
+  });
+  const purchaseEntries = Object.entries(purchaseMap).sort((a,b) => b[1]-a[1]);
+
+  h += `
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;">
+    <div class="panel-title" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;">📋 Purchase List</span>
+      <span style="flex:1;height:1px;background:var(--border);display:block;"></span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:left;border-bottom:1px solid var(--border);">Board Size</th>
+          <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:center;border-bottom:1px solid var(--border);">Qty to Order</th>
+          <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:right;border-bottom:1px solid var(--border);">% of Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${purchaseEntries.map(([name, qty]) => `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="font-family:var(--mono);font-size:13px;color:var(--text);padding:10px 12px;">${name}</td>
+          <td style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent);padding:10px 12px;text-align:center;">${qty} pcs</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--text2);padding:10px 12px;text-align:right;">${(qty/sheets.length*100).toFixed(1)}%</td>
+        </tr>`).join('')}
+        <tr style="background:var(--surface2);">
+          <td style="font-family:var(--mono);font-size:11px;color:var(--text2);padding:8px 12px;font-weight:600;">Total</td>
+          <td style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text);padding:8px 12px;text-align:center;">${sheets.length} pcs</td>
+          <td style="padding:8px 12px;"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  h += `<div class="sheets-grid">`;
+  
+  sheets.forEach((sheet, si) => {
+    const utilColor = sheet.util >= 0.85 ? '#00e5a0' : sheet.util >= 0.65 ? '#f0c040' : '#ff6b35';
+    h += `
+    <div class="sheet-card">
+      <div class="sheet-header">
+        <span class="sheet-num">SHEET #${si+1} · ${sheet.boardName}</span>
+        <span class="sheet-util" style="color:${utilColor}">${(sheet.util*100).toFixed(1)}% utilization</span>
+      </div>
+      <div class="sheet-body">
+        <div class="board-vis" id="vis_${si}"></div>
+        <div class="pieces-list">`;
+    
+    // Group placed by specId
+    const groups = {};
+    sheet.placed.forEach(p => {
+      if (!groups[p.specId]) groups[p.specId] = { name: p.name, color: p.color, count: 0 };
+      groups[p.specId].count++;
+    });
+    Object.values(groups).forEach(g => {
+      h += `<span class="piece-tag" style="background:${g.color}22;color:${g.color};">${g.name} ×${g.count}</span>`;
+    });
+    
+    h += `</div></div></div>`;
+  });
+  
+  h += `</div>`;
+  
+  const wrap = document.getElementById('resultsWrap');
+  wrap.style.display = 'block';
+  wrap.innerHTML = h;
+  
+  // Draw visual boards
+  sheets.forEach((sheet, si) => {
+    const vis = document.getElementById('vis_' + si);
+    if (!vis) return;
+    sheet.placed.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'piece-rect';
+      div.style.left   = (p.x / sheet.boardW * 100).toFixed(2) + '%';
+      div.style.top    = (p.y / sheet.boardH * 100).toFixed(2) + '%';
+      div.style.width  = (p.w / sheet.boardW * 100).toFixed(2) + '%';
+      div.style.height = (p.h / sheet.boardH * 100).toFixed(2) + '%';
+      div.style.background = p.color + '33';
+      div.style.color  = p.color;
+      div.title = `${p.name} ${p.w}×${p.h}`;
+      div.textContent = p.name.length <= 4 ? p.name : p.name.slice(0,4);
+      vis.appendChild(div);
+    });
+  });
+}
+
+// ── Autosave / localStorage ───────────────────────────────────────────────────
+const STORE_KEY = 'multiCutOptimizer_v1';
+
+function getState() {
+  return {
+    kerfW:  document.getElementById('kerfW').value,
+    kerfH:  document.getElementById('kerfH').value,
+    boards: getRawBoards(),
+    specs:  getRawSpecs()
+  };
+}
+
+function getRawSpecs() {
+  const rows = document.querySelectorAll('#specsBody tr');
+  const out = [];
+  rows.forEach(row => {
+    const id = row.id.replace('row_','');
+    out.push({
+      name: document.getElementById('name_'+id)?.value || '',
+      w:    document.getElementById('w_'+id)?.value    || '',
+      h:    document.getElementById('h_'+id)?.value    || '',
+      qty:  document.getElementById('qty_'+id)?.value  || ''
+    });
+  });
+  return out;
+}
+
+function applyState(data) {
+  if (data.kerfW)  document.getElementById('kerfW').value  = data.kerfW;
+  if (data.kerfH)  document.getElementById('kerfH').value  = data.kerfH;
+  if (data.boards && data.boards.length) {
+    document.getElementById('boardsBody').innerHTML = '';
+    boardRowId = 0;
+    data.boards.forEach(b => addBoardRow(b.w, b.h));
+  }
+  if (data.specs && data.specs.length) {
+    document.getElementById('specsBody').innerHTML = '';
+    rowId = 0;
+    data.specs.forEach(s => addRow(s.name, s.w, s.h, s.qty));
+  }
+}
+
+function autoSave() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ ...getState(), saved: new Date().toISOString() }));
+    showTag('Saved');
+  } catch(e) {}
+}
+
+function showTag(msg) {
+  const tag = document.getElementById('autosave_tag');
+  if (tag) { tag.textContent = msg; setTimeout(() => { tag.textContent = ''; }, 1800); }
+}
+
+// ── Export JSON ───────────────────────────────────────────────────────────────
+function exportJSON() {
+  const data = { ...getState(), saved: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'CutOptimizer_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+}
+
+// ── Import JSON ───────────────────────────────────────────────────────────────
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        applyState(data);
+        autoSave();
+        showTag('Imported ✓');
+      } catch(err) {
+        alert('Invalid file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// Hook autosave to all inputs
+document.addEventListener('input',  () => setTimeout(autoSave, 600));
+document.addEventListener('change', () => setTimeout(autoSave, 600));
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function(){
+  try {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved) {
+      applyState(JSON.parse(saved));
+      return;
+    }
+  } catch(e) {}
+  // Default: board rows + one empty spec row
+  addBoardRow();
+  addBoardRow();
+  addRow();
+})();
+</script>
+</body>
+</html>
