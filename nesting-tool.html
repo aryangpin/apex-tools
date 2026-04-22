@@ -114,8 +114,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); min-hei
   <div class="board-panel">
     <div class="panel-title">Board Size Settings</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-      <div class="field"><label>Kerf Left/Right (mm)</label><input type="number" id="kerfW" value="4"></div>
-      <div class="field"><label>Kerf Top/Bottom (mm)</label><input type="number" id="kerfH" value="4"></div>
+      <div class="field"><label>Kerf Left/Right (mm)</label><input type="number" id="kerfW" value="3"></div>
+      <div class="field"><label>Kerf Top/Bottom (mm)</label><input type="number" id="kerfH" value="3"></div>
     </div>
     <table class="specs-table">
       <thead>
@@ -274,103 +274,219 @@ function getSpecs() {
 }
 
 // ── Core Algorithm ────────────────────────────────────────────────────────────
-// Strip packing greedy:
-// For each sheet, try to place pieces using guillotine shelf approach.
-// Each shelf has a fixed height (tallest piece in that row).
-// Try both orientations for each piece.
+// Hybrid approach:
+// 1. Detect if pieces are "full-length" (piece height >= 90% of board height)
+//    → use 1D Strip Packing: pack widths greedily row by row
+// 2. Otherwise fall back to 2D Guillotine Best-Fit packing
 
-function tryPlace(pieces, boardW, boardH) {
+// ── 1D Strip Packer ───────────────────────────────────────────────────────────
+// Each row = one horizontal strip across the board width.
+// Pieces in a row share the same y-position; strip height = tallest piece in row.
+// Returns { placed, unplaced, freeRects } in same format as tryPlace2D.
+function tryPlace1D(pieces, boardW, boardH) {
   const placed = [];
-  const unplaced = [];
+  const unplaced = [...pieces];
 
-  // Free Rectangle (GUILLOTINE) packing
-  // Track all free rectangles on the board
-  let freeRects = [{ x: 0, y: 0, w: boardW, h: boardH }];
+  // rows: array of { x, y, h, remaining_w }
+  const rows = [];
+  let curY = 0;
 
-  function splitRect(rect, pw, ph) {
-    // Split free rect into two after placing piece (pw×ph) at rect origin
-    // Horizontal split: right rectangle + bottom rectangle
-    const results = [];
-    if (rect.w - pw > 0)
-      results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: ph });
-    if (rect.h - ph > 0)
-      results.push({ x: rect.x, y: rect.y + ph, w: rect.w, h: rect.h - ph });
-    return results;
-  }
-
-  function splitRectV(rect, pw, ph) {
-    // Vertical split variant
-    const results = [];
-    if (rect.h - ph > 0)
-      results.push({ x: rect.x, y: rect.y + ph, w: pw, h: rect.h - ph });
-    if (rect.w - pw > 0)
-      results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: rect.h });
-    return results;
-  }
-
-  function removeContained() {
-    // Remove free rects fully contained within another
-    freeRects = freeRects.filter((r, i) =>
-      !freeRects.some((other, j) => j !== i &&
-        other.x <= r.x && other.y <= r.y &&
-        other.x + other.w >= r.x + r.w &&
-        other.y + other.h >= r.y + r.h
-      )
-    );
-  }
-
-  for (const piece of pieces) {
+  // Greedy: iterate pieces (already sorted by caller), try to fit into existing rows first
+  let i = 0;
+  while (i < unplaced.length) {
+    const piece = unplaced[i];
+    // Try both orientations; pick the one that fits
     const orients = [
       { pw: piece.w, ph: piece.h },
       { pw: piece.h, ph: piece.w }
-    ];
+    ].filter(o => o.pw <= boardW && o.ph <= boardH);
 
-    let bestRect = -1;
+    if (orients.length === 0) { i++; continue; }
+
+    // Try to fit into an existing row (best-fit by remaining width)
+    let bestRow = -1;
     let bestOrient = null;
-    let bestScore = Infinity; // Best Fit: minimize leftover area
+    let bestLeftover = Infinity;
 
-    for (const o of orients) {
-      for (let ri = 0; ri < freeRects.length; ri++) {
-        const r = freeRects[ri];
-        if (o.pw <= r.w && o.ph <= r.h) {
-          // Score: area of free rect minus piece area (smaller = tighter fit)
-          const score = r.w * r.h - o.pw * o.ph;
-          if (score < bestScore) {
-            bestScore = score;
-            bestRect = ri;
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      for (const o of orients) {
+        if (o.pw <= row.remaining_w && o.ph <= row.h) {
+          const leftover = row.remaining_w - o.pw;
+          if (leftover < bestLeftover) {
+            bestLeftover = leftover;
+            bestRow = ri;
             bestOrient = o;
           }
         }
       }
     }
 
-    if (bestRect === -1) {
-      unplaced.push(piece);
+    if (bestRow !== -1) {
+      const row = rows[bestRow];
+      placed.push({
+        specId: piece.specId,
+        x: boardW - row.remaining_w,
+        y: row.y,
+        w: bestOrient.pw,
+        h: bestOrient.ph,
+        color: piece.color,
+        name: piece.name
+      });
+      row.remaining_w -= bestOrient.pw;
+      unplaced.splice(i, 1);
       continue;
     }
 
-    const r = freeRects[bestRect];
+    // Open a new row
+    // Pick best orientation for new row: prefer shorter height (save vertical space)
+    const best = orients.reduce((a, b) => a.ph <= b.ph ? a : b);
+    if (curY + best.ph > boardH) { i++; continue; } // no vertical space left
+
+    const newRow = { x: 0, y: curY, h: best.ph, remaining_w: boardW - best.pw };
+    rows.push(newRow);
     placed.push({
       specId: piece.specId,
-      x: r.x, y: r.y,
-      w: bestOrient.pw, h: bestOrient.ph,
-      color: piece.color, name: piece.name
+      x: 0,
+      y: curY,
+      w: best.pw,
+      h: best.ph,
+      color: piece.color,
+      name: piece.name
     });
+    curY += best.ph;
+    unplaced.splice(i, 1);
+  }
 
-    // Split free rect both ways, keep both splits for maximum coverage
-    const splitsH = splitRect(r, bestOrient.pw, bestOrient.ph);
-    const splitsV = splitRectV(r, bestOrient.pw, bestOrient.ph);
-    // Use the split that produces larger free rectangles
-    const areaH = splitsH.reduce((s, x) => s + x.w * x.h, 0);
-    const areaV = splitsV.reduce((s, x) => s + x.w * x.h, 0);
-    const newRects = areaH >= areaV ? splitsH : splitsV;
-
-    freeRects.splice(bestRect, 1);
-    freeRects.push(...newRects);
-    removeContained();
+  // Build freeRects from leftover row space + unused vertical space
+  const freeRects = [];
+  rows.forEach(row => {
+    if (row.remaining_w > 0) {
+      freeRects.push({ x: boardW - row.remaining_w, y: row.y, w: row.remaining_w, h: row.h });
+    }
+  });
+  if (curY < boardH) {
+    freeRects.push({ x: 0, y: curY, w: boardW, h: boardH - curY });
   }
 
   return { placed, unplaced, freeRects };
+}
+
+// ── 2D Guillotine Best-Fit ────────────────────────────────────────────────────
+function tryPlace2D(pieces, boardW, boardH) {
+  const placed = [];
+  const unplaced = [];
+  let freeRects = [{ x: 0, y: 0, w: boardW, h: boardH }];
+
+  function splitRect(rect, pw, ph) {
+    const results = [];
+    if (rect.w - pw > 0) results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: ph });
+    if (rect.h - ph > 0) results.push({ x: rect.x, y: rect.y + ph, w: rect.w, h: rect.h - ph });
+    return results;
+  }
+  function splitRectV(rect, pw, ph) {
+    const results = [];
+    if (rect.h - ph > 0) results.push({ x: rect.x, y: rect.y + ph, w: pw, h: rect.h - ph });
+    if (rect.w - pw > 0) results.push({ x: rect.x + pw, y: rect.y, w: rect.w - pw, h: rect.h });
+    return results;
+  }
+  function removeContained() {
+    freeRects = freeRects.filter((r, i) =>
+      !freeRects.some((other, j) => j !== i &&
+        other.x <= r.x && other.y <= r.y &&
+        other.x + other.w >= r.x + r.w && other.y + other.h >= r.y + r.h)
+    );
+  }
+
+  for (const piece of pieces) {
+    const orients = [{ pw: piece.w, ph: piece.h }, { pw: piece.h, ph: piece.w }];
+    let bestRect = -1, bestOrient = null, bestScore = Infinity;
+    for (const o of orients) {
+      for (let ri = 0; ri < freeRects.length; ri++) {
+        const r = freeRects[ri];
+        if (o.pw <= r.w && o.ph <= r.h) {
+          const score = r.w * r.h - o.pw * o.ph;
+          if (score < bestScore) { bestScore = score; bestRect = ri; bestOrient = o; }
+        }
+      }
+    }
+    if (bestRect === -1) { unplaced.push(piece); continue; }
+    const r = freeRects[bestRect];
+    placed.push({ specId: piece.specId, x: r.x, y: r.y, w: bestOrient.pw, h: bestOrient.ph, color: piece.color, name: piece.name });
+    const splitsH = splitRect(r, bestOrient.pw, bestOrient.ph);
+    const splitsV = splitRectV(r, bestOrient.pw, bestOrient.ph);
+    const areaH = splitsH.reduce((s, x) => s + x.w * x.h, 0);
+    const areaV = splitsV.reduce((s, x) => s + x.w * x.h, 0);
+    freeRects.splice(bestRect, 1);
+    freeRects.push(...(areaH >= areaV ? splitsH : splitsV));
+    removeContained();
+  }
+  return { placed, unplaced, freeRects };
+}
+
+// ── Smart dispatcher ──────────────────────────────────────────────────────────
+// If ALL pieces in the list are "full-length" (height >= 90% board height after
+// considering both orientations), use 1D packer. Otherwise use 2D.
+function tryPlace(pieces, boardW, boardH) {
+  if (pieces.length === 0) return { placed: [], unplaced: [], freeRects: [] };
+
+  // Check if pieces are full-length in at least one orientation
+  const allFullLength = pieces.every(p => {
+    const canStandH = p.h >= boardH * 0.88 && p.w <= boardW;
+    const canStandW = p.w >= boardH * 0.88 && p.h <= boardW;
+    return canStandH || canStandW;
+  });
+
+  if (allFullLength) {
+    // Normalize: orient each piece so the long dimension is vertical (along boardH)
+    const normalized = pieces.map(p => {
+      const useRotated = p.w > p.h; // rotate so h is the longer side
+      return {
+        ...p,
+        w: useRotated ? p.h : p.w,
+        h: useRotated ? p.w : p.h,
+        _origW: p.w, _origH: p.h
+      };
+    });
+    return tryPlace1D(normalized, boardW, boardH);
+  }
+
+  return tryPlace2D(pieces, boardW, boardH);
+}
+
+// ── Generate candidate strip combos for 1D full-length case ──────────────────
+// Enumerate all combinations of strip widths that fit within boardW.
+// Returns array of { counts: {specId: n}, totalW }
+function enumStripCombos(activeSpecs, boardW, remaining) {
+  // Build item pool: one entry per spec with its effective width (shorter dimension)
+  const items = activeSpecs.map(s => ({
+    ...s,
+    stripW: Math.min(s.w, s.h) // width consumed per strip
+  })).filter(s => s.stripW <= boardW);
+
+  const results = [];
+
+  function recurse(idx, combo, usedW) {
+    results.push({ combo: { ...combo }, usedW });
+    for (let i = idx; i < items.length; i++) {
+      const item = items[i];
+      const maxCount = Math.min(remaining[item.id], Math.floor((boardW - usedW) / item.stripW));
+      for (let n = 1; n <= maxCount; n++) {
+        combo[item.id] = (combo[item.id] || 0) + n;
+        recurse(i + 1, combo, usedW + n * item.stripW);
+        combo[item.id] -= n;
+        if (combo[item.id] === 0) delete combo[item.id];
+      }
+    }
+  }
+
+  recurse(0, {}, 0);
+
+  // Sort by usedW descending (highest utilization first), cap at 500 candidates
+  return results
+    .filter(r => Object.keys(r.combo).length > 0)
+    .sort((a, b) => b.usedW - a.usedW)
+    .slice(0, 500);
 }
 
 function runOptimize() {
@@ -406,26 +522,17 @@ function runOptimize() {
       const usableH = board.h - kerfH;
       const boardArea = usableW * usableH;
 
-      // Try each spec as primary, fillers fill the rest
-      // Pieces list: primary spec first (all qty), then fillers sorted large→small
-      for (const primary of activeSpecs) {
-        const fillers = activeSpecs
-          .filter(s => s.id !== primary.id)
-          .sort((a,b) => (b.w*b.h) - (a.w*a.h));
+      // Detect full-length mode: any spec whose long dim >= 88% of usableH
+      const isFullLength = activeSpecs.every(s => {
+        const longDim = Math.max(s.w, s.h);
+        const shortDim = Math.min(s.w, s.h);
+        return longDim >= usableH * 0.88 && shortDim <= usableW;
+      });
 
-        const pieces = [];
-        for (let i = 0; i < remaining[primary.id]; i++)
-          pieces.push({ specId: primary.id, w: primary.w, h: primary.h, color: primary.color, name: primary.name });
-        fillers.forEach(s => {
-          for (let i = 0; i < remaining[s.id]; i++)
-            pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
-        });
-
+      function evalPieces(pieces) {
         const result = tryPlace(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s,p) => s + p.w*p.h, 0);
         const util = usedArea / boardArea;
-
-        // Utilization is the ONLY scoring criterion — no variety penalty
         if (util > bestUtil) {
           bestUtil = util;
           bestResult = result;
@@ -433,20 +540,48 @@ function runOptimize() {
         }
       }
 
-      // Also try all specs mixed (large first) as a candidate
-      const allLargeFirst = [...activeSpecs].sort((a,b) => (b.w*b.h)-(a.w*a.h));
-      const mixedPieces = [];
-      allLargeFirst.forEach(s => {
-        for (let i = 0; i < remaining[s.id]; i++)
-          mixedPieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
-      });
-      const mixedResult = tryPlace(mixedPieces, usableW, usableH);
-      const mixedUsed = mixedResult.placed.reduce((s,p) => s + p.w*p.h, 0);
-      const mixedUtil = mixedUsed / boardArea;
-      if (mixedUtil > bestUtil) {
-        bestUtil = mixedUtil;
-        bestResult = mixedResult;
-        bestBoard = { ...board, usableW, usableH, boardArea };
+      if (isFullLength) {
+        // ── 1D combo enumeration: find best strip combination ──
+        const combos = enumStripCombos(activeSpecs, usableW, remaining);
+        // Also add single-spec combos to ensure coverage
+        for (const combo of combos) {
+          const pieces = [];
+          for (const [sid, cnt] of Object.entries(combo.combo)) {
+            const spec = activeSpecs.find(s => s.id === sid);
+            if (!spec) continue;
+            for (let i = 0; i < cnt; i++)
+              pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
+          }
+          if (pieces.length > 0) evalPieces(pieces);
+        }
+        // Fallback: each spec alone
+        for (const s of activeSpecs) {
+          const pieces = [];
+          for (let i = 0; i < remaining[s.id]; i++)
+            pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+          evalPieces(pieces);
+        }
+      } else {
+        // ── 2D mode: original greedy candidates ──
+        for (const primary of activeSpecs) {
+          const fillers = activeSpecs.filter(s => s.id !== primary.id).sort((a,b) => (b.w*b.h)-(a.w*a.h));
+          const pieces = [];
+          for (let i = 0; i < remaining[primary.id]; i++)
+            pieces.push({ specId: primary.id, w: primary.w, h: primary.h, color: primary.color, name: primary.name });
+          fillers.forEach(s => {
+            for (let i = 0; i < remaining[s.id]; i++)
+              pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+          });
+          evalPieces(pieces);
+        }
+        // Mixed large-first
+        const allLargeFirst = [...activeSpecs].sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+        const mixedPieces = [];
+        allLargeFirst.forEach(s => {
+          for (let i = 0; i < remaining[s.id]; i++)
+            mixedPieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+        });
+        evalPieces(mixedPieces);
       }
     }
 
