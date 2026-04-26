@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metal Frame Costing · Zincalume</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--border:#2a3349;--accent:#00c896;--accent2:#0082ff;--warn:#ff6b35;--text:#e8eaf0;--text2:#8892a4;--text3:#4a5568;--green:#00c896;--red:#ff4d6d;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.header h1{font-size:20px;font-weight:500;letter-spacing:-0.3px;}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:20px;}
+.main-content{flex:1;padding:24px;overflow-y:auto;min-width:0;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;}
+.ph{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;}
+.pd{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+.pb{padding:14px;}
+.f{margin-bottom:12px;}
+.f label{display:block;font-size:10px;font-weight:500;color:var(--text2);margin-bottom:4px;letter-spacing:0.3px;text-transform:uppercase;}
+.f input,.f select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;transition:border-color 0.15s;}
+.f input:focus,.f select:focus{border-color:var(--accent);}
+.f select option{background:var(--surface2);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.sec{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.hwt{width:100%;border-collapse:collapse;}
+.hwt td{padding:4px 3px;font-size:12px;}
+.hwt td:first-child{color:var(--text2);}
+.hwt input{width:76px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:4px 6px;text-align:right;outline:none;}
+.hwt input:focus{border-color:var(--accent);}
+.pr{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;}
+.pr .lbl{color:var(--text2);flex:1;}
+.pr input{width:66px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:4px 6px;text-align:right;outline:none;}
+.pr input:focus{border-color:var(--accent);}
+.pru{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.btn-calc{width:100%;background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:13px;font-weight:600;padding:11px;cursor:pointer;letter-spacing:0.5px;transition:opacity 0.15s,transform 0.1s;margin-top:14px;}
+.btn-calc:hover{opacity:0.85;}
+.btn-calc:active{transform:scale(0.99);}
+.btn-add{background:transparent;border:1px dashed var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:12px;padding:7px;cursor:pointer;width:100%;transition:all 0.15s;margin-top:8px;}
+.btn-add:hover{border-color:var(--accent);color:var(--accent);}
+.dr{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;}
+.drh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.drn{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:600;letter-spacing:1px;}
+.brm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;transition:color 0.15s;}
+.brm:hover{color:var(--red);}
+.cut-chip{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-top:6px;font-family:var(--mono);font-size:11px;}
+.ltag{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;margin-left:4px;}
+.la{background:rgba(0,200,150,0.1);color:var(--accent);}
+.lm{background:rgba(255,107,53,0.12);color:var(--warn);}
+.rempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:var(--text3);font-family:var(--mono);font-size:12px;gap:8px;}
+.sgrid{display:grid;gap:12px;margin-bottom:16px;}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;}
+.sc.hi{border-color:var(--accent);}
+.sl{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;}
+.sv{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text);}
+.sc.hi .sv{color:var(--accent);}
+.ss{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px;}
+.pres{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tabs{display:flex;gap:2px;padding:10px 16px 0;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.tb{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;padding:6px 14px 8px;cursor:pointer;transition:color 0.15s;}
+.tb.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tc{display:none;}
+.tc.active{display:block;}
+.rt{width:100%;border-collapse:collapse;}
+.rt th{font-family:var(--mono);font-size:10px;color:var(--text3);font-weight:500;letter-spacing:0.4px;text-transform:uppercase;padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);}
+.rt th:first-child,.rt th:nth-child(2){text-align:left;}
+.rt td{padding:8px 10px;font-family:var(--mono);font-size:12px;text-align:right;border-bottom:1px solid rgba(42,51,73,0.5);color:var(--text2);}
+.rt td:first-child,.rt td:nth-child(2){text-align:left;color:var(--text);}
+.rt tr:hover td{background:rgba(255,255,255,0.02);}
+.vg{color:var(--green)!important;font-weight:600;}
+.vr{color:var(--red)!important;font-weight:600;}
+.va{color:var(--accent2)!important;}
+.pill{display:inline-block;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:11px;font-weight:600;}
+.pill.g{background:rgba(0,200,150,0.15);color:var(--green);}
+.pill.o{background:rgba(0,130,255,0.15);color:var(--accent2);}
+.pill.r{background:rgba(255,77,109,0.15);color:var(--red);}
+.bdc{background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.bdh{padding:10px 14px;border-bottom:1px solid var(--border);}
+.brw{display:flex;justify-content:space-between;padding:6px 14px;font-size:12px;border-top:1px solid var(--border);}
+.brw .bn{color:var(--text2);}
+.brw .bv{font-family:var(--mono);}
+.brw.tot{background:rgba(0,200,150,0.06);}
+.brw.tot .bn{color:var(--text);font-weight:500;}
+.brw.tot .bv{color:var(--accent);font-size:13px;font-weight:600;}
+.lt2{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+.lt2 th{background:var(--surface2);color:var(--text2);padding:6px 10px;text-align:center;border:1px solid var(--border);font-weight:500;}
+.lt2 td{padding:4px 10px;text-align:center;border:1px solid var(--border);color:var(--text2);}
+.lt2 td:first-child{text-align:left;color:var(--text);font-weight:500;}
+.lt2 td.hi{background:rgba(0,200,150,0.15);color:var(--accent);font-weight:600;}
+/* Length row */
+.btn-del-sm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;transition:color 0.15s;padding:0;width:24px;text-align:center;}
+.btn-del-sm:hover{color:var(--red);}
+/* Nesting styles */
+.nest-section{margin-bottom:24px;}
+.nest-header{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:9px 14px;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.nest-header.top{color:var(--warn);background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);}
+.nest-header.lr{color:var(--accent2);background:rgba(0,130,255,0.06);border:1px solid rgba(0,130,255,0.2);}
+.piece-tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;}
+.nest-stat-bar{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;}
+.nsb-item{font-family:var(--mono);font-size:11px;}
+.nsb-lbl{color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;}
+.nsb-val{color:var(--text);font-weight:600;}
+.nsb-val.hi{color:var(--accent);}
+/* Profile sidebar */
+.sidebar{width:180px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:fixed;top:0;left:0;z-index:50;}
+.sb-header{padding:16px 14px 10px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+.sb-logo{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);letter-spacing:1px;}
+.sb-new{width:100%;background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px;cursor:pointer;}
+.sb-list{flex:1;overflow-y:auto;padding:8px;}
+.sb-item{padding:8px 10px;border-radius:5px;cursor:pointer;margin-bottom:4px;display:flex;align-items:center;gap:6px;transition:background 0.15s;border:1px solid transparent;}
+.sb-item:hover{background:var(--surface2);}
+.sb-item.active{background:var(--surface2);border-color:var(--border);}
+.sb-item-name{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-item-date{font-family:var(--mono);font-size:9px;color:var(--text3);}
+.sb-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;line-height:1;padding:0 2px;transition:color 0.15s;opacity:0;}
+.sb-item:hover .sb-del{opacity:1;}
+.sb-del:hover{color:var(--red);}
+.sb-rename-input{width:100%;background:var(--bg);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:11px;padding:2px 5px;outline:none;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sb-header">
+    <div class="sb-logo">Zincalume</div>
+    <button class="sb-new" onclick="newProfile()">+ New Profile</button>
+  </div>
+  <div class="sb-list" id="sbList"></div>
+</div>
+
+<div class="main-content" style="margin-left:180px;">
+<div style="max-width:1500px;margin:0 auto;">
+<div class="header">
+  <div>
+    <h1>Metal Frame Costing Calculation</h1>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:4px;">Zincalume · 1219mm width only · Nesting Integrated</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button onclick="importJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬆ Import</button>
+    <button onclick="exportJSON()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">⬇ Export</button>
+    <span id="autosave_tag" style="font-family:var(--mono);font-size:10px;color:var(--text3);"></span>
+  </div>
+</div>
+<div class="layout">
+  <!-- LEFT -->
+  <div>
+    <div class="panel">
+      <div class="ph"><span class="pd"></span>MATERIAL SETTINGS</div>
+      <div class="pb">
+        <div class="fr">
+          <div class="f"><label>Material Type</label>
+            <select id="matType" onchange="updateMaterial()">
+              <option value="Zincalume" selected>Zincalume</option>
+            </select></div>
+          <div class="f"><label>Thickness (mm)</label>
+            <select id="matThick">
+              <option value="0.9">0.9</option><option value="0.95">0.95</option>
+              <option value="1.0" selected>1.0</option><option value="1.1">1.1</option>
+              <option value="1.15">1.15</option><option value="1.2">1.2</option>
+            </select></div>
+        </div>
+        <div class="f"><label>Price (RM / ton)</label>
+          <input type="number" id="matPrice" value="3500" step="50"></div>
+        <div class="f"><label>Kerf per side (mm)</label>
+          <input type="number" id="kerf" value="2" step="0.5" min="0">
+          <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block;">Board border only: top/bottom/left/right each −kerf. Piece = cutting size. No inter-piece loss.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span class="pd" style="background:var(--accent2)"></span>SHEET SIZES (for nesting)</div>
+      <div class="pb">
+        <div style="margin-bottom:10px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:6px;letter-spacing:0.5px;">AVAILABLE WIDTHS (auto by material)</div>
+          <div id="sheetWidthDisplay" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:6px;letter-spacing:0.5px;">LENGTHS TO USE (mm) — algorithm picks best width × length combo</div>
+          <div id="boardLengthRows"></div>
+          <button class="btn-add" onclick="addLengthRow()" style="margin-top:4px;">+ Add Length</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span class="pd" style="background:var(--accent2)"></span>HARDWARE UNIT COST (RM)</div>
+      <div class="pb">
+        <table class="hwt">
+          <tr><td>Hinges (pcs)</td><td style="text-align:right"><input type="number" id="hw_hinge" value="4.00" step="0.1"></td></tr>
+          <tr><td>Striker Plate</td><td style="text-align:right"><input type="number" id="hw_striker" value="0.00" step="0.1"></td></tr>
+          <tr><td>Spreader Bar</td><td style="text-align:right"><input type="number" id="hw_spreader" value="2.00" step="0.1"></td></tr>
+          <tr><td>Wire Ties</td><td style="text-align:right"><input type="number" id="hw_wire" value="1.00" step="0.1"></td></tr>
+          <tr><td>Column / Stiffner Strap</td><td style="text-align:right"><input type="number" id="hw_strap" value="1.20" step="0.1"></td></tr>
+          <tr><td>Morter Box</td><td style="text-align:right"><input type="number" id="hw_morter" value="0.50" step="0.1"></td></tr>
+          <tr><td>Transport Fee (per frame)</td><td style="text-align:right"><input type="number" id="hw_transport" value="3.30" step="0.1"></td></tr>
+        </table>
+        <div class="sec">Overhead %</div>
+        <div class="pr"><span class="lbl">Rejection</span><input type="number" id="pct_r" value="2" step="0.1"><span class="pru">%</span></div>
+        <div class="pr"><span class="lbl">Admin Cost</span><input type="number" id="pct_a" value="11" step="0.5"><span class="pru">%</span></div>
+        <div class="pr"><span class="lbl">Overhead</span><input type="number" id="pct_o" value="12" step="0.5"><span class="pru">%</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><span class="pd" style="background:var(--warn)"></span>DOOR ORDERS</div>
+      <div class="pb">
+        <div id="doorRows"></div>
+        <button class="btn-add" onclick="addDoorRow()">+ Add Door Type</button>
+        <button class="btn-add" onclick="clearAllDoors()" style="color:var(--red);border-color:var(--red);margin-top:4px;">Clear All</button>
+        <button class="btn-calc" onclick="calculate()">⚡ CALCULATE COSTING</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <div id="resultsArea">
+      <div class="rempty"><span style="font-size:32px;">⚡</span><span>Fill in door specs and click Calculate</span></div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+const DENSITY={EG:0.000007888336532,GI:0.000008230354593,Aluzinc:0.000008143290141,GA:0.000008143290141,Zincalume:0.000008143290141};
+const MAT_PRICES={EG:3850,GI:3500,Aluzinc:3500,GA:3000,Zincalume:4950};
+const SHEET_WIDTHS={EG:[1100,1219,1250],GI:[1100,1219,1250],Aluzinc:[1100,1219,1250],GA:[1100,1219,1250],Zincalume:[1219]};
+const COLOURS=['#00c896','#0082ff','#ff6b35','#f0c040','#e05bf0','#3dc8f0','#f05b7a','#7af05b','#f09c3d','#3d8af0','#c0f040','#f040c0','#40f0c0','#f07040','#4070f0'];
+const LABOUR={
+  APF1:{2130:12,2430:12,3000:12},APF2:{2130:12,2430:12,3000:12},
+  APF3:{2130:12,2430:12,3000:12},APF4:{2130:12,2430:12,3000:12},
+  APF5:{2130:12,2430:12,3000:12},APF6:{2130:12,2430:12,3000:12},
+  APF7:{2130:12,2430:12,3000:12},APF8:{2130:12,2430:12,3000:12},
+  APF9:{2130:12,2430:12,3000:12},APF10:{2130:12,2430:12,3000:12},
+  APF11:{2130:12,2430:12,3000:12},APF12:{2130:12,2430:12,3000:12},
+  APF13:{2130:12,2430:12,3000:12},APF14:{2130:12,2430:12,3000:12},
+  APF15:{2130:null,2430:null,3000:null},APF16:{2130:null,2430:null,3000:null},
+  APF17:{2130:null,2430:null,3000:null},APF18:{2130:null,2430:null,3000:null},
+  APF19:{2130:null,2430:null,3000:null},
+  APFD1:{2130:12,2430:12,3000:12},APFD2:{2130:12,2430:12,3000:12},
+  APFD3:{2130:12,2430:12,3000:12},APFD4:{2130:12,2430:12,3000:12},
+  APFD5:{2130:null,2430:null,3000:null},APFD6:{2130:null,2430:null,3000:null},
+  APFD7:{2130:null,2430:null,3000:null},APFD8:{2130:12,2430:12,3000:12}
+};
+const HB=[2130,2430,3000];
+const PROFS=Object.keys(LABOUR);
+let dc=0,lengthRowId=0,_lastResults=[],_lastNesting=null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function gv(id){return parseFloat(document.getElementById(id).value)||0;}
+function gs(id){return document.getElementById(id).value;}
+function hKey(h){const b=HB.filter(x=>x>=h);return b.length?b[0]:HB[HB.length-1];}
+function getLabour(p,h){const r=LABOUR[p];if(!r)return null;return r[hKey(h)];}
+function rm(v){return'RM '+(v||0).toFixed(2);}
+function pc(v){return(v||0).toFixed(2)+'%';}
+function pill(v){const c=v>=10?'g':v>=7?'o':'r';return`<span class="pill ${c}">${pc(v)}</span>`;}
+
+// ── Material ──────────────────────────────────────────────────────────────────
+function getSheetWidths(){return SHEET_WIDTHS[gs('matType')]||[1219];}
+function updateMaterial(){
+  document.getElementById('matPrice').value=MAT_PRICES[gs('matType')]||3500;
+  renderWidthDisplay();
+  document.querySelectorAll('.dr').forEach(row=>{const n=row.id.replace('door_','');previewCut(n);});
+}
+function renderWidthDisplay(){
+  const widths=getSheetWidths();const matType=gs('matType');
+  const el=document.getElementById('sheetWidthDisplay');if(!el)return;
+  el.innerHTML=widths.map(w=>`<span style="font-family:var(--mono);font-size:12px;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;color:var(--accent);">${w}mm</span>`).join('')+
+    (matType==='Zincalume'?'<span style="font-family:var(--mono);font-size:10px;color:var(--warn);margin-left:6px;align-self:center;">Zincalume: 1219mm only</span>':'<span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px;align-self:center;">Algorithm picks best width</span>');
+}
+
+// ── Length row manager ────────────────────────────────────────────────────────
+function addLengthRow(h=''){
+  lengthRowId++;const id=lengthRowId;
+  const d=document.createElement('div');d.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;';d.id='lrow_'+id;
+  d.innerHTML=`<input type="number" id="lh_${id}" value="${h}" placeholder="e.g. 2438" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:5px 8px;outline:none;"><span style="font-family:var(--mono);font-size:10px;color:var(--text3);">mm</span><button class="btn-del-sm" onclick="delLengthRow(${id})">✕</button>`;
+  document.getElementById('boardLengthRows').appendChild(d);
+  setTimeout(()=>document.getElementById('lh_'+id)?.focus(),50);
+}
+function delLengthRow(id){const e=document.getElementById('lrow_'+id);if(e)e.remove();}
+function getRawLengths(){
+  const out=[];document.querySelectorAll('[id^="lrow_"]').forEach(row=>{const id=row.id.replace('lrow_','');const v=document.getElementById('lh_'+id)?.value||'';if(v)out.push({h:v});});return out;
+}
+function getBoardSpecs(){
+  const widths=getSheetWidths();const out=[];
+  document.querySelectorAll('[id^="lrow_"]').forEach(row=>{const id=row.id.replace('lrow_','');const h=parseFloat(document.getElementById('lh_'+id)?.value)||0;if(h>0)widths.forEach(w=>out.push({name:`${w}x${h}`,w,h}));});
+  return out;
+}
+
+// ── 1D Strip Packer ───────────────────────────────────────────────────────────
+// NO rotation: piece.w = cutting width (narrow), piece.h = frame height (long, must be vertical)
+// Pack strips side by side horizontally. Each strip = piece.w wide, piece.h tall.
+function tryPlace1D(pieces,bW,bH){
+  const placed=[],unplaced=[...pieces],rows=[];let curY=0,i=0;
+  while(i<unplaced.length){
+    const p=unplaced[i];
+    // Fixed orientation only: pw=p.w (cutting width), ph=p.h (frame height)
+    if(p.w>bW||p.h>bH){i++;continue;}
+    let bRow=-1,bLf=Infinity;
+    for(let ri=0;ri<rows.length;ri++){const row=rows[ri];if(p.w<=row.rw&&p.h<=row.h){const lf=row.rw-p.w;if(lf<bLf){bLf=lf;bRow=ri;}}}
+    if(bRow!==-1){const row=rows[bRow];placed.push({specId:p.specId,x:bW-row.rw,y:row.y,w:p.w,h:p.h,color:p.color,name:p.name});row.rw-=p.w;unplaced.splice(i,1);continue;}
+    if(curY+p.h>bH){i++;continue;}
+    rows.push({y:curY,h:p.h,rw:bW-p.w});placed.push({specId:p.specId,x:0,y:curY,w:p.w,h:p.h,color:p.color,name:p.name});curY+=p.h;unplaced.splice(i,1);
+  }
+  const freeRects=[];rows.forEach(r=>{if(r.rw>0)freeRects.push({x:bW-r.rw,y:r.y,w:r.rw,h:r.h});});
+  if(curY<bH)freeRects.push({x:0,y:curY,w:bW,h:bH-curY});
+  return{placed,unplaced,freeRects};
+}
+
+// ── 2D Guillotine ─────────────────────────────────────────────────────────────
+// NO rotation: fixed orientation only
+function tryPlace2D(pieces,bW,bH){
+  const placed=[],unplaced=[];let fR=[{x:0,y:0,w:bW,h:bH}];
+  function sH(r,pw,ph){const a=[];if(r.w-pw>0)a.push({x:r.x+pw,y:r.y,w:r.w-pw,h:ph});if(r.h-ph>0)a.push({x:r.x,y:r.y+ph,w:r.w,h:r.h-ph});return a;}
+  function sV(r,pw,ph){const a=[];if(r.h-ph>0)a.push({x:r.x,y:r.y+ph,w:pw,h:r.h-ph});if(r.w-pw>0)a.push({x:r.x+pw,y:r.y,w:r.w-pw,h:r.h});return a;}
+  function rmC(){fR=fR.filter((r,i)=>!fR.some((o,j)=>j!==i&&o.x<=r.x&&o.y<=r.y&&o.x+o.w>=r.x+r.w&&o.y+o.h>=r.y+r.h));}
+  for(const p of pieces){
+    // Fixed orientation only: pw=p.w, ph=p.h
+    let bRect=-1,bS=Infinity;
+    for(let ri=0;ri<fR.length;ri++){const r=fR[ri];if(p.w<=r.w&&p.h<=r.h){const s=r.w*r.h-p.w*p.h;if(s<bS){bS=s;bRect=ri;}}}
+    if(bRect===-1){unplaced.push(p);continue;}
+    const r=fR[bRect];placed.push({specId:p.specId,x:r.x,y:r.y,w:p.w,h:p.h,color:p.color,name:p.name});
+    const aH=sH(r,p.w,p.h),aV=sV(r,p.w,p.h);
+    fR.splice(bRect,1);fR.push(...(aH.reduce((s,x)=>s+x.w*x.h,0)>=aV.reduce((s,x)=>s+x.w*x.h,0)?aH:aV));rmC();
+  }
+  return{placed,unplaced,freeRects:fR};
+}
+
+function placeSingleInFreeRects(piece,fR){
+  // Fixed orientation only: piece.w x piece.h, no rotation
+  let bRect=-1,bS=Infinity;
+  for(let ri=0;ri<fR.length;ri++){const r=fR[ri];if(piece.w<=r.w&&piece.h<=r.h){const s=r.w*r.h-piece.w*piece.h;if(s<bS){bS=s;bRect=ri;}}}
+  if(bRect===-1)return null;
+  const r=fR[bRect];const pl={specId:piece.specId,x:r.x,y:r.y,w:piece.w,h:piece.h,color:piece.color,name:piece.name};
+  const sH=[{x:r.x+piece.w,y:r.y,w:r.w-piece.w,h:piece.h},{x:r.x,y:r.y+piece.h,w:r.w,h:r.h-piece.h}].filter(s=>s.w>0&&s.h>0);
+  const sV=[{x:r.x,y:r.y+piece.h,w:piece.w,h:r.h-piece.h},{x:r.x+piece.w,y:r.y,w:r.w-piece.w,h:r.h}].filter(s=>s.w>0&&s.h>0);
+  const aH=sH.reduce((s,x)=>s+x.w*x.h,0),aV=sV.reduce((s,x)=>s+x.w*x.h,0);
+  fR.splice(bRect,1,...(aH>=aV?sH:sV));
+  const cl=fR.filter((r,i)=>!fR.some((o,j)=>j!==i&&o.x<=r.x&&o.y<=r.y&&o.x+o.w>=r.x+r.w&&o.y+o.h>=r.y+r.h));
+  fR.length=0;fR.push(...cl);return pl;
+}
+
+// ── Strip-Combination Optimizer ───────────────────────────────────────────────
+function bestStripCombo(active,remaining,bW){
+  const items=active.map(s=>({spec:s,w:s.w,maxN:remaining[s.id]})).filter(it=>it.w<=bW&&it.maxN>0);
+  if(!items.length)return null;
+  let bestWaste=Infinity,bestCombo=null;
+  function enumerate(idx,usedW,counts){
+    const waste=bW-usedW;if(waste<bestWaste){bestWaste=waste;bestCombo={...counts};}
+    if(idx>=items.length)return;const item=items[idx];const maxFit=Math.min(item.maxN,Math.floor((bW-usedW)/item.w));
+    for(let n=maxFit;n>=0;n--){if(n>0)counts[item.spec.id]=n;else delete counts[item.spec.id];enumerate(idx+1,usedW+n*item.w,counts);if(bestWaste===0)return;}
+    delete counts[item.spec.id];
+  }
+  enumerate(0,0,{});return bestCombo&&Object.keys(bestCombo).length>0?bestCombo:null;
+}
+
+function placeStripCombo(combo,active,bW,bH){
+  const placed=[];let x=0;
+  for(const[sid,cnt]of Object.entries(combo)){const spec=active.find(s=>s.id===sid);if(!spec)continue;for(let i=0;i<cnt;i++){placed.push({specId:spec.id,x,y:0,w:spec.w,h:Math.min(spec.h,bH),color:spec.color,name:spec.name});x+=spec.w;}}
+  const freeRects=[];if(x<bW)freeRects.push({x,y:0,w:bW-x,h:bH});placed.forEach(p=>{if(p.h<bH)freeRects.push({x:p.x,y:p.h,w:p.w,h:bH-p.h});});
+  return{placed,freeRects};
+}
+
+// ── Core Nesting Engine ───────────────────────────────────────────────────────
+// piece.w = cutting width (narrow side), piece.h = frame height (long side, VERTICAL, NO rotation)
+function runNesting(specs,boardSpecs,kerfBorder){
+  kerfBorder=kerfBorder||0;
+  if(!specs.length||!boardSpecs.length)return{sheets:[],unmet:specs.map(s=>({...s,leftover:s.qty}))};
+  const remaining={};specs.forEach(s=>{remaining[s.id]=s.qty;});
+  const sheets=[];let safety=0;const maxS=specs.reduce((s,x)=>s+x.qty,0)*2+20;
+  while(true){
+    if(!specs.some(s=>remaining[s.id]>0))break;if(safety++>maxS)break;
+    const active=specs.filter(s=>remaining[s.id]>0);
+    let bestPlaced=null,bestFR=null,bestUtil=-1,bestBoard=null,bestPC=null;
+    for(const board of boardSpecs){
+      const bW=board.w-kerfBorder*2;const bH=board.h-kerfBorder*2;if(bW<=0||bH<=0)continue;const bArea=bW*bH;
+      // allFL: piece.h (frame height) fits vertically and is >= 80% of board height — strip mode
+      const allFL=active.every(s=>s.h>=bH*0.80&&s.w<=bW&&s.h<=bH);
+      function evalResult(placed,fr){const usedArea=placed.reduce((s,p)=>s+p.w*p.h,0);const u=usedArea/bArea;if(u>bestUtil){bestUtil=u;bestPlaced=placed;bestFR=fr;bestBoard={...board,bW,bH,bArea};const pc2={};placed.forEach(p=>{pc2[p.specId]=(pc2[p.specId]||0)+1;});bestPC=pc2;}}
+      if(allFL){
+        // Strip mode: pieces in FIXED orientation (w=cutting width, h=frame height), pack side by side
+        const validActive=active.filter(s=>s.w<=bW&&s.h<=bH);if(!validActive.length)continue;
+        const combo=bestStripCombo(validActive,remaining,bW);
+        if(combo){const{placed,freeRects}=placeStripCombo(combo,validActive,bW,bH);if(placed.length)evalResult(placed,freeRects);}
+        for(const s of validActive){const n=Math.min(remaining[s.id],Math.floor(bW/s.w));if(n<1)continue;const sc={[s.id]:n};const{placed,freeRects}=placeStripCombo(sc,validActive,bW,bH);if(placed.length)evalResult(placed,freeRects);}
+      }else{
+        for(const pri of active){
+          if(pri.w>bW||pri.h>bH)continue;
+          const fillers=active.filter(s=>s.id!==pri.id&&s.w<=bW&&s.h<=bH).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+          const pieces=[];for(let i=0;i<remaining[pri.id];i++)pieces.push({specId:pri.id,w:pri.w,h:pri.h,color:pri.color,name:pri.name});
+          fillers.forEach(s=>{for(let i=0;i<remaining[s.id];i++)pieces.push({specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name});});
+          const res=tryPlace2D(pieces,bW,bH);evalResult(res.placed,res.freeRects);
+        }
+        const bigFirst=[...active].filter(s=>s.w<=bW&&s.h<=bH).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+        const mp=[];bigFirst.forEach(s=>{for(let i=0;i<remaining[s.id];i++)mp.push({specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name});});
+        if(mp.length){const res2=tryPlace2D(mp,bW,bH);evalResult(res2.placed,res2.freeRects);}
+      }
+    }
+    if(!bestPlaced||!bestPlaced.length)break;
+    Object.entries(bestPC).forEach(([sid,cnt])=>{remaining[sid]=Math.max(0,(remaining[sid]||0)-cnt);});
+    const used=bestPlaced.reduce((s,p)=>s+p.w*p.h,0);
+    sheets.push({placed:bestPlaced,pc:bestPC,usedArea:used,util:used/bestBoard.bArea,bW:bestBoard.bW,bH:bestBoard.bH,bArea:bestBoard.bArea,bName:bestBoard.name,rawW:bestBoard.w,rawH:bestBoard.h,fR:bestFR});
+  }
+  specs.forEach(s=>{while(remaining[s.id]>0){const piece={specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name};let filled=false;for(const sh of sheets){const r=placeSingleInFreeRects(piece,sh.fR);if(r){sh.placed.push(r);sh.pc[s.id]=(sh.pc[s.id]||0)+1;sh.usedArea+=r.w*r.h;sh.util=sh.usedArea/sh.bArea;remaining[s.id]--;filled=true;break;}}if(!filled)break;}});
+  const unmet=specs.filter(s=>remaining[s.id]>0).map(s=>({...s,leftover:remaining[s.id]}));
+  return{sheets,unmet};
+}
+
+function calcSheetRM(rawW,rawH,matType,thick,pricePerTon){
+  const d=DENSITY[matType]||0.000008143290141;return d*rawW*rawH*thick*(pricePerTon/1000);
+}
+
+// ── Preview chip ──────────────────────────────────────────────────────────────
+function previewCut(n){
+  const cs=gv('d'+n+'_cs'),fw=gv('d'+n+'_fw'),fh=gv('d'+n+'_fh'),qty=gv('d'+n+'_qty');
+  const chip=document.getElementById('d'+n+'_chip');if(!chip||!cs||!fw||!fh||qty<1)return;
+  const kerf=gv('kerf'),matType=gs('matType'),thick=gv('matThick'),price=gv('matPrice');
+  const boards=getBoardSpecs();
+  if(!boards.length){chip.innerHTML='<span style="color:var(--warn);font-size:11px;">Add sheet lengths above first</span>';return;}
+  const tNest=runNesting([{id:'top',name:'TOP',w:cs,h:fw,qty:1,color:COLOURS[0]}],boards,kerf);
+  const lNest=runNesting([{id:'lr',name:'L/R',w:cs,h:fh,qty:2,color:COLOURS[1]}],boards,kerf);
+  const tSh=tNest.sheets[0],lSh=lNest.sheets[0];
+  if(!tSh||!lSh){chip.innerHTML='<span style="color:var(--warn);font-size:11px;">Cannot fit — check sheet sizes</span>';return;}
+  const tRM=calcSheetRM(tSh.rawW,tSh.rawH,matType,thick,price);const lRM=calcSheetRM(lSh.rawW,lSh.rawH,matType,thick,price);
+  const tCpp=tRM/tSh.placed.length,lCpp=lRM/lSh.placed.length;
+  chip.innerHTML=`
+    <div style="font-size:10px;color:var(--accent);font-weight:600;margin-bottom:6px;">NESTING PREVIEW · piece=${cs}mm wide · board usable=board-${kerf*2}mm</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:var(--bg);border-radius:4px;padding:7px;">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">TOP — 1 pc/door</div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;">${tSh.bName}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">${tSh.placed.length} pcs/sheet · ${(tSh.util*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;font-weight:600;">1 pc approx RM ${tCpp.toFixed(2)}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:4px;padding:7px;">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">L/R — 2 pcs/door</div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;">${lSh.bName}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">${lSh.placed.length} pcs/sheet · ${(lSh.util*100).toFixed(1)}%</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:3px;font-weight:600;">2 pcs approx RM ${(lCpp*2).toFixed(2)}</div>
+      </div>
+    </div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:flex;justify-content:space-between;">
+      <span style="font-size:11px;color:var(--text2);">Metal est. / door</span>
+      <span style="font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;">RM ${(tCpp+lCpp*2).toFixed(2)}</span>
+    </div>`;
+}
+
+// ── Door rows ─────────────────────────────────────────────────────────────────
+function addDoorRow(def={}){
+  dc++;const n=dc;const profOpts=PROFS.map(p=>`<option value="${p}"${p===(def.profile||'APF1')?' selected':''}>${p}</option>`).join('');
+  const d=document.createElement('div');d.className='dr';d.id='door_'+n;
+  d.innerHTML=`
+    <div class="drh">
+      <span class="drn">DOOR #${n}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button onclick="copyDoor(${n})" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text2);font-family:var(--mono);font-size:10px;padding:2px 8px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Copy</button>
+        <button class="brm" onclick="removeDoor(${n})">x</button>
+      </div>
+    </div>
+    <div class="fr">
+      <div class="f"><label>Door Type</label><input type="text" id="d${n}_dtype" value="${def.dtype||''}" placeholder="e.g. D1, D2..."></div>
+      <div class="f"><label>APF Profile</label><select id="d${n}_profile" onchange="onPC(${n})">${profOpts}</select></div>
+    </div>
+    <div class="fr">
+      <div class="f"><label>Hinges (pcs)</label>
+        <select id="d${n}_hinges"><option value="3" selected>3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select>
+      </div>
+    </div>
+    <div class="sec">Cutting Dimensions</div>
+    <div class="fr3">
+      <div class="f"><label>Cutting Size (mm)</label><input type="number" id="d${n}_cs" value="${def.cs||233}" step="0.5" onchange="previewCut(${n})"></div>
+      <div class="f"><label>Frame W (mm)</label><input type="number" id="d${n}_fw" value="${def.fw||800}" step="1" onchange="previewCut(${n})"></div>
+      <div class="f"><label>Frame H (mm)</label><input type="number" id="d${n}_fh" value="${def.fh||2130}" step="1" onchange="onHC(${n})"></div>
+    </div>
+    <div class="cut-chip" id="d${n}_chip" style="margin-bottom:10px;"><span style="color:var(--text3);font-size:11px;">Set sheet lengths, then fill dimensions to preview</span></div>
+    <div class="sec">Quantity and Pricing</div>
+    <div class="fr3">
+      <div class="f"><label>Quantity</label><input type="number" id="d${n}_qty" value="${def.qty||10}" min="1" onchange="previewCut(${n})"></div>
+      <div class="f"><label>Labour (RM/door) <span id="d${n}_tag" class="ltag"></span></label><input type="number" id="d${n}_lab" value="12.40" step="0.1"></div>
+      <div class="f"><label>Selling Price (RM)</label><input type="number" id="d${n}_sell" value="${def.sell||81}" step="0.5"></div>
+    </div>`;
+  document.getElementById('doorRows').appendChild(d);onPC(n);previewCut(n);
+}
+function onPC(n){onHC(n);}
+function onHC(n){
+  const p=gs('d'+n+'_profile'),h=gv('d'+n+'_fh');const lab=getLabour(p,h);const tag=document.getElementById('d'+n+'_tag');
+  if(lab!==null&&lab!==undefined){document.getElementById('d'+n+'_lab').value=lab;tag.textContent='AUTO.'+p+'<='+hKey(h);tag.className='ltag la';}
+  else{tag.textContent='manual';tag.className='ltag lm';}
+  previewCut(n);
+}
+function removeDoor(n){const e=document.getElementById('door_'+n);if(e)e.remove();}
+function copyDoor(n){
+  addDoorRow({dtype:gs('d'+n+'_dtype'),profile:gs('d'+n+'_profile'),cs:gs('d'+n+'_cs'),fw:gs('d'+n+'_fw'),fh:gs('d'+n+'_fh'),qty:gs('d'+n+'_qty'),sell:gs('d'+n+'_sell')});
+  const nn=dc;document.getElementById('d'+nn+'_hinges').value=gs('d'+n+'_hinges');document.getElementById('d'+nn+'_lab').value=gs('d'+n+'_lab');
+}
+function clearAllDoors(){
+  if(!confirm('Clear all door types?'))return;document.getElementById('doorRows').innerHTML='';dc=0;
+  document.getElementById('resultsArea').innerHTML='<div class="rempty"><span style="font-size:32px;">&#9889;</span><span>Fill in door specs and click Calculate</span></div>';autoSave();
+}
+
+// ── Calculate ─────────────────────────────────────────────────────────────────
+function calculate(){
+  const matType=gs('matType'),thick=gv('matThick'),price=gv('matPrice'),kerf=gv('kerf');
+  const hwH=gv('hw_hinge'),hwSt=gv('hw_striker'),hwSp=gv('hw_spreader'),hwW=gv('hw_wire'),hwSr=gv('hw_strap'),hwMo=gv('hw_morter'),hwTr=gv('hw_transport');
+  const pR=gv('pct_r')/100,pA=gv('pct_a')/100,pO=gv('pct_o')/100;
+  const boards=getBoardSpecs();const rows=document.querySelectorAll('.dr');
+  if(!rows.length){alert('Add at least one door!');return;}
+  if(!boards.length){alert('Add at least one sheet length!');return;}
+
+  const doorData=[];
+  rows.forEach((row,di)=>{const n=row.id.replace('door_','');doorData.push({n,di,dtype:gs('d'+n+'_dtype'),prof:gs('d'+n+'_profile'),hinges:gv('d'+n+'_hinges'),cs:gv('d'+n+'_cs'),fw:gv('d'+n+'_fw'),fh:gv('d'+n+'_fh'),qty:gv('d'+n+'_qty'),lab:gv('d'+n+'_lab'),sell:gv('d'+n+'_sell'),colTop:COLOURS[di%COLOURS.length],colLR:COLOURS[(di+7)%COLOURS.length]});});
+  doorData.forEach(d=>{d.label=d.dtype||('Door #'+(d.di+1));d.eff=d.cs;});
+
+  const allTopSpecs=doorData.map(d=>({id:'top_'+d.di,name:d.label+' T',w:d.eff,h:d.fw,qty:d.qty,color:d.colTop}));
+  const allLRSpecs=doorData.map(d=>({id:'lr_'+d.di,name:d.label+' LR',w:d.eff,h:d.fh,qty:d.qty*2,color:d.colLR}));
+
+  const topNest=runNesting(allTopSpecs,boards,kerf);const lrNest=runNesting(allLRSpecs,boards,kerf);
+  const topTotalRM=topNest.sheets.reduce((s,sh)=>s+calcSheetRM(sh.rawW,sh.rawH,matType,thick,price),0);
+  const lrTotalRM=lrNest.sheets.reduce((s,sh)=>s+calcSheetRM(sh.rawW,sh.rawH,matType,thick,price),0);
+  const topTotalPieceArea=doorData.reduce((s,d)=>s+d.eff*d.fw*d.qty,0);
+  const lrTotalPieceArea=doorData.reduce((s,d)=>s+d.eff*d.fh*d.qty*2,0);
+
+  const R=[];
+  doorData.forEach(d=>{
+    const topPieceArea=d.eff*d.fw*d.qty;const lrPieceArea=d.eff*d.fh*d.qty*2;
+    const topAreaRatio=topTotalPieceArea>0?topPieceArea/topTotalPieceArea:0;const lrAreaRatio=lrTotalPieceArea>0?lrPieceArea/lrTotalPieceArea:0;
+    const tMetalRM=topTotalRM*topAreaRatio;const lMetalRM=lrTotalRM*lrAreaRatio;const metalPerDoor=(tMetalRM+lMetalRM)/d.qty;
+    const morter=(d.hinges<=4)?hwMo:0;const hw=(d.hinges*hwH)+hwSt+hwSp+hwW+hwSr+morter;
+    const frame=metalPerDoor+hw+d.lab+hwTr;const rej=frame*pR,adm=frame*pA,ohd=frame*pO;const total=frame+rej+adm+ohd;
+    const profit=d.sell-total,pct=d.sell>0?(profit/d.sell)*100:0;
+    const tSheets=Math.round(topNest.sheets.length*topAreaRatio)||0;const lSheets=Math.round(lrNest.sheets.length*lrAreaRatio)||0;
+    R.push({n:d.n,dtype:d.dtype,prof:d.prof,hinges:d.hinges,cs:d.cs,fw:d.fw,fh:d.fh,qty:d.qty,lab:d.lab,sell:d.sell,metalPerDoor,tMetalRM,lMetalRM,tSheets,lSheets,hw,hwTr,frame,rej,adm,ohd,total,profit,pct,hk:hKey(d.fh),tR:d.sell*d.qty,tC:total*d.qty,tP:profit*d.qty});
+  });
+  _lastResults=R;_lastNesting={topNest,lrNest,topSpecs:allTopSpecs,lrSpecs:allLRSpecs,topTotalRM,lrTotalRM,topTotalSheets:topNest.sheets.length,lrTotalSheets:lrNest.sheets.length};
+  render(R);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(R){
+  const tQ=R.reduce((s,r)=>s+r.qty,0);const tHinges=R.reduce((s,r)=>s+(r.hinges*r.qty),0);
+  const tRev=R.reduce((s,r)=>s+r.tR,0);const tCost=R.reduce((s,r)=>s+r.tC,0);const tProfit=R.reduce((s,r)=>s+r.tP,0);
+  const avg=tRev>0?(tProfit/tRev)*100:0;const tTop=_lastNesting?_lastNesting.topTotalSheets:0;const tLR=_lastNesting?_lastNesting.lrTotalSheets:0;
+
+  let h=`<div class="sgrid" style="grid-template-columns:repeat(5,1fr);">
+    <div class="sc"><div class="sl">Total Doors</div><div class="sv">${tQ}</div><div class="ss">units</div></div>
+    <div class="sc"><div class="sl">Total Hinges</div><div class="sv">${tHinges}</div><div class="ss">pcs needed</div></div>
+    <div class="sc"><div class="sl">Sheets (TOP+L/R)</div><div class="sv">${tTop+tLR}</div><div class="ss">TOP:${tTop} L/R:${tLR}</div></div>
+    <div class="sc"><div class="sl">Total Revenue</div><div class="sv" style="font-size:14px;">RM ${tRev.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="ss">sell x qty</div></div>
+    <div class="sc hi"><div class="sl">Total Profit</div><div class="sv" style="font-size:14px;">RM ${tProfit.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="ss">${pc(avg)} avg margin</div></div>
+  </div>
+  <div class="pres">
+    <div class="tabs" style="justify-content:space-between;align-items:flex-end;">
+      <div style="display:flex;gap:2px;flex-wrap:wrap;">
+        <button class="tb active" onclick="sw('summary',event)">SUMMARY</button>
+        <button class="tb" onclick="sw('cutting',event)">CUT PLAN</button>
+        <button class="tb" onclick="sw('breakdown',event)">BREAKDOWN</button>
+        <button class="tb" onclick="sw('nesting',event)">NESTING VIEW</button>
+        <button class="tb" onclick="sw('purchase',event)">PURCHASE ORDER</button>
+        <button class="tb" onclick="sw('pricing',event)">PRICING GUIDE</button>
+        <button class="tb" onclick="sw('labourtable',event)">LABOUR TABLE</button>
+      </div>
+      <button onclick="exportExcel()" style="background:var(--accent);color:#000;border:none;border-radius:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;margin:0 0 2px;">&#11015; Export Excel</button>
+    </div>
+    <div class="tc active" id="tab_summary" style="padding:16px;overflow-x:auto;">
+      <table class="rt"><thead><tr>
+        <th>Door Type</th><th>Profile</th><th>Cut Size</th><th>Frame</th><th>Qty</th>
+        <th>Frame Cost</th><th>HW</th><th>Transport</th><th>Labour</th>
+        <th>Rej+OH</th><th>Total/frame</th><th>Sell</th><th>Profit</th><th>Margin</th>
+      </tr></thead><tbody>`;
+  R.forEach(r=>{h+=`<tr><td>${r.dtype||'--'}</td><td>${r.prof}</td><td>${r.cs}mm</td><td>${r.fw}x${r.fh}</td><td>${r.qty}</td><td>${rm(r.metalPerDoor)}</td><td>${rm(r.hw)}</td><td>${rm(r.hwTr)}</td><td>${rm(r.lab)}</td><td>${rm(r.rej+r.adm+r.ohd)}</td><td class="va">${rm(r.total)}</td><td>${rm(r.sell)}</td><td class="${r.profit>=0?'vg':'vr'}">${rm(r.profit)}</td><td>${pill(r.pct)}</td></tr>`;});
+  h+=`</tbody><tfoot><tr style="background:var(--surface2);"><td colspan="4" style="color:var(--text);font-weight:600;">TOTAL</td><td style="color:var(--text);font-weight:600;">${tQ}</td><td colspan="5"></td><td class="va" style="font-weight:600;">${rm(tCost)}</td><td style="color:var(--text);font-weight:600;">${rm(tRev)}</td><td class="${tProfit>=0?'vg':'vr'}" style="font-weight:600;">${rm(tProfit)}</td><td>${pill(avg)}</td></tr></tfoot></table></div>
+
+    <div class="tc" id="tab_cutting" style="padding:16px;"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">`;
+  R.forEach((r,di)=>{
+    // Extract actual sheet sizes used for this door type from nesting result
+    const topSpecId='top_'+di;const lrSpecId='lr_'+di;
+    // Count sheets & collect size info per door type
+    const topSheetMap={},lrSheetMap={};
+    if(_lastNesting){
+      _lastNesting.topNest.sheets.forEach(sh=>{if(sh.pc[topSpecId]){topSheetMap[sh.bName]=(topSheetMap[sh.bName]||0)+1;}});
+      _lastNesting.lrNest.sheets.forEach(sh=>{if(sh.pc[lrSpecId]){lrSheetMap[sh.bName]=(lrSheetMap[sh.bName]||0)+1;}});
+    }
+    const topSizeStr=Object.entries(topSheetMap).map(([k,v])=>`<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--warn);">${k}</span> <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">x${v}</span>`).join(' + ')||'<span style="color:var(--text3);font-size:10px;">—</span>';
+    const lrSizeStr=Object.entries(lrSheetMap).map(([k,v])=>`<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);">${k}</span> <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">x${v}</span>`).join(' + ')||'<span style="color:var(--text3);font-size:10px;">—</span>';
+    const topPcsPerSheet=Object.keys(topSheetMap).length?Math.round(r.qty/Object.values(topSheetMap).reduce((a,b)=>a+b,0)*10)/10:'?';
+    const lrPcsPerSheet=Object.keys(lrSheetMap).length?Math.round(r.qty*2/Object.values(lrSheetMap).reduce((a,b)=>a+b,0)*10)/10:'?';
+    h+=`<div class="bdc">
+      <div class="bdh"><div>
+        <span style="font-family:var(--mono);font-size:12px;font-weight:600;">${r.dtype||r.prof} . ${r.prof} . cut ${r.cs}mm . frame ${r.fw}x${r.fh}</span><br>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2);">x${r.qty} doors</span>
+      </div></div>
+      <div style="padding:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:var(--bg);border-radius:4px;padding:10px;">
+            <div style="font-size:9px;color:var(--warn);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">TOP — 1 pc/door</div>
+            <div style="margin-bottom:4px;">${topSizeStr}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:6px;">piece: ${r.cs}mm x ${r.fw}mm &nbsp;·&nbsp; ~${topPcsPerSheet} pcs/sheet</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;">RM ${(r.tMetalRM/r.qty).toFixed(2)} / door</div>
+          </div>
+          <div style="background:var(--bg);border-radius:4px;padding:10px;">
+            <div style="font-size:9px;color:var(--accent2);text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">L/R — 2 pcs/door</div>
+            <div style="margin-bottom:4px;">${lrSizeStr}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:6px;">piece: ${r.cs}mm x ${r.fh}mm &nbsp;·&nbsp; ~${lrPcsPerSheet} pcs/sheet</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;">RM ${(r.lMetalRM/r.qty).toFixed(2)} / door</div>
+          </div>
+        </div>
+      </div>
+      <div class="brw tot"><span class="bn">Metal cost / door (nesting)</span><span class="bv">${rm(r.metalPerDoor)}</span></div>
+      <div class="brw" style="background:var(--bg);"><span class="bn">Total metal x ${r.qty} doors</span><span class="bv">${rm(r.tMetalRM+r.lMetalRM)}</span></div>
+    </div>`;
+  });
+  h+=`</div></div>
+
+    <div class="tc" id="tab_breakdown" style="padding:16px;"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;">`;
+  const PIE_COLORS=['#00c896','#0082ff','#ff9f43','#a29bfe','#fd79a8','#fdcb6e','#e17055'];
+  R.forEach((r,ri)=>{
+    const items=[{l:'Metal Sheet (nesting)',v:r.metalPerDoor},{l:'Hardware',v:r.hw},{l:'Labour',v:r.lab},{l:'Transport',v:r.hwTr},{l:'Rejection',v:r.rej},{l:'Admin',v:r.adm},{l:'Overhead',v:r.ohd}];
+    h+=`<div class="bdc"><div class="bdh"><div><span style="font-family:var(--mono);font-size:12px;font-weight:600;">${r.dtype?r.dtype+' . ':''} ${r.prof} . ${r.fw}x${r.fh}</span><br><span style="font-family:var(--mono);font-size:10px;color:var(--text2);">TOP: ${r.tSheets} sheets . L/R: ${r.lSheets} sheets . metal total: ${rm(r.tMetalRM+r.lMetalRM)}</span></div></div><div style="display:flex;align-items:center;gap:16px;padding:14px;"><div style="position:relative;width:120px;height:120px;flex-shrink:0;"><canvas id="pie_${ri}" width="120" height="120"></canvas><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;"><div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);">${rm(r.total)}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text2);">/ frame</div></div></div><div style="flex:1;display:flex;flex-direction:column;gap:5px;">${items.map((it,i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;"><span style="display:flex;align-items:center;gap:5px;color:var(--text2);"><span style="width:8px;height:8px;border-radius:2px;background:${PIE_COLORS[i]};display:inline-block;"></span>${it.l}</span><span style="font-family:var(--mono);color:var(--text);">${rm(it.v)} <span style="color:var(--text3);font-size:10px;">${r.total>0?(it.v/r.total*100).toFixed(1):'0'}%</span></span></div>`).join('')}</div></div><div class="brw tot"><span class="bn">Total cost / frame</span><span class="bv">${rm(r.total)}</span></div><div class="brw" style="background:var(--bg);"><span class="bn">Selling price</span><span class="bv">${rm(r.sell)}</span></div><div class="brw" style="background:var(--bg);"><span class="bn">Profit / frame</span><span class="bv ${r.profit>=0?'vg':'vr'}">${rm(r.profit)} &nbsp;${pill(r.pct)}</span></div><div class="brw" style="background:var(--bg);border-top:1px solid var(--border);"><span class="bn">Total profit x${r.qty}</span><span class="bv ${r.tP>=0?'vg':'vr'}">${rm(r.tP)}</span></div></div>`;
+  });
+  setTimeout(()=>{R.forEach((r,ri)=>{const el=document.getElementById('pie_'+ri);if(!el)return;new Chart(el,{type:'doughnut',data:{datasets:[{data:[r.metalPerDoor,r.hw,r.lab,r.hwTr,r.rej,r.adm,r.ohd],backgroundColor:PIE_COLORS,borderWidth:2,borderColor:'transparent',hoverOffset:4}]},options:{responsive:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{enabled:false}},animation:{animateRotate:true,duration:700}}});});},100);
+
+  h+=`</div></div>
+    <div class="tc" id="tab_nesting" style="padding:16px;"></div>
+    <div class="tc" id="tab_purchase" style="padding:16px;"></div>
+    <div class="tc" id="tab_pricing" style="padding:16px;">
+      <p style="font-size:11px;color:var(--text2);margin-bottom:16px;font-family:var(--mono);">Suggested selling price by customer type. Highlighted = closest to your entered selling price.</p>
+      <div style="overflow-x:auto;"><table class="lt2"><thead><tr>
+        <th style="text-align:left;">Door Type</th><th style="text-align:left;">Profile</th><th>Frame</th><th>Total Cost</th>
+        <th style="background:rgba(0,130,255,0.1);">VIP 7%</th><th style="background:rgba(0,200,150,0.1);">Normal 10%</th>
+        <th style="background:rgba(255,107,53,0.1);">Difficult 13%</th><th>Your Price</th><th>Actual Margin</th>
+      </tr></thead><tbody id="pricingBody"></tbody></table></div>
+    </div>
+    <div class="tc" id="tab_labourtable" style="padding:16px;">
+      <p style="font-size:11px;color:var(--text2);margin-bottom:12px;font-family:var(--mono);">Labour RM/door by profile x door height. Highlighted = currently in use.</p>
+      <div style="overflow-x:auto;"><table class="lt2"><thead><tr><th>Profile</th><th>&lt;= 2130mm</th><th>&lt;= 2430mm</th><th>&lt;= 3000mm</th></tr></thead><tbody>`;
+  const activeMap={};R.forEach(r=>{activeMap[r.prof+'-'+r.hk]=true;});
+  PROFS.forEach(p=>{const row=LABOUR[p];h+=`<tr><td>${p}</td>`;HB.forEach(hb=>{const v=row[hb],act=activeMap[p+'-'+hb];h+=`<td class="${act?'hi':''}">${v!==null&&v!==undefined?v.toFixed(1):'--'}</td>`;});h+=`</tr>`;});
+  h+=`</tbody></table></div></div></div>`;
+  document.getElementById('resultsArea').innerHTML=h;
+
+  setTimeout(()=>{const tbody=document.getElementById('pricingBody');if(!tbody)return;let rows='';
+    R.forEach(r=>{const p7=r.total/0.93,p10=r.total/0.90,p13=r.total/0.87;const am=r.sell>0?((r.sell-r.total)/r.sell*100):0;const d7=Math.abs(p7-r.sell),d10=Math.abs(p10-r.sell),d13=Math.abs(p13-r.sell);const min=Math.min(d7,d10,d13);rows+=`<tr><td style="text-align:left;font-weight:500;">${r.dtype||'--'}</td><td style="text-align:left;">${r.prof}</td><td>${r.fw}x${r.fh}</td><td style="font-family:var(--mono);">${rm(r.total)}</td><td style="background:rgba(0,130,255,0.06);font-family:var(--mono);${min===d7?'color:var(--accent2);font-weight:600;':''}">${rm(p7)}</td><td style="background:rgba(0,200,150,0.06);font-family:var(--mono);${min===d10?'color:var(--accent);font-weight:600;':''}">${rm(p10)}</td><td style="background:rgba(255,107,53,0.06);font-family:var(--mono);${min===d13?'color:var(--warn);font-weight:600;':''}">${rm(p13)}</td><td style="font-family:var(--mono);">${rm(r.sell)}</td><td>${pill(am)}</td></tr>`;});
+    tbody.innerHTML=rows;},50);
+  setTimeout(()=>buildNestingTab(),80);
+}
+
+function sw(name,e){
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab_'+name).classList.add('active');if(e)e.target.classList.add('active');
+  if(name==='nesting')buildNestingTab();
+  if(name==='purchase')buildPurchaseTab();
+}
+
+// ── Purchase Order Tab ────────────────────────────────────────────────────────
+function buildPurchaseTab(){
+  const tab=document.getElementById('tab_purchase');if(!tab||!_lastNesting||!_lastResults.length)return;
+  const matType=gs('matType'),thick=gv('matThick'),price=gv('matPrice');
+
+  // Build detailed sheet-by-sheet breakdown from actual nesting result
+  // Key: sheetSize → {sheets: [{doorLabel, group, pcsOnThisSheet}], totalSheets}
+  const purchaseMap={}; // key = bName, value = {totalSheets, sheetW, sheetH, sheetRM, rows:[]}
+
+  function processGroup(nest,specs,groupLabel){
+    // specs is allTopSpecs or allLRSpecs, indexed by di
+    nest.sheets.forEach(sh=>{
+      const key=sh.bName;
+      if(!purchaseMap[key])purchaseMap[key]={bName:key,rawW:sh.rawW,rawH:sh.rawH,totalSheets:0,sheetRM:calcSheetRM(sh.rawW,sh.rawH,matType,thick,price),rows:[]};
+      purchaseMap[key].totalSheets++;
+      // Which door types are on this sheet?
+      const doorBreakdown=[];
+      Object.entries(sh.pc).forEach(([specId,cnt])=>{
+        const spec=specs.find(s=>s.id===specId);if(!spec)return;
+        // Find door label from _lastResults
+        const di=parseInt(specId.replace('top_','').replace('lr_',''));
+        const r=_lastResults[di];
+        const doorLabel=r?(r.dtype||('Door#'+(di+1))):'?';
+        const pieceW=r?r.cs:0;
+        const pieceH=groupLabel==='TOP'?(r?r.fw:0):(r?r.fh:0);
+        doorBreakdown.push({doorLabel,group:groupLabel,pcs:cnt,pieceW,pieceH,doorQty:r?r.qty:0});
+      });
+      purchaseMap[key].rows.push({sheetIndex:purchaseMap[key].totalSheets,breakdown:doorBreakdown});
+    });
+  }
+
+  processGroup(_lastNesting.topNest,_lastNesting.topSpecs,'TOP');
+  processGroup(_lastNesting.lrNest,_lastNesting.lrSpecs,'L/R');
+
+  // Now consolidate: for each sheet size, summarise total pcs per door+group
+  // Also build a consolidated order list
+  const orderSummary={}; // key = bName+doorLabel+group, value = {totalPcs, totalSheets, ...}
+
+  Object.values(purchaseMap).forEach(entry=>{
+    entry.rows.forEach(row=>{
+      row.breakdown.forEach(b=>{
+        const key2=`${entry.bName}||${b.doorLabel}||${b.group}`;
+        if(!orderSummary[key2]){orderSummary[key2]={bName:entry.bName,rawW:entry.rawW,rawH:entry.rawH,sheetRM:entry.sheetRM,doorLabel:b.doorLabel,group:b.group,pieceW:b.pieceW,pieceH:b.pieceH,doorQty:b.doorQty,totalPcsAcrossSheets:0,sheetsInvolved:new Set()};}
+        orderSummary[key2].totalPcsAcrossSheets+=b.pcs;
+        orderSummary[key2].sheetsInvolved.add(row.sheetIndex+'_'+entry.bName);
+      });
+    });
+  });
+
+  // Build consolidated purchase rows grouped by sheet size
+  // Each unique sheet size → total sheets needed (from purchaseMap)
+  // Then sub-rows: for each door type + group using that sheet size
+
+  // Group order summary by bName
+  const bySheet={};
+  Object.values(orderSummary).forEach(o=>{
+    if(!bySheet[o.bName])bySheet[o.bName]={bName:o.bName,rawW:o.rawW,rawH:o.rawH,sheetRM:o.sheetRM,totalSheets:purchaseMap[o.bName]?.totalSheets||0,usages:[]};
+    const avgPcsPerSheet=purchaseMap[o.bName]?.totalSheets>0?o.totalPcsAcrossSheets/purchaseMap[o.bName].totalSheets:0;
+    bySheet[o.bName].usages.push({...o,avgPcsPerSheet:+avgPcsPerSheet.toFixed(1)});
+  });
+
+  // Grand total sheets
+  const grandTotalSheets=Object.values(purchaseMap).reduce((s,e)=>s+e.totalSheets,0);
+  const grandTotalRM=Object.values(bySheet).reduce((s,e)=>s+e.totalSheets*e.sheetRM,0);
+
+  // Render
+  let h=`
+  <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);">Material Purchase Order</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;">${matType} · ${thick}mm · RM ${price}/ton · Kerf ${gv('kerf')}mm/side</div>
+    </div>
+    <div style="display:flex;gap:12px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 16px;text-align:center;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Sheets</div>
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);">${grandTotalSheets}</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:10px 16px;text-align:center;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Material Cost</div>
+        <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);">${rm(grandTotalRM)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="overflow-x:auto;">
+  <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;">
+    <thead>
+      <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
+        <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Sheet Size (mm)</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Sheets to Buy</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Cost / Sheet</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Subtotal</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Door Type</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Part</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Piece Size (mm)</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Pcs/Sheet (avg)</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Total Pcs Needed</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">Door Qty</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  const sheetEntries=Object.values(bySheet).sort((a,b)=>a.bName.localeCompare(b.bName));
+  sheetEntries.forEach((entry,ei)=>{
+    const rowspan=entry.usages.length;
+    const subtotal=entry.totalSheets*entry.sheetRM;
+    const bgStripe=ei%2===0?'':'background:rgba(255,255,255,0.015);';
+    entry.usages.forEach((u,ui)=>{
+      const groupColor=u.group==='TOP'?'var(--warn)':'var(--accent2)';
+      const pcsNeeded=u.group==='TOP'?u.doorQty:u.doorQty*2;
+      if(ui===0){
+        h+=`<tr style="${bgStripe}border-top:2px solid var(--border);">
+          <td rowspan="${rowspan}" style="padding:12px;font-weight:700;font-size:13px;color:var(--text);vertical-align:middle;border-right:1px solid var(--border);white-space:nowrap;">
+            <span style="color:var(--accent);">${entry.rawW}</span><span style="color:var(--text3);">×</span><span style="color:var(--accent);">${entry.rawH}</span>
+            <div style="font-size:9px;color:var(--text3);font-weight:400;margin-top:2px;">${matType} ${thick}mm</div>
+          </td>
+          <td rowspan="${rowspan}" style="padding:12px;text-align:center;vertical-align:middle;border-right:1px solid var(--border);">
+            <div style="font-size:22px;font-weight:700;color:var(--warn);">${entry.totalSheets}</div>
+            <div style="font-size:9px;color:var(--text3);">sheets</div>
+          </td>
+          <td rowspan="${rowspan}" style="padding:12px;text-align:center;vertical-align:middle;border-right:1px solid var(--border);color:var(--text2);">${rm(entry.sheetRM)}</td>
+          <td rowspan="${rowspan}" style="padding:12px;text-align:center;vertical-align:middle;border-right:1px solid var(--border);font-weight:600;color:var(--accent);">${rm(subtotal)}</td>`;
+      }else{
+        h+=`<tr style="${bgStripe}border-top:1px solid rgba(42,51,73,0.4);">`;
+      }
+      h+=`
+          <td style="padding:10px 12px;font-weight:600;color:var(--text);">${u.doorLabel}</td>
+          <td style="padding:10px 12px;text-align:center;">
+            <span style="background:${groupColor}22;color:${groupColor};border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:0.5px;">${u.group}</span>
+          </td>
+          <td style="padding:10px 12px;text-align:center;color:var(--text2);">${u.pieceW}×${u.pieceH}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700;color:var(--text);">${u.avgPcsPerSheet}</td>
+          <td style="padding:10px 12px;text-align:center;color:var(--text2);">${u.totalPcsAcrossSheets}</td>
+          <td style="padding:10px 12px;text-align:center;color:var(--text3);">×${u.doorQty}</td>
+        </tr>`;
+    });
+  });
+
+  h+=`</tbody>
+    <tfoot>
+      <tr style="background:var(--surface2);border-top:2px solid var(--border);">
+        <td colspan="2" style="padding:12px;font-size:11px;font-weight:700;color:var(--text);">GRAND TOTAL</td>
+        <td style="padding:12px;text-align:center;font-weight:700;color:var(--warn);font-size:16px;">${grandTotalSheets} sheets</td>
+        <td style="padding:12px;text-align:center;"></td>
+        <td style="padding:12px;text-align:center;font-weight:700;color:var(--accent);font-size:14px;" colspan="6">${rm(grandTotalRM)}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+
+  <div style="margin-top:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;">
+    <div style="font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Quick Order Summary</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">`;
+
+  sheetEntries.forEach(entry=>{
+    h+=`<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 16px;min-width:160px;">
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--warn);">${entry.rawW}×${entry.rawH}</div>
+      <div style="font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent);line-height:1.1;">${entry.totalSheets} <span style="font-size:12px;color:var(--text3);">pcs</span></div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;">${rm(entry.totalSheets*entry.sheetRM)}</div>
+    </div>`;
+  });
+
+  h+=`</div></div>`;
+  tab.innerHTML=h;
+}
+
+// ── Nesting Tab Builder ───────────────────────────────────────────────────────
+function buildNestingTab(){
+  const tab=document.getElementById('tab_nesting');if(!tab||!_lastNesting)return;tab.innerHTML='';
+  function buildSection(nestResult,specs,title,cls,totalRM){
+    const sec=document.createElement('div');sec.className='nest-section';
+    const sheets=nestResult.sheets;let tUsed=0,tBoard=0;const purchase={};
+    sheets.forEach(sh=>{tUsed+=sh.usedArea;tBoard+=sh.bW*sh.bH;purchase[sh.bName]=(purchase[sh.bName]||0)+1;});
+    const overallU=tBoard>0?(tUsed/tBoard*100).toFixed(1):'0';
+    const purchaseStr=Object.entries(purchase).map(([k,v])=>`<strong style="color:var(--text)">${k}: ${v}pcs</strong>`).join('  .  ');
+    const legendStr=specs.map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${s.color};"></span>${s.name} x${s.qty}</span>`).join('');
+    const hdr=document.createElement('div');
+    hdr.innerHTML=`<div class="nest-header ${cls}">&#9670; ${title} -- ${sheets.length} sheets total . RM ${totalRM.toFixed(2)} material</div><div class="nest-stat-bar"><div class="nsb-item"><div class="nsb-lbl">Sheets</div><div class="nsb-val hi">${sheets.length} pcs</div></div><div class="nsb-item"><div class="nsb-lbl">Utilization</div><div class="nsb-val hi">${overallU}%</div></div><div class="nsb-item"><div class="nsb-lbl">To Order</div><div class="nsb-val">${purchaseStr}</div></div></div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${legendStr}</div>`;
+    sec.appendChild(hdr);
+    sheets.forEach((sh,si)=>{
+      const uColor=sh.util>=0.85?'#00c896':sh.util>=0.65?'#f0c040':'#ff6b35';
+      const card=document.createElement('div');card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;';
+      const gps={};sh.placed.forEach(p=>{if(!gps[p.specId])gps[p.specId]={name:p.name,color:p.color,count:0};gps[p.specId].count++;});
+      const tags=Object.values(gps).map(g=>`<span class="piece-tag" style="background:${g.color}22;color:${g.color};">${g.name} x${g.count}</span>`).join('');
+      const visId=`vis_${cls}_${si}`;
+      card.innerHTML=`<div style="background:var(--surface2);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);"><div style="display:flex;align-items:center;gap:12px;"><span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);">SHEET #${si+1}</span><span style="font-family:var(--mono);font-size:11px;color:var(--text2);">${sh.bName} mm</span><span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${uColor};">${(sh.util*100).toFixed(1)}% utilization</span></div><div style="display:flex;flex-wrap:wrap;gap:4px;">${tags}</div></div><div style="padding:14px;"><div id="${visId}" style="width:100%;height:360px;background:var(--bg);border:1px solid var(--border);border-radius:6px;position:relative;overflow:hidden;"></div></div>`;
+      sec.appendChild(card);
+      requestAnimationFrame(()=>{
+        const vis=document.getElementById(visId);if(!vis)return;
+        const containerW=vis.clientWidth||600;const containerH=360;const scaleX=containerW/sh.bW;const scaleY=containerH/sh.bH;
+        sh.placed.forEach(p=>{
+          const div=document.createElement('div');
+          div.style.cssText=`position:absolute;left:${(p.x*scaleX).toFixed(1)}px;top:${(p.y*scaleY).toFixed(1)}px;width:${(p.w*scaleX).toFixed(1)}px;height:${(p.h*scaleY).toFixed(1)}px;background:${p.color}28;border:2px solid ${p.color}99;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:default;box-sizing:border-box;`;
+          div.onmouseenter=()=>{div.style.background=p.color+'55';div.style.zIndex='10';};div.onmouseleave=()=>{div.style.background=p.color+'28';div.style.zIndex='';};
+          div.title=`${p.name}\n${p.w}x${p.h}mm`;
+          const pxW=p.w*scaleX,pxH=p.h*scaleY;
+          if(pxW>22&&pxH>16)div.innerHTML=`<div style="font-family:var(--mono);font-size:${Math.min(11,Math.max(8,pxW/8))}px;font-weight:700;color:${p.color};text-align:center;line-height:1.2;padding:2px;">${p.name}</div>${pxH>30?`<div style="font-family:var(--mono);font-size:${Math.min(9,Math.max(7,pxW/10))}px;color:${p.color}88;text-align:center;">${p.w}x${p.h}</div>`:''}`;
+          vis.appendChild(div);
+        });
+        const bgCanvas=document.createElement('canvas');bgCanvas.style.cssText='position:absolute;top:0;left:0;pointer-events:none;opacity:0.15;';bgCanvas.width=containerW;bgCanvas.height=containerH;
+        const ctx=bgCanvas.getContext('2d');ctx.strokeStyle='#ffffff';ctx.lineWidth=0.5;
+        for(let x=0;x<=sh.bW;x+=100){ctx.beginPath();ctx.moveTo(x*scaleX,0);ctx.lineTo(x*scaleX,containerH);ctx.stroke();}
+        for(let y=0;y<=sh.bH;y+=100){ctx.beginPath();ctx.moveTo(0,y*scaleY);ctx.lineTo(containerW,y*scaleY);ctx.stroke();}
+        vis.insertBefore(bgCanvas,vis.firstChild);
+        const lbl=document.createElement('div');lbl.style.cssText='position:absolute;bottom:4px;right:6px;font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.25);pointer-events:none;';lbl.textContent=`${sh.bW}x${sh.bH}mm`;vis.appendChild(lbl);
+      });
+    });
+    if(nestResult.unmet&&nestResult.unmet.length){const w=document.createElement('div');w.style.cssText='background:rgba(255,61,107,0.06);border:1px solid rgba(255,61,107,0.2);border-radius:6px;padding:12px;margin-top:6px;';w.innerHTML=`<div style="font-family:var(--mono);font-size:10px;color:var(--red);margin-bottom:6px;">Parts not placed -- sheet may be too small</div>`+nestResult.unmet.map(u=>`<span class="piece-tag" style="background:${u.color}22;color:${u.color};">${u.name} missing ${u.leftover} pcs</span>`).join('');sec.appendChild(w);}
+    return sec;
+  }
+  const{topNest,lrNest,topSpecs,lrSpecs,topTotalRM,lrTotalRM}=_lastNesting;
+  tab.appendChild(buildSection(topNest,topSpecs,'TOP PIECES - 1 per door (mixed nesting)','top',topTotalRM));
+  tab.appendChild(buildSection(lrNest,lrSpecs,'L/R PIECES - 2 per door (mixed nesting)','lr',lrTotalRM));
+}
+
+// ── Export Excel ──────────────────────────────────────────────────────────────
+function exportExcel(){
+  if(!_lastResults.length){alert('Please calculate first!');return;}
+  const wb=XLSX.utils.book_new();
+  const d=[['Door Type','Profile','Cut Size','Frame W','Frame H','Qty','Metal/door (RM)','TOP Sheets','L/R Sheets','Total Metal (RM)','Hardware (RM)','Labour (RM)','Transport (RM)','Rejection+OH (RM)','Total Cost/door (RM)','Sell (RM)','Profit/door (RM)','Margin%','Total Revenue','Total Cost','Total Profit']];
+  _lastResults.forEach(r=>{d.push([r.dtype||'',r.prof,r.cs,r.fw,r.fh,r.qty,+r.metalPerDoor.toFixed(2),r.tSheets,r.lSheets,+(r.tMetalRM+r.lMetalRM).toFixed(2),+r.hw.toFixed(2),+r.lab.toFixed(2),+r.hwTr.toFixed(2),+(r.rej+r.adm+r.ohd).toFixed(2),+r.total.toFixed(2),+r.sell.toFixed(2),+r.profit.toFixed(2),+r.pct.toFixed(2),+r.tR.toFixed(2),+r.tC.toFixed(2),+r.tP.toFixed(2)]);});
+  const ws=XLSX.utils.aoa_to_sheet(d);ws['!cols']=Array(21).fill({wch:14});XLSX.utils.book_append_sheet(wb,ws,'Summary');
+  XLSX.writeFile(wb,'MFCC_v4_nesting_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+// ── Profile System ────────────────────────────────────────────────────────────
+const STORE_KEY='mfcc_zinc_profiles';const ACTIVE_KEY='mfcc_zinc_active';
+function getSettings(){return{matType:gs('matType'),matThick:gs('matThick'),matPrice:gs('matPrice'),kerf:gs('kerf'),hw_hinge:gs('hw_hinge'),hw_striker:gs('hw_striker'),hw_spreader:gs('hw_spreader'),hw_wire:gs('hw_wire'),hw_strap:gs('hw_strap'),hw_morter:gs('hw_morter'),hw_transport:gs('hw_transport'),pct_r:gs('pct_r'),pct_a:gs('pct_a'),pct_o:gs('pct_o'),lengths:getRawLengths()};}
+function getDoors(){const doors=[];document.querySelectorAll('.dr').forEach(row=>{const n=row.id.replace('door_','');doors.push({dtype:gs('d'+n+'_dtype'),profile:gs('d'+n+'_profile'),hinges:gs('d'+n+'_hinges'),cs:gs('d'+n+'_cs'),fw:gs('d'+n+'_fw'),fh:gs('d'+n+'_fh'),qty:gs('d'+n+'_qty'),lab:gs('d'+n+'_lab'),sell:gs('d'+n+'_sell')});});return doors;}
+function applySettings(s){
+  if(!s)return;
+  ['matType','matThick','matPrice','kerf','hw_hinge','hw_striker','hw_spreader','hw_wire','hw_strap','hw_morter','hw_transport','pct_r','pct_a','pct_o'].forEach(id=>{if(s[id]!==undefined)document.getElementById(id).value=s[id];});
+  document.getElementById('boardLengthRows').innerHTML='';lengthRowId=0;
+  const lengths=s.lengths||s.boards;
+  if(lengths&&lengths.length){lengths.forEach(b=>{if(b.h)addLengthRow(b.h);});}else{addLengthRow(2438);addLengthRow(3048);}
+  renderWidthDisplay();
+}
+function applyDoors(doors){
+  if(!doors||!doors.length)return;document.getElementById('doorRows').innerHTML='';dc=0;
+  doors.forEach(d=>addDoorRow({dtype:d.dtype,profile:d.profile,cs:d.cs,fw:d.fw,fh:d.fh,qty:d.qty,sell:d.sell}));
+  document.querySelectorAll('.dr').forEach((row,i)=>{const n=row.id.replace('door_','');const d=doors[i];if(!d)return;document.getElementById('d'+n+'_hinges').value=d.hinges;document.getElementById('d'+n+'_lab').value=d.lab;});
+}
+function loadProfiles(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return{};}}
+function saveProfiles(p){try{localStorage.setItem(STORE_KEY,JSON.stringify(p));}catch(e){}}
+function getActiveId(){return localStorage.getItem(ACTIVE_KEY)||null;}
+function setActiveId(id){localStorage.setItem(ACTIVE_KEY,id);}
+function autoSave(){const id=getActiveId();if(!id)return;const ps=loadProfiles();if(!ps[id])return;ps[id].settings=getSettings();ps[id].doors=getDoors();ps[id].updated=new Date().toISOString();saveProfiles(ps);const tag=document.getElementById('autosave_tag');if(tag){tag.textContent='Saved';setTimeout(()=>{tag.textContent='';},1500);}}
+function defaultSettings(){return{matType:'Zincalume',matThick:'1.0',matPrice:'4950',kerf:'2',hw_hinge:'4.00',hw_striker:'0.00',hw_spreader:'2.00',hw_wire:'1.00',hw_strap:'1.20',hw_morter:'0.50',hw_transport:'3.30',pct_r:'2',pct_a:'11',pct_o:'12',lengths:[{h:'2438'},{h:'3048'}]};}
+function newProfile(name){
+  autoSave();const ps=loadProfiles();const id='p_'+Date.now();const pname=name||('Profile '+(Object.keys(ps).length+1));
+  ps[id]={id,name:pname,settings:defaultSettings(),doors:[],created:new Date().toISOString(),updated:new Date().toISOString()};
+  saveProfiles(ps);setActiveId(id);applySettings(defaultSettings());document.getElementById('doorRows').innerHTML='';dc=0;
+  addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
+  document.getElementById('resultsArea').innerHTML='<div class="rempty"><span style="font-size:32px;">&#9889;</span><span>Fill in door specs and click Calculate</span></div>';
+  renderSidebar();showTag('New profile created');
+}
+function switchProfile(id){
+  autoSave();const ps=loadProfiles();const p=ps[id];if(!p)return;setActiveId(id);applySettings(p.settings||{});applyDoors(p.doors||[]);
+  if(!p.doors||!p.doors.length)addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});
+  renderSidebar();document.getElementById('resultsArea').innerHTML='<div class="rempty"><span style="font-size:32px;">&#9889;</span><span>Fill in door specs and click Calculate</span></div>';
+}
+function deleteProfile(id,e){e.stopPropagation();const ps=loadProfiles();const name=ps[id]?ps[id].name:'this profile';if(!confirm('Delete "'+name+'"?'))return;delete ps[id];saveProfiles(ps);const keys=Object.keys(ps);if(getActiveId()===id){if(keys.length>0){setActiveId(keys[keys.length-1]);switchProfile(keys[keys.length-1]);}else{localStorage.removeItem(ACTIVE_KEY);newProfile('Profile 1');}}renderSidebar();}
+function startRename(id,e){e.stopPropagation();const item=document.querySelector('[data-id="'+id+'"]');if(!item)return;const nameEl=item.querySelector('.sb-item-name');const ps=loadProfiles();const cur=ps[id]?ps[id].name:'';const input=document.createElement('input');input.className='sb-rename-input';input.value=cur;nameEl.replaceWith(input);input.focus();input.select();const finish=()=>{const val=input.value.trim()||cur;const p2=loadProfiles();if(p2[id]){p2[id].name=val;saveProfiles(p2);}renderSidebar();};input.addEventListener('blur',finish);input.addEventListener('keydown',ev=>{if(ev.key==='Enter')input.blur();if(ev.key==='Escape'){input.value=cur;input.blur();}});}
+function fmtDate(iso){if(!iso)return'';const d=new Date(iso);return(d.getMonth()+1)+'/'+d.getDate()+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
+function renderSidebar(){const ps=loadProfiles();const activeId=getActiveId();const list=document.getElementById('sbList');if(!list)return;const keys=Object.keys(ps).sort((a,b)=>(ps[a].updated||'')<(ps[b].updated||'')?1:-1);if(!keys.length){list.innerHTML='<div style="padding:12px;font-size:11px;color:var(--text3);">No profiles yet</div>';return;}list.innerHTML='';keys.forEach(id=>{const p=ps[id];const isA=id===activeId;const div=document.createElement('div');div.className='sb-item'+(isA?' active':'');div.setAttribute('data-id',id);div.innerHTML='<div style="flex:1;min-width:0;"><div class="sb-item-name">'+p.name+'</div><div class="sb-item-date">'+fmtDate(p.updated)+'</div></div><button class="sb-del">x</button>';div.addEventListener('click',()=>switchProfile(id));div.addEventListener('dblclick',e=>startRename(id,e));div.querySelector('.sb-del').addEventListener('click',e=>deleteProfile(id,e));list.appendChild(div);});}
+function showTag(msg){const tag=document.getElementById('autosave_tag');if(tag){tag.textContent=msg;setTimeout(()=>{tag.textContent='';},2000);}}
+function exportJSON(){const data={settings:getSettings(),doors:getDoors(),saved:new Date().toISOString()};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MFCC_v4_'+new Date().toISOString().split('T')[0]+'.json';a.click();}
+function importJSON(){const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(data.settings)applySettings(data.settings);if(data.doors)applyDoors(data.doors);autoSave();alert('Imported!');}catch(err){alert('Invalid file.');}};reader.readAsText(file);};input.click();}
+
+document.addEventListener('input',()=>setTimeout(autoSave,500));
+document.addEventListener('change',()=>setTimeout(autoSave,500));
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function(){
+  try{
+    const ps=loadProfiles();const keys=Object.keys(ps);
+    if(keys.length){const activeId=getActiveId();const id=activeId&&ps[activeId]?activeId:keys[keys.length-1];setActiveId(id);applySettings(ps[id].settings||{});applyDoors(ps[id].doors||[]);if(!ps[id].doors||!ps[id].doors.length)addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});renderSidebar();return;}
+  }catch(e){}
+  applySettings(defaultSettings());addDoorRow({profile:'APF1',cs:233,fw:800,fh:2130,qty:10,sell:81});newProfile('Default');
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</body>
+</html>
