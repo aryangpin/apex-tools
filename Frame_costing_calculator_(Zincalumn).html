@@ -213,6 +213,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
       <div class="pb">
         <div id="doorRows"></div>
         <button class="btn-add" onclick="addDoorRow()">+ Add Door Type</button>
+        <button class="btn-add" onclick="showBatchImport()" style="color:var(--accent2);border-color:var(--accent2);margin-top:4px;">⚡ Batch Import (CSV)</button>
         <button class="btn-add" onclick="clearAllDoors()" style="color:var(--red);border-color:var(--red);margin-top:4px;">Clear All</button>
         <button class="btn-calc" onclick="calculate()">⚡ CALCULATE COSTING</button>
       </div>
@@ -929,8 +930,52 @@ function showTag(msg){const tag=document.getElementById('autosave_tag');if(tag){
 function exportJSON(){const data={settings:getSettings(),doors:getDoors(),saved:new Date().toISOString()};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MFCC_v4_'+new Date().toISOString().split('T')[0]+'.json';a.click();}
 function importJSON(){const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(data.settings)applySettings(data.settings);if(data.doors)applyDoors(data.doors);autoSave();alert('Imported!');}catch(err){alert('Invalid file.');}};reader.readAsText(file);};input.click();}
 
-document.addEventListener('input',()=>setTimeout(autoSave,500));
-document.addEventListener('change',()=>setTimeout(autoSave,500));
+// ── Batch Import ───────────────────────────────────────────────────────────────
+function showBatchImport(){document.getElementById('batchImportModal').style.display='flex';}
+function closeBatchImport(){document.getElementById('batchImportModal').style.display='none';document.getElementById('batchImportText').value='';}
+function processBatchImport(){
+  const raw=document.getElementById('batchImportText').value.trim();
+  if(!raw){alert('Please paste your order data first!');return;}
+  const lines=raw.split('\n');
+  const valid=[];const errors=[];
+  // Format 8-field: DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,Hinges,CutSize
+  // Format 7-field: DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,CutSize
+  const PROF_MAP={};PROFS.forEach(p=>{
+    PROF_MAP[p.toLowerCase().replace(/\s/g,'')]=p;
+    PROF_MAP[p.toLowerCase()]=p;
+  });
+  lines.forEach((line,i)=>{
+    line=line.trim();if(!line)return;
+    const parts=line.split(',');
+    if(parts.length<7){errors.push('Line '+(i+1)+': need at least 7 fields (DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,CutSize)');return;}
+    const dtype=parts[0].trim();
+    const profRaw=parts[1].trim();
+    const fw=parseFloat(parts[2]);
+    const fh=parseFloat(parts[3]);
+    const qty=parseInt(parts[4]);
+    const sell=parseFloat(parts[5]);
+    let hinges=3,cs;
+    if(parts.length>=8){hinges=parseInt(parts[6]);cs=parseFloat(parts[7]);}
+    else{cs=parseFloat(parts[6]);}
+    const profKey=profRaw.toLowerCase().replace(/\s/g,'');
+    const prof=PROF_MAP[profKey]||null;
+    const validHinges=[3,4,6,8];
+    if(!dtype||!prof||isNaN(fw)||isNaN(fh)||isNaN(qty)||qty<1||isNaN(cs)||isNaN(hinges)||!validHinges.includes(hinges)){
+      errors.push('Line '+(i+1)+': invalid data'+(prof?'':' (unknown profile: '+profRaw+')')+(validHinges.includes(hinges)?'':' (hinges must be 3/4/6/8)')+' — '+line);return;
+    }
+    valid.push({dtype,prof,fw,fh,qty,sell,hinges,cs});
+  });
+  if(valid.length===0){alert('No valid rows found.\n\nExpected format:\nD8,APF1,1800,2125,46,109,6,233\n\nErrors:\n'+errors.join('\n'));return;}
+  document.getElementById('doorRows').innerHTML='';dc=0;
+  valid.forEach(v=>{
+    addDoorRow({dtype:v.dtype,profile:v.prof,fw:v.fw,fh:v.fh,qty:v.qty,sell:v.sell,cs:v.cs});
+    const hEl=document.getElementById('d'+dc+'_hinges');if(hEl)hEl.value=v.hinges;
+  });
+  closeBatchImport();
+  autoSave();
+  if(errors.length>0){alert('Imported '+valid.length+' doors.\n\nSkipped rows:\n'+errors.join('\n'));}
+}
+
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (function(){
@@ -943,5 +988,20 @@ document.addEventListener('change',()=>setTimeout(autoSave,500));
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<div id="batchImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;width:500px;max-width:92vw;padding:24px;position:relative;">
+    <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent2);letter-spacing:1px;margin-bottom:4px;">BATCH IMPORT</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:14px;">One door per line · Format: <span style="color:var(--accent);">DoorType, APF Profile, FrameW, FrameH, Qty, SellPrice, Hinges, CutSize</span></div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--text3);">
+      Example:<br>
+      <span style="color:var(--text2);">D8,APF1,1800,2125,46,109,6,233<br>D9,APF2,900,2125,20,85,3,233<br>D10,APF3,1100,2430,10,120,4,233</span>
+    </div>
+    <textarea id="batchImportText" rows="10" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:12px;padding:10px;outline:none;resize:vertical;line-height:1.6;" placeholder="Paste your CSV data here..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button onclick="processBatchImport()" style="flex:1;background:var(--accent2);color:#fff;border:none;border-radius:5px;font-family:var(--mono);font-size:13px;font-weight:600;padding:10px;cursor:pointer;">IMPORT</button>
+      <button onclick="closeBatchImport()" style="background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:12px;padding:10px 18px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
