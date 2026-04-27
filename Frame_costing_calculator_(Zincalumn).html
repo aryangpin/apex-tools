@@ -99,6 +99,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .nest-header.top{color:var(--warn);background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);}
 .nest-header.lr{color:var(--accent2);background:rgba(0,130,255,0.06);border:1px solid rgba(0,130,255,0.2);}
 .piece-tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;}
+.piece-rect{position:absolute;border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;font-weight:700;overflow:hidden;cursor:default;transition:opacity 0.15s;}
+.piece-rect:hover{opacity:0.85;z-index:10;}
 .nest-stat-bar{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 16px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;}
 .nsb-item{font-family:var(--mono);font-size:11px;}
 .nsb-lbl{color:var(--text3);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;}
@@ -298,122 +300,300 @@ function getBoardSpecs(){
 }
 
 // ── 1D Strip Packer ───────────────────────────────────────────────────────────
-// NO rotation: piece.w = cutting width (narrow), piece.h = frame height (long, must be vertical)
-// Pack strips side by side horizontally. Each strip = piece.w wide, piece.h tall.
-function tryPlace1D(pieces,bW,bH){
-  const placed=[],unplaced=[...pieces],rows=[];let curY=0,i=0;
-  while(i<unplaced.length){
-    const p=unplaced[i];
-    // Fixed orientation only: pw=p.w (cutting width), ph=p.h (frame height)
-    if(p.w>bW||p.h>bH){i++;continue;}
-    let bRow=-1,bLf=Infinity;
-    for(let ri=0;ri<rows.length;ri++){const row=rows[ri];if(p.w<=row.rw&&p.h<=row.h){const lf=row.rw-p.w;if(lf<bLf){bLf=lf;bRow=ri;}}}
-    if(bRow!==-1){const row=rows[bRow];placed.push({specId:p.specId,x:bW-row.rw,y:row.y,w:p.w,h:p.h,color:p.color,name:p.name});row.rw-=p.w;unplaced.splice(i,1);continue;}
-    if(curY+p.h>bH){i++;continue;}
-    rows.push({y:curY,h:p.h,rw:bW-p.w});placed.push({specId:p.specId,x:0,y:curY,w:p.w,h:p.h,color:p.color,name:p.name});curY+=p.h;unplaced.splice(i,1);
+// Hybrid approach: detect full-length pieces → 1D strip, else 2D guillotine.
+// Supports rotation. Each row = one horizontal strip; strip height = tallest piece in row.
+function tryPlace1D(pieces, boardW, boardH) {
+  const placed = [];
+  const unplaced = [...pieces];
+  const rows = [];
+  let curY = 0;
+  let i = 0;
+  while (i < unplaced.length) {
+    const piece = unplaced[i];
+    const orients = [
+      { pw: piece.w, ph: piece.h },
+      { pw: piece.h, ph: piece.w }
+    ].filter(o => o.pw <= boardW && o.ph <= boardH);
+    if (orients.length === 0) { i++; continue; }
+    let bestRow = -1, bestOrient = null, bestLeftover = Infinity;
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      for (const o of orients) {
+        if (o.pw <= row.remaining_w && o.ph <= row.h) {
+          const leftover = row.remaining_w - o.pw;
+          if (leftover < bestLeftover) { bestLeftover = leftover; bestRow = ri; bestOrient = o; }
+        }
+      }
+    }
+    if (bestRow !== -1) {
+      const row = rows[bestRow];
+      placed.push({ specId: piece.specId, x: boardW - row.remaining_w, y: row.y, w: bestOrient.pw, h: bestOrient.ph, color: piece.color, name: piece.name });
+      row.remaining_w -= bestOrient.pw;
+      unplaced.splice(i, 1);
+      continue;
+    }
+    const best = orients.reduce((a, b) => a.ph <= b.ph ? a : b);
+    if (curY + best.ph > boardH) { i++; continue; }
+    const newRow = { x: 0, y: curY, h: best.ph, remaining_w: boardW - best.pw };
+    rows.push(newRow);
+    placed.push({ specId: piece.specId, x: 0, y: curY, w: best.pw, h: best.ph, color: piece.color, name: piece.name });
+    curY += best.ph;
+    unplaced.splice(i, 1);
   }
-  const freeRects=[];rows.forEach(r=>{if(r.rw>0)freeRects.push({x:bW-r.rw,y:r.y,w:r.rw,h:r.h});});
-  if(curY<bH)freeRects.push({x:0,y:curY,w:bW,h:bH-curY});
-  return{placed,unplaced,freeRects};
+  const freeRects = [];
+  rows.forEach(row => { if (row.remaining_w > 0) freeRects.push({ x: boardW - row.remaining_w, y: row.y, w: row.remaining_w, h: row.h }); });
+  if (curY < boardH) freeRects.push({ x: 0, y: curY, w: boardW, h: boardH - curY });
+  return { placed, unplaced, freeRects };
 }
 
-// ── 2D Guillotine ─────────────────────────────────────────────────────────────
-// NO rotation: fixed orientation only
-function tryPlace2D(pieces,bW,bH){
-  const placed=[],unplaced=[];let fR=[{x:0,y:0,w:bW,h:bH}];
-  function sH(r,pw,ph){const a=[];if(r.w-pw>0)a.push({x:r.x+pw,y:r.y,w:r.w-pw,h:ph});if(r.h-ph>0)a.push({x:r.x,y:r.y+ph,w:r.w,h:r.h-ph});return a;}
-  function sV(r,pw,ph){const a=[];if(r.h-ph>0)a.push({x:r.x,y:r.y+ph,w:pw,h:r.h-ph});if(r.w-pw>0)a.push({x:r.x+pw,y:r.y,w:r.w-pw,h:r.h});return a;}
-  function rmC(){fR=fR.filter((r,i)=>!fR.some((o,j)=>j!==i&&o.x<=r.x&&o.y<=r.y&&o.x+o.w>=r.x+r.w&&o.y+o.h>=r.y+r.h));}
-  for(const p of pieces){
-    // Fixed orientation only: pw=p.w, ph=p.h
-    let bRect=-1,bS=Infinity;
-    for(let ri=0;ri<fR.length;ri++){const r=fR[ri];if(p.w<=r.w&&p.h<=r.h){const s=r.w*r.h-p.w*p.h;if(s<bS){bS=s;bRect=ri;}}}
-    if(bRect===-1){unplaced.push(p);continue;}
-    const r=fR[bRect];placed.push({specId:p.specId,x:r.x,y:r.y,w:p.w,h:p.h,color:p.color,name:p.name});
-    const aH=sH(r,p.w,p.h),aV=sV(r,p.w,p.h);
-    fR.splice(bRect,1);fR.push(...(aH.reduce((s,x)=>s+x.w*x.h,0)>=aV.reduce((s,x)=>s+x.w*x.h,0)?aH:aV));rmC();
+// ── 2D Guillotine Best-Fit ────────────────────────────────────────────────────
+// Supports rotation. Best-fit (smallest leftover area) with guillotine split.
+function tryPlace2D(pieces, boardW, boardH) {
+  const placed = [];
+  const unplaced = [];
+  let freeRects = [{ x: 0, y: 0, w: boardW, h: boardH }];
+  function splitH(r, pw, ph) {
+    const a = [];
+    if (r.w - pw > 0) a.push({ x: r.x + pw, y: r.y, w: r.w - pw, h: ph });
+    if (r.h - ph > 0) a.push({ x: r.x, y: r.y + ph, w: r.w, h: r.h - ph });
+    return a;
   }
-  return{placed,unplaced,freeRects:fR};
-}
-
-function placeSingleInFreeRects(piece,fR){
-  // Fixed orientation only: piece.w x piece.h, no rotation
-  let bRect=-1,bS=Infinity;
-  for(let ri=0;ri<fR.length;ri++){const r=fR[ri];if(piece.w<=r.w&&piece.h<=r.h){const s=r.w*r.h-piece.w*piece.h;if(s<bS){bS=s;bRect=ri;}}}
-  if(bRect===-1)return null;
-  const r=fR[bRect];const pl={specId:piece.specId,x:r.x,y:r.y,w:piece.w,h:piece.h,color:piece.color,name:piece.name};
-  const sH=[{x:r.x+piece.w,y:r.y,w:r.w-piece.w,h:piece.h},{x:r.x,y:r.y+piece.h,w:r.w,h:r.h-piece.h}].filter(s=>s.w>0&&s.h>0);
-  const sV=[{x:r.x,y:r.y+piece.h,w:piece.w,h:r.h-piece.h},{x:r.x+piece.w,y:r.y,w:r.w-piece.w,h:r.h}].filter(s=>s.w>0&&s.h>0);
-  const aH=sH.reduce((s,x)=>s+x.w*x.h,0),aV=sV.reduce((s,x)=>s+x.w*x.h,0);
-  fR.splice(bRect,1,...(aH>=aV?sH:sV));
-  const cl=fR.filter((r,i)=>!fR.some((o,j)=>j!==i&&o.x<=r.x&&o.y<=r.y&&o.x+o.w>=r.x+r.w&&o.y+o.h>=r.y+r.h));
-  fR.length=0;fR.push(...cl);return pl;
-}
-
-// ── Strip-Combination Optimizer ───────────────────────────────────────────────
-function bestStripCombo(active,remaining,bW){
-  const items=active.map(s=>({spec:s,w:s.w,maxN:remaining[s.id]})).filter(it=>it.w<=bW&&it.maxN>0);
-  if(!items.length)return null;
-  let bestWaste=Infinity,bestCombo=null;
-  function enumerate(idx,usedW,counts){
-    const waste=bW-usedW;if(waste<bestWaste){bestWaste=waste;bestCombo={...counts};}
-    if(idx>=items.length)return;const item=items[idx];const maxFit=Math.min(item.maxN,Math.floor((bW-usedW)/item.w));
-    for(let n=maxFit;n>=0;n--){if(n>0)counts[item.spec.id]=n;else delete counts[item.spec.id];enumerate(idx+1,usedW+n*item.w,counts);if(bestWaste===0)return;}
-    delete counts[item.spec.id];
+  function splitV(r, pw, ph) {
+    const a = [];
+    if (r.h - ph > 0) a.push({ x: r.x, y: r.y + ph, w: pw, h: r.h - ph });
+    if (r.w - pw > 0) a.push({ x: r.x + pw, y: r.y, w: r.w - pw, h: r.h });
+    return a;
   }
-  enumerate(0,0,{});return bestCombo&&Object.keys(bestCombo).length>0?bestCombo:null;
+  function removeContained() {
+    freeRects = freeRects.filter((r, i) => !freeRects.some((o, j) => j !== i && o.x <= r.x && o.y <= r.y && o.x + o.w >= r.x + r.w && o.y + o.h >= r.y + r.h));
+  }
+  for (const piece of pieces) {
+    const orients = [{ pw: piece.w, ph: piece.h }, { pw: piece.h, ph: piece.w }];
+    let bestRect = -1, bestOrient = null, bestScore = Infinity;
+    for (const o of orients) {
+      for (let ri = 0; ri < freeRects.length; ri++) {
+        const r = freeRects[ri];
+        if (o.pw <= r.w && o.ph <= r.h) {
+          const score = r.w * r.h - o.pw * o.ph;
+          if (score < bestScore) { bestScore = score; bestRect = ri; bestOrient = o; }
+        }
+      }
+    }
+    if (bestRect === -1) { unplaced.push(piece); continue; }
+    const r = freeRects[bestRect];
+    placed.push({ specId: piece.specId, x: r.x, y: r.y, w: bestOrient.pw, h: bestOrient.ph, color: piece.color, name: piece.name });
+    const splitsH = splitH(r, bestOrient.pw, bestOrient.ph);
+    const splitsV = splitV(r, bestOrient.pw, bestOrient.ph);
+    const aH = splitsH.reduce((s, x) => s + x.w * x.h, 0);
+    const aV = splitsV.reduce((s, x) => s + x.w * x.h, 0);
+    freeRects.splice(bestRect, 1);
+    freeRects.push(...(aH >= aV ? splitsH : splitsV));
+    removeContained();
+  }
+  return { placed, unplaced, freeRects };
 }
 
-function placeStripCombo(combo,active,bW,bH){
-  const placed=[];let x=0;
-  for(const[sid,cnt]of Object.entries(combo)){const spec=active.find(s=>s.id===sid);if(!spec)continue;for(let i=0;i<cnt;i++){placed.push({specId:spec.id,x,y:0,w:spec.w,h:Math.min(spec.h,bH),color:spec.color,name:spec.name});x+=spec.w;}}
-  const freeRects=[];if(x<bW)freeRects.push({x,y:0,w:bW-x,h:bH});placed.forEach(p=>{if(p.h<bH)freeRects.push({x:p.x,y:p.h,w:p.w,h:bH-p.h});});
-  return{placed,freeRects};
+// ── Smart dispatcher ──────────────────────────────────────────────────────────
+// Full-length (long dim >= 88% of board height in at least one orientation) → 1D strip.
+// Otherwise → 2D guillotine.
+function tryPlace(pieces, boardW, boardH) {
+  if (pieces.length === 0) return { placed: [], unplaced: [], freeRects: [] };
+  const allFullLength = pieces.every(p => {
+    const canStandH = p.h >= boardH * 0.88 && p.w <= boardW;
+    const canStandW = p.w >= boardH * 0.88 && p.h <= boardW;
+    return canStandH || canStandW;
+  });
+  if (allFullLength) {
+    const normalized = pieces.map(p => {
+      const useRotated = p.w > p.h;
+      return { ...p, w: useRotated ? p.h : p.w, h: useRotated ? p.w : p.h };
+    });
+    return tryPlace1D(normalized, boardW, boardH);
+  }
+  return tryPlace2D(pieces, boardW, boardH);
+}
+
+// ── Backfill: place single piece into existing free rects (with rotation) ─────
+function placeSingleInFreeRects(piece, freeRects) {
+  const orients = [{ pw: piece.w, ph: piece.h }, { pw: piece.h, ph: piece.w }];
+  let bestRect = -1, bestOrient = null, bestScore = Infinity;
+  for (const o of orients) {
+    for (let ri = 0; ri < freeRects.length; ri++) {
+      const r = freeRects[ri];
+      if (o.pw <= r.w && o.ph <= r.h) {
+        const score = r.w * r.h - o.pw * o.ph;
+        if (score < bestScore) { bestScore = score; bestRect = ri; bestOrient = o; }
+      }
+    }
+  }
+  if (bestRect === -1) return null;
+  const r = freeRects[bestRect];
+  const pl = { specId: piece.specId, x: r.x, y: r.y, w: bestOrient.pw, h: bestOrient.ph, color: piece.color, name: piece.name };
+  const splitsH = [
+    { x: r.x + bestOrient.pw, y: r.y, w: r.w - bestOrient.pw, h: bestOrient.ph },
+    { x: r.x, y: r.y + bestOrient.ph, w: r.w, h: r.h - bestOrient.ph }
+  ].filter(s => s.w > 0 && s.h > 0);
+  const splitsV = [
+    { x: r.x, y: r.y + bestOrient.ph, w: bestOrient.pw, h: r.h - bestOrient.ph },
+    { x: r.x + bestOrient.pw, y: r.y, w: r.w - bestOrient.pw, h: r.h }
+  ].filter(s => s.w > 0 && s.h > 0);
+  const aH = splitsH.reduce((s, x) => s + x.w * x.h, 0);
+  const aV = splitsV.reduce((s, x) => s + x.w * x.h, 0);
+  freeRects.splice(bestRect, 1, ...(aH >= aV ? splitsH : splitsV));
+  const cleaned = freeRects.filter((r, i) => !freeRects.some((o, j) => j !== i && o.x <= r.x && o.y <= r.y && o.x + o.w >= r.x + r.w && o.y + o.h >= r.y + r.h));
+  freeRects.length = 0; freeRects.push(...cleaned);
+  return pl;
+}
+
+// ── Strip combo enumerator (1D full-length mode) ──────────────────────────────
+// Enumerate all width combinations that fit boardW; sort by utilization desc; cap 500.
+function enumStripCombos(activeSpecs, boardW, remaining) {
+  const items = activeSpecs.map(s => ({ ...s, stripW: Math.min(s.w, s.h) })).filter(s => s.stripW <= boardW);
+  const results = [];
+  function recurse(idx, combo, usedW) {
+    results.push({ combo: { ...combo }, usedW });
+    for (let i = idx; i < items.length; i++) {
+      const item = items[i];
+      const maxCount = Math.min(remaining[item.id], Math.floor((boardW - usedW) / item.stripW));
+      for (let n = 1; n <= maxCount; n++) {
+        combo[item.id] = (combo[item.id] || 0) + n;
+        recurse(i + 1, combo, usedW + n * item.stripW);
+        combo[item.id] -= n;
+        if (combo[item.id] === 0) delete combo[item.id];
+      }
+    }
+  }
+  recurse(0, {}, 0);
+  return results.filter(r => Object.keys(r.combo).length > 0).sort((a, b) => b.usedW - a.usedW).slice(0, 500);
 }
 
 // ── Core Nesting Engine ───────────────────────────────────────────────────────
-// piece.w = cutting width (narrow side), piece.h = frame height (long side, VERTICAL, NO rotation)
-function runNesting(specs,boardSpecs,kerfBorder){
-  kerfBorder=kerfBorder||0;
-  if(!specs.length||!boardSpecs.length)return{sheets:[],unmet:specs.map(s=>({...s,leftover:s.qty}))};
-  const remaining={};specs.forEach(s=>{remaining[s.id]=s.qty;});
-  const sheets=[];let safety=0;const maxS=specs.reduce((s,x)=>s+x.qty,0)*2+20;
-  while(true){
-    if(!specs.some(s=>remaining[s.id]>0))break;if(safety++>maxS)break;
-    const active=specs.filter(s=>remaining[s.id]>0);
-    let bestPlaced=null,bestFR=null,bestUtil=-1,bestBoard=null,bestPC=null;
-    for(const board of boardSpecs){
-      const bW=board.w-kerfBorder*2;const bH=board.h-kerfBorder*2;if(bW<=0||bH<=0)continue;const bArea=bW*bH;
-      // allFL: piece.h (frame height) fits vertically and is >= 80% of board height — strip mode
-      const allFL=active.every(s=>s.h>=bH*0.80&&s.w<=bW&&s.h<=bH);
-      function evalResult(placed,fr){const usedArea=placed.reduce((s,p)=>s+p.w*p.h,0);const u=usedArea/bArea;if(u>bestUtil){bestUtil=u;bestPlaced=placed;bestFR=fr;bestBoard={...board,bW,bH,bArea};const pc2={};placed.forEach(p=>{pc2[p.specId]=(pc2[p.specId]||0)+1;});bestPC=pc2;}}
-      if(allFL){
-        // Strip mode: pieces in FIXED orientation (w=cutting width, h=frame height), pack side by side
-        const validActive=active.filter(s=>s.w<=bW&&s.h<=bH);if(!validActive.length)continue;
-        const combo=bestStripCombo(validActive,remaining,bW);
-        if(combo){const{placed,freeRects}=placeStripCombo(combo,validActive,bW,bH);if(placed.length)evalResult(placed,freeRects);}
-        for(const s of validActive){const n=Math.min(remaining[s.id],Math.floor(bW/s.w));if(n<1)continue;const sc={[s.id]:n};const{placed,freeRects}=placeStripCombo(sc,validActive,bW,bH);if(placed.length)evalResult(placed,freeRects);}
-      }else{
-        for(const pri of active){
-          if(pri.w>bW||pri.h>bH)continue;
-          const fillers=active.filter(s=>s.id!==pri.id&&s.w<=bW&&s.h<=bH).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
-          const pieces=[];for(let i=0;i<remaining[pri.id];i++)pieces.push({specId:pri.id,w:pri.w,h:pri.h,color:pri.color,name:pri.name});
-          fillers.forEach(s=>{for(let i=0;i<remaining[s.id];i++)pieces.push({specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name});});
-          const res=tryPlace2D(pieces,bW,bH);evalResult(res.placed,res.freeRects);
+// Wraps the nesting-tool algorithm. kerfW/kerfH applied to usable board dims.
+// Keeps the same output shape expected by calculate(): { sheets, unmet }
+// sheets[i]: { placed, pc, usedArea, util, bW, bH, bArea, bName, rawW, rawH, fR }
+function runNesting(specs, boardSpecs, kerfBorder) {
+  kerfBorder = kerfBorder || 0;
+  if (!specs.length || !boardSpecs.length) return { sheets: [], unmet: specs.map(s => ({ ...s, leftover: s.qty })) };
+  // Apply kerf symmetrically (same as original: kerfBorder on each side → total 2× per axis)
+  const kerfW = kerfBorder * 2;
+  const kerfH = kerfBorder * 2;
+  const remaining = {};
+  specs.forEach(s => { remaining[s.id] = s.qty; });
+  const sheets = [];
+  let safety = 0;
+  const maxSheets = specs.reduce((s, x) => s + x.qty, 0) + 10;
+
+  while (true) {
+    const anyLeft = specs.some(s => remaining[s.id] > 0);
+    if (!anyLeft) break;
+    if (safety++ > maxSheets) break;
+
+    const activeSpecs = specs.filter(s => remaining[s.id] > 0);
+    let bestResult = null, bestUtil = -1, bestBoard = null;
+
+    for (const board of boardSpecs) {
+      const usableW = board.w - kerfW;
+      const usableH = board.h - kerfH;
+      if (usableW <= 0 || usableH <= 0) continue;
+      const boardArea = usableW * usableH;
+
+      const isFullLength = activeSpecs.every(s => {
+        const longDim = Math.max(s.w, s.h);
+        const shortDim = Math.min(s.w, s.h);
+        return longDim >= usableH * 0.88 && shortDim <= usableW;
+      });
+
+      function evalPieces(pieces) {
+        const result = tryPlace(pieces, usableW, usableH);
+        const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
+        const util = usedArea / boardArea;
+        if (util > bestUtil) {
+          bestUtil = util;
+          bestResult = result;
+          bestBoard = { ...board, usableW, usableH, boardArea };
         }
-        const bigFirst=[...active].filter(s=>s.w<=bW&&s.h<=bH).sort((a,b)=>(b.w*b.h)-(a.w*a.h));
-        const mp=[];bigFirst.forEach(s=>{for(let i=0;i<remaining[s.id];i++)mp.push({specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name});});
-        if(mp.length){const res2=tryPlace2D(mp,bW,bH);evalResult(res2.placed,res2.freeRects);}
+      }
+
+      if (isFullLength) {
+        const combos = enumStripCombos(activeSpecs, usableW, remaining);
+        for (const combo of combos) {
+          const pieces = [];
+          for (const [sid, cnt] of Object.entries(combo.combo)) {
+            const spec = activeSpecs.find(s => s.id === sid);
+            if (!spec) continue;
+            for (let i = 0; i < cnt; i++)
+              pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
+          }
+          if (pieces.length > 0) evalPieces(pieces);
+        }
+        for (const s of activeSpecs) {
+          const pieces = [];
+          for (let i = 0; i < remaining[s.id]; i++)
+            pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+          evalPieces(pieces);
+        }
+      } else {
+        for (const primary of activeSpecs) {
+          const fillers = activeSpecs.filter(s => s.id !== primary.id).sort((a, b) => (b.w * b.h) - (a.w * a.h));
+          const pieces = [];
+          for (let i = 0; i < remaining[primary.id]; i++)
+            pieces.push({ specId: primary.id, w: primary.w, h: primary.h, color: primary.color, name: primary.name });
+          fillers.forEach(s => { for (let i = 0; i < remaining[s.id]; i++) pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name }); });
+          evalPieces(pieces);
+        }
+        const allLargeFirst = [...activeSpecs].sort((a, b) => (b.w * b.h) - (a.w * a.h));
+        const mixedPieces = [];
+        allLargeFirst.forEach(s => { for (let i = 0; i < remaining[s.id]; i++) mixedPieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name }); });
+        evalPieces(mixedPieces);
       }
     }
-    if(!bestPlaced||!bestPlaced.length)break;
-    Object.entries(bestPC).forEach(([sid,cnt])=>{remaining[sid]=Math.max(0,(remaining[sid]||0)-cnt);});
-    const used=bestPlaced.reduce((s,p)=>s+p.w*p.h,0);
-    sheets.push({placed:bestPlaced,pc:bestPC,usedArea:used,util:used/bestBoard.bArea,bW:bestBoard.bW,bH:bestBoard.bH,bArea:bestBoard.bArea,bName:bestBoard.name,rawW:bestBoard.w,rawH:bestBoard.h,fR:bestFR});
+
+    if (!bestResult || bestResult.placed.length === 0) break;
+
+    const placedCounts = {};
+    bestResult.placed.forEach(p => { placedCounts[p.specId] = (placedCounts[p.specId] || 0) + 1; });
+    Object.entries(placedCounts).forEach(([sid, cnt]) => { remaining[sid] = Math.max(0, (remaining[sid] || 0) - cnt); });
+
+    const usedArea = bestResult.placed.reduce((s, p) => s + p.w * p.h, 0);
+    // Normalise output to match what calculate() expects downstream
+    sheets.push({
+      placed: bestResult.placed,
+      pc: placedCounts,
+      usedArea,
+      util: usedArea / bestBoard.boardArea,
+      bW: bestBoard.usableW,
+      bH: bestBoard.usableH,
+      bArea: bestBoard.boardArea,
+      bName: bestBoard.name,
+      rawW: bestBoard.w,
+      rawH: bestBoard.h,
+      fR: bestResult.freeRects
+    });
   }
-  specs.forEach(s=>{while(remaining[s.id]>0){const piece={specId:s.id,w:s.w,h:s.h,color:s.color,name:s.name};let filled=false;for(const sh of sheets){const r=placeSingleInFreeRects(piece,sh.fR);if(r){sh.placed.push(r);sh.pc[s.id]=(sh.pc[s.id]||0)+1;sh.usedArea+=r.w*r.h;sh.util=sh.usedArea/sh.bArea;remaining[s.id]--;filled=true;break;}}if(!filled)break;}});
-  const unmet=specs.filter(s=>remaining[s.id]>0).map(s=>({...s,leftover:remaining[s.id]}));
-  return{sheets,unmet};
+
+  // ── Backfill: squeeze remaining into existing sheets before declaring unmet ──
+  specs.forEach(s => {
+    while (remaining[s.id] > 0) {
+      const piece = { specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name };
+      let filled = false;
+      for (const sh of sheets) {
+        const result = placeSingleInFreeRects(piece, sh.fR);
+        if (result) {
+          sh.placed.push(result);
+          sh.pc[s.id] = (sh.pc[s.id] || 0) + 1;
+          sh.usedArea += result.w * result.h;
+          sh.util = sh.usedArea / sh.bArea;
+          remaining[s.id]--;
+          filled = true;
+          break;
+        }
+      }
+      if (!filled) break;
+    }
+  });
+
+  const unmet = specs.filter(s => remaining[s.id] > 0).map(s => ({ ...s, leftover: remaining[s.id] }));
+  return { sheets, unmet };
 }
 
 function calcSheetRM(rawW,rawH,matType,thick,pricePerTon){
@@ -527,18 +707,35 @@ function calculate(){
   const topNest=runNesting(allTopSpecs,boards,kerf);const lrNest=runNesting(allLRSpecs,boards,kerf);
   const topTotalRM=topNest.sheets.reduce((s,sh)=>s+calcSheetRM(sh.rawW,sh.rawH,matType,thick,price),0);
   const lrTotalRM=lrNest.sheets.reduce((s,sh)=>s+calcSheetRM(sh.rawW,sh.rawH,matType,thick,price),0);
-  const topTotalPieceArea=doorData.reduce((s,d)=>s+d.eff*d.fw*d.qty,0);
-  const lrTotalPieceArea=doorData.reduce((s,d)=>s+d.eff*d.fh*d.qty*2,0);
+
+  // Method 2 + waste: per-sheet actual area allocation
+  // Each sheet's full cost is split by placed-area ratio → waste absorbed proportionally
+  const topMetalByDoor={};const lrMetalByDoor={};
+  doorData.forEach((_,di)=>{topMetalByDoor[di]=0;lrMetalByDoor[di]=0;});
+  topNest.sheets.forEach(sh=>{
+    const shRM=calcSheetRM(sh.rawW,sh.rawH,matType,thick,price);
+    const totalA=sh.placed.reduce((s,p)=>s+p.w*p.h,0);if(totalA<=0)return;
+    doorData.forEach((d,di)=>{const sA=sh.placed.filter(p=>p.specId==='top_'+di).reduce((s,p)=>s+p.w*p.h,0);topMetalByDoor[di]+=(sA/totalA)*shRM;});
+  });
+  lrNest.sheets.forEach(sh=>{
+    const shRM=calcSheetRM(sh.rawW,sh.rawH,matType,thick,price);
+    const totalA=sh.placed.reduce((s,p)=>s+p.w*p.h,0);if(totalA<=0)return;
+    doorData.forEach((d,di)=>{const sA=sh.placed.filter(p=>p.specId==='lr_'+di).reduce((s,p)=>s+p.w*p.h,0);lrMetalByDoor[di]+=(sA/totalA)*shRM;});
+  });
+  const topSheetsByDoor={};const lrSheetsByDoor={};
+  doorData.forEach((_,di)=>{
+    topSheetsByDoor[di]=topNest.sheets.filter(sh=>sh.placed.some(p=>p.specId==='top_'+di)).length;
+    lrSheetsByDoor[di]=lrNest.sheets.filter(sh=>sh.placed.some(p=>p.specId==='lr_'+di)).length;
+  });
 
   const R=[];
-  doorData.forEach(d=>{
-    const topPieceArea=d.eff*d.fw*d.qty;const lrPieceArea=d.eff*d.fh*d.qty*2;
-    const topAreaRatio=topTotalPieceArea>0?topPieceArea/topTotalPieceArea:0;const lrAreaRatio=lrTotalPieceArea>0?lrPieceArea/lrTotalPieceArea:0;
-    const tMetalRM=topTotalRM*topAreaRatio;const lMetalRM=lrTotalRM*lrAreaRatio;const metalPerDoor=(tMetalRM+lMetalRM)/d.qty;
+  doorData.forEach((d,di)=>{
+    const tMetalRM=topMetalByDoor[di];const lMetalRM=lrMetalByDoor[di];
+    const metalPerDoor=(tMetalRM+lMetalRM)/d.qty;
     const morter=(d.hinges<=4)?hwMo:0;const hw=(d.hinges*hwH)+hwSt+hwSp+hwW+hwSr+morter;
     const frame=metalPerDoor+hw+d.lab+hwTr;const rej=frame*pR,adm=frame*pA,ohd=frame*pO;const total=frame+rej+adm+ohd;
     const profit=d.sell-total,pct=d.sell>0?(profit/d.sell)*100:0;
-    const tSheets=Math.round(topNest.sheets.length*topAreaRatio)||0;const lSheets=Math.round(lrNest.sheets.length*lrAreaRatio)||0;
+    const tSheets=topSheetsByDoor[di]||0;const lSheets=lrSheetsByDoor[di]||0;
     R.push({n:d.n,dtype:d.dtype,prof:d.prof,hinges:d.hinges,cs:d.cs,fw:d.fw,fh:d.fh,qty:d.qty,lab:d.lab,sell:d.sell,metalPerDoor,tMetalRM,lMetalRM,tSheets,lSheets,hw,hwTr,frame,rej,adm,ohd,total,profit,pct,hk:hKey(d.fh),tR:d.sell*d.qty,tC:total*d.qty,tP:profit*d.qty});
   });
   _lastResults=R;_lastNesting={topNest,lrNest,topSpecs:allTopSpecs,lrSpecs:allLRSpecs,topTotalRM,lrTotalRM,topTotalSheets:topNest.sheets.length,lrTotalSheets:lrNest.sheets.length};
@@ -830,50 +1027,143 @@ function buildPurchaseTab(){
 // ── Nesting Tab Builder ───────────────────────────────────────────────────────
 function buildNestingTab(){
   const tab=document.getElementById('tab_nesting');if(!tab||!_lastNesting)return;tab.innerHTML='';
+
   function buildSection(nestResult,specs,title,cls,totalRM){
-    const sec=document.createElement('div');sec.className='nest-section';
-    const sheets=nestResult.sheets;let tUsed=0,tBoard=0;const purchase={};
-    sheets.forEach(sh=>{tUsed+=sh.usedArea;tBoard+=sh.bW*sh.bH;purchase[sh.bName]=(purchase[sh.bName]||0)+1;});
-    const overallU=tBoard>0?(tUsed/tBoard*100).toFixed(1):'0';
-    const purchaseStr=Object.entries(purchase).map(([k,v])=>`<strong style="color:var(--text)">${k}: ${v}pcs</strong>`).join('  .  ');
-    const legendStr=specs.map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${s.color};"></span>${s.name} x${s.qty}</span>`).join('');
-    const hdr=document.createElement('div');
-    hdr.innerHTML=`<div class="nest-header ${cls}">&#9670; ${title} -- ${sheets.length} sheets total . RM ${totalRM.toFixed(2)} material</div><div class="nest-stat-bar"><div class="nsb-item"><div class="nsb-lbl">Sheets</div><div class="nsb-val hi">${sheets.length} pcs</div></div><div class="nsb-item"><div class="nsb-lbl">Utilization</div><div class="nsb-val hi">${overallU}%</div></div><div class="nsb-item"><div class="nsb-lbl">To Order</div><div class="nsb-val">${purchaseStr}</div></div></div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${legendStr}</div>`;
-    sec.appendChild(hdr);
+    const sheets=nestResult.sheets;
+    if(!sheets.length)return;
+
+    // ── Summary stats (mirrors nesting-tool summary grid) ──────────────────
+    const totalPieces=specs.reduce((s,x)=>s+x.qty,0);
+    const placedPieces=sheets.reduce((s,sh)=>s+sh.placed.length,0);
+    const avgUtil=sheets.length?(sheets.reduce((s,sh)=>s+sh.util,0)/sheets.length*100).toFixed(1):0;
+    const totalUsed=sheets.reduce((s,sh)=>s+sh.usedArea,0);
+    const totalBoard=sheets.reduce((s,sh)=>s+sh.bW*sh.bH,0);
+    const overallUtil=totalBoard?(totalUsed/totalBoard*100).toFixed(1):0;
+
+    // Purchase map (board name → count)
+    const purchaseMap={};
+    sheets.forEach(sh=>{purchaseMap[sh.bName]=(purchaseMap[sh.bName]||0)+1;});
+    const purchaseEntries=Object.entries(purchaseMap).sort((a,b)=>b[1]-a[1]);
+
+    // Section wrapper
+    const sec=document.createElement('div');
+    sec.style.cssText='margin-bottom:32px;';
+
+    // Section title header (nest-header style)
+    const titleDiv=document.createElement('div');
+    titleDiv.className='nest-header '+cls;
+    titleDiv.innerHTML=`&#9670; ${title}`;
+    sec.appendChild(titleDiv);
+
+    // ── Summary grid (5 cards, identical to nesting-tool) ─────────────────
+    const summaryGrid=document.createElement('div');
+    summaryGrid.style.cssText='display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;';
+    summaryGrid.innerHTML=`
+      <div class="sc"><div class="sl">Sheets Required</div><div class="sv">${sheets.length}</div><div class="ss">pcs</div></div>
+      <div class="sc"><div class="sl">Part Types</div><div class="sv">${specs.length}</div><div class="ss">types</div></div>
+      <div class="sc"><div class="sl">Total Parts</div><div class="sv">${totalPieces}</div><div class="ss">pcs</div></div>
+      <div class="sc"><div class="sl">Parts Placed</div><div class="sv">${placedPieces}</div><div class="ss">pcs</div></div>
+      <div class="sc hi"><div class="sl">Overall Utilization</div><div class="sv">${overallUtil}%</div><div class="ss">avg ${avgUtil}%/sheet</div></div>`;
+    sec.appendChild(summaryGrid);
+
+    // ── Unmet warning ──────────────────────────────────────────────────────
+    if(nestResult.unmet&&nestResult.unmet.length){
+      const unmetDiv=document.createElement('div');
+      unmetDiv.style.cssText='background:rgba(255,61,107,0.06);border:1px solid rgba(255,61,107,0.2);border-radius:8px;padding:14px;margin-bottom:16px;';
+      unmetDiv.innerHTML=`<div style="font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:1px;margin-bottom:8px;">⚠ Parts below could not be fully placed</div>`
+        +nestResult.unmet.map(u=>`<span class="piece-tag" style="background:${u.color}22;color:${u.color};">${u.name} missing ${u.leftover} pcs</span>`).join('');
+      sec.appendChild(unmetDiv);
+    }
+
+    // ── Purchase list table ────────────────────────────────────────────────
+    const purchaseWrap=document.createElement('div');
+    purchaseWrap.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;';
+    let ph=`<div style="font-family:var(--mono);font-size:10px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;">📋 Purchase List <span style="flex:1;height:1px;background:var(--border);display:block;"></span></div>`;
+    ph+=`<table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:left;border-bottom:1px solid var(--border);">Board Size</th>
+        <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:center;border-bottom:1px solid var(--border);">Qty to Order</th>
+        <th style="font-family:var(--mono);font-size:9px;color:var(--text3);font-weight:600;letter-spacing:0.8px;text-transform:uppercase;padding:6px 12px;text-align:right;border-bottom:1px solid var(--border);">% of Total</th>
+      </tr></thead><tbody>`;
+    purchaseEntries.forEach(([name,qty])=>{
+      ph+=`<tr style="border-bottom:1px solid var(--border);">
+        <td style="font-family:var(--mono);font-size:13px;color:var(--text);padding:10px 12px;">${name}</td>
+        <td style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent);padding:10px 12px;text-align:center;">${qty} pcs</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text2);padding:10px 12px;text-align:right;">${(qty/sheets.length*100).toFixed(1)}%</td>
+      </tr>`;
+    });
+    ph+=`<tr style="background:var(--surface2);">
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);padding:8px 12px;font-weight:600;">Total</td>
+      <td style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text);padding:8px 12px;text-align:center;">${sheets.length} pcs</td>
+      <td style="padding:8px 12px;"></td>
+    </tr></tbody></table>`;
+    purchaseWrap.innerHTML=ph;
+    sec.appendChild(purchaseWrap);
+
+    // ── Sheet cards grid (mirrors nesting-tool sheets-grid) ────────────────
+    const sheetsGrid=document.createElement('div');
+    sheetsGrid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;';
+
     sheets.forEach((sh,si)=>{
-      const uColor=sh.util>=0.85?'#00c896':sh.util>=0.65?'#f0c040':'#ff6b35';
-      const card=document.createElement('div');card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;';
-      const gps={};sh.placed.forEach(p=>{if(!gps[p.specId])gps[p.specId]={name:p.name,color:p.color,count:0};gps[p.specId].count++;});
-      const tags=Object.values(gps).map(g=>`<span class="piece-tag" style="background:${g.color}22;color:${g.color};">${g.name} x${g.count}</span>`).join('');
+      const utilColor=sh.util>=0.85?'#00e5a0':sh.util>=0.65?'#f0c040':'#ff6b35';
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;';
+
+      // Group placed by specId for tags
+      const groups={};
+      sh.placed.forEach(p=>{
+        if(!groups[p.specId])groups[p.specId]={name:p.name,color:p.color,count:0};
+        groups[p.specId].count++;
+      });
+      const tags=Object.values(groups).map(g=>`<span class="piece-tag" style="background:${g.color}22;color:${g.color};">${g.name} ×${g.count}</span>`).join('');
+
       const visId=`vis_${cls}_${si}`;
-      card.innerHTML=`<div style="background:var(--surface2);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);"><div style="display:flex;align-items:center;gap:12px;"><span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);">SHEET #${si+1}</span><span style="font-family:var(--mono);font-size:11px;color:var(--text2);">${sh.bName} mm</span><span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${uColor};">${(sh.util*100).toFixed(1)}% utilization</span></div><div style="display:flex;flex-wrap:wrap;gap:4px;">${tags}</div></div><div style="padding:14px;"><div id="${visId}" style="width:100%;height:360px;background:var(--bg);border:1px solid var(--border);border-radius:6px;position:relative;overflow:hidden;"></div></div>`;
-      sec.appendChild(card);
+      // Board aspect ratio: bW × bH (usable dims)
+      const aspectPct=(sh.bH/sh.bW*100).toFixed(2);
+
+      card.innerHTML=`
+        <div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+          <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent2);letter-spacing:1px;">SHEET #${si+1} · ${sh.bName}</span>
+          <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${utilColor};">${(sh.util*100).toFixed(1)}% utilization</span>
+        </div>
+        <div style="padding:14px;">
+          <div id="${visId}" style="width:100%;aspect-ratio:${sh.bW}/${sh.bH};background:var(--bg);border:1px solid var(--border);border-radius:6px;position:relative;overflow:hidden;margin-bottom:12px;"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">${tags}</div>
+        </div>`;
+      sheetsGrid.appendChild(card);
+
+      // Draw pieces after DOM is ready
       requestAnimationFrame(()=>{
         const vis=document.getElementById(visId);if(!vis)return;
-        const containerW=vis.clientWidth||600;const containerH=360;const scaleX=containerW/sh.bW;const scaleY=containerH/sh.bH;
+        const containerW=vis.clientWidth||340;
+        const containerH=vis.clientHeight||Math.round(340*sh.bH/sh.bW);
+        const scaleX=containerW/sh.bW;
+        const scaleY=containerH/sh.bH;
+
         sh.placed.forEach(p=>{
           const div=document.createElement('div');
-          div.style.cssText=`position:absolute;left:${(p.x*scaleX).toFixed(1)}px;top:${(p.y*scaleY).toFixed(1)}px;width:${(p.w*scaleX).toFixed(1)}px;height:${(p.h*scaleY).toFixed(1)}px;background:${p.color}28;border:2px solid ${p.color}99;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:default;box-sizing:border-box;`;
-          div.onmouseenter=()=>{div.style.background=p.color+'55';div.style.zIndex='10';};div.onmouseleave=()=>{div.style.background=p.color+'28';div.style.zIndex='';};
-          div.title=`${p.name}\n${p.w}x${p.h}mm`;
-          const pxW=p.w*scaleX,pxH=p.h*scaleY;
-          if(pxW>22&&pxH>16)div.innerHTML=`<div style="font-family:var(--mono);font-size:${Math.min(11,Math.max(8,pxW/8))}px;font-weight:700;color:${p.color};text-align:center;line-height:1.2;padding:2px;">${p.name}</div>${pxH>30?`<div style="font-family:var(--mono);font-size:${Math.min(9,Math.max(7,pxW/10))}px;color:${p.color}88;text-align:center;">${p.w}x${p.h}</div>`:''}`;
+          div.className='piece-rect';
+          div.style.left=(p.x/sh.bW*100).toFixed(2)+'%';
+          div.style.top=(p.y/sh.bH*100).toFixed(2)+'%';
+          div.style.width=(p.w/sh.bW*100).toFixed(2)+'%';
+          div.style.height=(p.h/sh.bH*100).toFixed(2)+'%';
+          div.style.background=p.color+'33';
+          div.style.color=p.color;
+          div.style.border='1px solid rgba(255,255,255,0.08)';
+          div.title=`${p.name} ${p.w}×${p.h}`;
+          div.textContent=p.name.length<=4?p.name:p.name.slice(0,4);
           vis.appendChild(div);
         });
-        const bgCanvas=document.createElement('canvas');bgCanvas.style.cssText='position:absolute;top:0;left:0;pointer-events:none;opacity:0.15;';bgCanvas.width=containerW;bgCanvas.height=containerH;
-        const ctx=bgCanvas.getContext('2d');ctx.strokeStyle='#ffffff';ctx.lineWidth=0.5;
-        for(let x=0;x<=sh.bW;x+=100){ctx.beginPath();ctx.moveTo(x*scaleX,0);ctx.lineTo(x*scaleX,containerH);ctx.stroke();}
-        for(let y=0;y<=sh.bH;y+=100){ctx.beginPath();ctx.moveTo(0,y*scaleY);ctx.lineTo(containerW,y*scaleY);ctx.stroke();}
-        vis.insertBefore(bgCanvas,vis.firstChild);
-        const lbl=document.createElement('div');lbl.style.cssText='position:absolute;bottom:4px;right:6px;font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.25);pointer-events:none;';lbl.textContent=`${sh.bW}x${sh.bH}mm`;vis.appendChild(lbl);
       });
     });
-    if(nestResult.unmet&&nestResult.unmet.length){const w=document.createElement('div');w.style.cssText='background:rgba(255,61,107,0.06);border:1px solid rgba(255,61,107,0.2);border-radius:6px;padding:12px;margin-top:6px;';w.innerHTML=`<div style="font-family:var(--mono);font-size:10px;color:var(--red);margin-bottom:6px;">Parts not placed -- sheet may be too small</div>`+nestResult.unmet.map(u=>`<span class="piece-tag" style="background:${u.color}22;color:${u.color};">${u.name} missing ${u.leftover} pcs</span>`).join('');sec.appendChild(w);}
-    return sec;
+
+    sec.appendChild(sheetsGrid);
+    tab.appendChild(sec);
   }
+
   const{topNest,lrNest,topSpecs,lrSpecs,topTotalRM,lrTotalRM}=_lastNesting;
-  tab.appendChild(buildSection(topNest,topSpecs,'TOP PIECES - 1 per door (mixed nesting)','top',topTotalRM));
-  tab.appendChild(buildSection(lrNest,lrSpecs,'L/R PIECES - 2 per door (mixed nesting)','lr',lrTotalRM));
+  buildSection(topNest,topSpecs,'TOP PIECES — 1 per door','top',topTotalRM);
+  buildSection(lrNest,lrSpecs,'L/R PIECES — 2 per door','lr',lrTotalRM);
 }
 
 // ── Export Excel ──────────────────────────────────────────────────────────────
@@ -938,25 +1228,34 @@ function processBatchImport(){
   if(!raw){alert('Please paste your order data first!');return;}
   const lines=raw.split('\n');
   const valid=[];const errors=[];
-  // Format 8-field: DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,Hinges,CutSize
-  // Format 7-field: DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,CutSize
   const PROF_MAP={};PROFS.forEach(p=>{
     PROF_MAP[p.toLowerCase().replace(/\s/g,'')]=p;
     PROF_MAP[p.toLowerCase()]=p;
   });
+  function parseLine(line){
+    const firstComma=line.indexOf(',');if(firstComma<0)return null;
+    const dtype=line.substring(0,firstComma).trim();
+    const rest=line.substring(firstComma+1).trim();
+    const profMatch=rest.match(/^(APF[D]?\s*\d+)\s*,?(.*)/i);
+    if(!profMatch)return null;
+    const profRaw=profMatch[1].replace(/\s+/g,'');
+    const afterProf=profMatch[2].trim();
+    const filtered=afterProf.split(',').map(s=>s.trim()).filter(s=>s!=='');
+    return{dtype,profRaw,nums:filtered};
+  }
   lines.forEach((line,i)=>{
     line=line.trim();if(!line)return;
-    const parts=line.split(',');
-    if(parts.length<7){errors.push('Line '+(i+1)+': need at least 7 fields (DoorType,APFProfile,FrameW,FrameH,Qty,SellPrice,CutSize)');return;}
-    const dtype=parts[0].trim();
-    const profRaw=parts[1].trim();
-    const fw=parseFloat(parts[2]);
-    const fh=parseFloat(parts[3]);
-    const qty=parseInt(parts[4]);
-    const sell=parseFloat(parts[5]);
+    const parsed=parseLine(line);
+    if(!parsed){errors.push('Line '+(i+1)+': cannot parse — '+line);return;}
+    const{dtype,profRaw,nums}=parsed;
+    if(nums.length<5){errors.push('Line '+(i+1)+': not enough numeric fields — '+line);return;}
+    const fw=parseFloat(nums[0]);
+    const fh=parseFloat(nums[1]);
+    const qty=parseInt(nums[2]);
+    const sell=parseFloat(nums[3]);
     let hinges=3,cs;
-    if(parts.length>=8){hinges=parseInt(parts[6]);cs=parseFloat(parts[7]);}
-    else{cs=parseFloat(parts[6]);}
+    if(nums.length>=6){hinges=parseInt(nums[4]);cs=parseFloat(nums[5]);}
+    else{cs=parseFloat(nums[4]);}
     const profKey=profRaw.toLowerCase().replace(/\s/g,'');
     const prof=PROF_MAP[profKey]||null;
     const validHinges=[3,4,6,8];
