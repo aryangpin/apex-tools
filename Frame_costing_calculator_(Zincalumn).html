@@ -603,7 +603,38 @@ function runNesting(specs, boardSpecs, kerfBorder) {
         }
       } else if (fullLengthSpecs.length > 0 && nonFullSpecs.length > 0) {
         // Mixed situation: some specs full-length, some not.
-        // Use evalStrips for the full-length group (supports mixed fh).
+        // Step 1: enumerate strip combos for full-length specs.
+        // Step 2: for each strip combo result, try to backfill non-full specs
+        //         into the free rects left by the strips. This allows e.g. FD7(TOP)
+        //         and FD6(TOP) to share the same sheet instead of wasting two boards.
+        function evalMixed(stripPieces) {
+          const stripResult = tryPlaceVerticalStrips(stripPieces, usableW, usableH);
+          if (stripResult.placed.length === 0) return;
+          // Clone free rects so backfill doesn't mutate the strip result
+          const freeRects = stripResult.freeRects.map(r => ({...r}));
+          const extraPlaced = [];
+          // Try to fit each non-full spec into leftover free rects
+          const nonFullQueue = [];
+          nonFullSpecs.forEach(s => { for (let i = 0; i < remaining[s.id]; i++) nonFullQueue.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name }); });
+          // Sort largest area first for better packing
+          nonFullQueue.sort((a,b) => b.w*b.h - a.w*a.h);
+          for (const piece of nonFullQueue) {
+            const placed = placeSingleInFreeRects(piece, freeRects);
+            if (placed) extraPlaced.push(placed);
+          }
+          const allPlaced = [...stripResult.placed, ...extraPlaced];
+          const usedArea = allPlaced.reduce((s, p) => s + p.w * p.h, 0);
+          const util = usedArea / boardArea;
+          const curBoardArea = bestBoard ? bestBoard.boardArea : Infinity;
+          const isSmaller = boardArea < curBoardArea;
+          const placesMore = allPlaced.length > (bestResult ? bestResult.placed.length : 0);
+          const bigUtilGain = util > bestUtil + 0.08;
+          if (!bestResult || isSmaller || placesMore || bigUtilGain) {
+            bestUtil = util;
+            bestResult = { placed: allPlaced, unplaced: stripResult.unplaced, freeRects };
+            bestBoard = { ...board, usableW, usableH, boardArea };
+          }
+        }
         const combos = enumStripCombos(fullLengthSpecs, usableW, remaining);
         for (const combo of combos) {
           const pieces = [];
@@ -613,9 +644,9 @@ function runNesting(specs, boardSpecs, kerfBorder) {
             for (let i = 0; i < cnt; i++)
               pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
           }
-          if (pieces.length > 0) evalStrips(pieces);
+          if (pieces.length > 0) evalMixed(pieces);
         }
-        // Also try 2D for non-full-length specs
+        // Also try pure 2D for non-full-length specs (fallback)
         for (const primary of nonFullSpecs) {
           const fillers = activeSpecs.filter(s => s.id !== primary.id).sort((a, b) => (b.w * b.h) - (a.w * a.h));
           const pieces = [];
