@@ -399,8 +399,8 @@ function tryPlace2D(pieces, boardW, boardH) {
 function tryPlace(pieces, boardW, boardH) {
   if (pieces.length === 0) return { placed: [], unplaced: [], freeRects: [] };
   const allFullLength = pieces.every(p => {
-    const canStandH = p.h >= boardH * 0.88 && p.w <= boardW;
-    const canStandW = p.w >= boardH * 0.88 && p.h <= boardW;
+    const canStandH = p.h > boardW && p.w <= boardW;
+    const canStandW = p.w > boardW && p.h <= boardW;
     return canStandH || canStandW;
   });
   if (allFullLength) {
@@ -445,8 +445,36 @@ function placeSingleInFreeRects(piece, freeRects) {
   return pl;
 }
 
+// ── Vertical Strip Placer (mixed-fh full-length mode) ────────────────────────
+// Places pieces as independent vertical strips side by side.
+// Unlike tryPlace1D (row-based), each strip is independent — different fh pieces
+// can coexist because each strip only uses its own height, not the row's max height.
+// pieces: [{specId, w (strip width = cs), h (strip height = fh), color, name}]
+// Returns same shape as tryPlace: { placed, unplaced, freeRects }
+function tryPlaceVerticalStrips(pieces, boardW, boardH) {
+  const placed = [];
+  const unplaced = [];
+  let curX = 0;
+  for (const piece of pieces) {
+    // Each piece is a full-height strip: orient so w=cs (narrow), h=fh (tall)
+    const sw = Math.min(piece.w, piece.h); // strip width = cs
+    const sh = Math.max(piece.w, piece.h); // strip height = fh
+    if (curX + sw > boardW || sh > boardH) { unplaced.push(piece); continue; }
+    placed.push({ specId: piece.specId, x: curX, y: 0, w: sw, h: sh, color: piece.color, name: piece.name });
+    curX += sw;
+  }
+  // Free rects: rightmost unused column + any short-strip top gaps
+  const freeRects = [];
+  if (curX < boardW) freeRects.push({ x: curX, y: 0, w: boardW - curX, h: boardH });
+  // Also register top-gaps of shorter strips for backfill
+  placed.forEach(p => { if (p.h < boardH) freeRects.push({ x: p.x, y: p.h, w: p.w, h: boardH - p.h }); });
+  return { placed, unplaced, freeRects };
+}
+
 // ── Strip combo enumerator (1D full-length mode) ──────────────────────────────
 // Enumerate all width combinations that fit boardW; sort by utilization desc; cap 500.
+// Supports cross-cs mixing: strips of different widths can share the same board
+// as long as all pieces are full-length (height spans the full board height).
 function enumStripCombos(activeSpecs, boardW, remaining) {
   const items = activeSpecs.map(s => ({ ...s, stripW: Math.min(s.w, s.h) })).filter(s => s.stripW <= boardW);
   const results = [];
@@ -497,12 +525,22 @@ function runNesting(specs, boardSpecs, kerfBorder) {
       if (usableW <= 0 || usableH <= 0) continue;
       const boardArea = usableW * usableH;
 
+      // isFullLength: TRUE if EVERY active spec has its long dimension >= 88% of board height.
+      // When mixed-cs specs are present (e.g. cs=294 and cs=314), each is individually
+      // full-length → their strips can co-exist side-by-side on the same board because
+      // each strip independently spans the full board height.
       const isFullLength = activeSpecs.every(s => {
         const longDim = Math.max(s.w, s.h);
         const shortDim = Math.min(s.w, s.h);
-        return longDim >= usableH * 0.88 && shortDim <= usableW;
+        return longDim > usableW && shortDim <= usableW;
       });
 
+      // hasMixedFullLength: some specs are full-length, some are not.
+      // Split and treat full-length group with strip combos, 2D group separately.
+      const fullLengthSpecs = activeSpecs.filter(s => Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW);
+      const nonFullSpecs = activeSpecs.filter(s => !(Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW));
+
+      // evalPieces: use standard tryPlace (1D or 2D based on piece heights)
       function evalPieces(pieces) {
         const result = tryPlace(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
@@ -514,7 +552,40 @@ function runNesting(specs, boardSpecs, kerfBorder) {
         }
       }
 
+      // evalStrips: use tryPlaceVerticalStrips — allows mixed-fh strips side by side.
+      // Each strip is independent so fh=2430 and fh=2180 can coexist on the same board.
+      // Global-aware scoring: for each spec type mixed in, add the waste area that would
+      // otherwise be wasted if that spec ran alone on its own sheet.
+      function evalStrips(pieces) {
+        const result = tryPlaceVerticalStrips(pieces, usableW, usableH);
+        const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
+        // For each unique spec type placed, estimate the waste saved vs running alone.
+        // Alone: best fit = floor(boardW / stripW) strips → aloneUtil = n*stripW*fh / boardArea
+        // Mixed: the wasted rightmost gap is shared/eliminated.
+        const placedSpecIds = new Set(result.placed.map(p => p.specId));
+        let savedWaste = 0;
+        placedSpecIds.forEach(sid => {
+          const spec = activeSpecs.find(s => s.id === sid);
+          if (!spec) return;
+          const sw = Math.min(spec.w, spec.h);
+          const sh = Math.max(spec.w, spec.h);
+          const aloneCount = Math.floor(usableW / sw);
+          const aloneUsed = aloneCount * sw * sh;
+          const aloneWaste = boardArea - aloneUsed;
+          savedWaste += aloneWaste;
+        });
+        // Score: actual used area + estimated waste saved by mixing, normalised
+        const score = (usedArea + savedWaste * 0.5) / boardArea;
+        if (score > bestUtil) {
+          bestUtil = score;
+          bestResult = result;
+          bestBoard = { ...board, usableW, usableH, boardArea };
+        }
+      }
+
       if (isFullLength) {
+        // All specs are full-length → enumerate cross-cs strip combos.
+        // Use evalStrips so different fh values can sit side-by-side without conflict.
         const combos = enumStripCombos(activeSpecs, usableW, remaining);
         for (const combo of combos) {
           const pieces = [];
@@ -524,12 +595,36 @@ function runNesting(specs, boardSpecs, kerfBorder) {
             for (let i = 0; i < cnt; i++)
               pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
           }
-          if (pieces.length > 0) evalPieces(pieces);
+          if (pieces.length > 0) evalStrips(pieces);
         }
+        // Also try each spec individually via standard tryPlace (fallback)
         for (const s of activeSpecs) {
           const pieces = [];
           for (let i = 0; i < remaining[s.id]; i++)
             pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name });
+          evalPieces(pieces);
+        }
+      } else if (fullLengthSpecs.length > 0 && nonFullSpecs.length > 0) {
+        // Mixed situation: some specs full-length, some not.
+        // Use evalStrips for the full-length group (supports mixed fh).
+        const combos = enumStripCombos(fullLengthSpecs, usableW, remaining);
+        for (const combo of combos) {
+          const pieces = [];
+          for (const [sid, cnt] of Object.entries(combo.combo)) {
+            const spec = fullLengthSpecs.find(s => s.id === sid);
+            if (!spec) continue;
+            for (let i = 0; i < cnt; i++)
+              pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
+          }
+          if (pieces.length > 0) evalStrips(pieces);
+        }
+        // Also try 2D for non-full-length specs
+        for (const primary of nonFullSpecs) {
+          const fillers = activeSpecs.filter(s => s.id !== primary.id).sort((a, b) => (b.w * b.h) - (a.w * a.h));
+          const pieces = [];
+          for (let i = 0; i < remaining[primary.id]; i++)
+            pieces.push({ specId: primary.id, w: primary.w, h: primary.h, color: primary.color, name: primary.name });
+          fillers.forEach(s => { for (let i = 0; i < remaining[s.id]; i++) pieces.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name }); });
           evalPieces(pieces);
         }
       } else {
