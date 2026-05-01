@@ -297,6 +297,7 @@ function getRawLengths(){
 function getBoardSpecs(){
   const widths=getSheetWidths();const out=[];
   document.querySelectorAll('[id^="lrow_"]').forEach(row=>{const id=row.id.replace('lrow_','');const h=parseFloat(document.getElementById('lh_'+id)?.value)||0;if(h>0)widths.forEach(w=>out.push({name:`${w}x${h}`,w,h}));});
+  out.sort((a,b)=>a.w*a.h - b.w*b.h);
   return out;
 }
 
@@ -541,44 +542,39 @@ function runNesting(specs, boardSpecs, kerfBorder) {
       const fullLengthSpecs = activeSpecs.filter(s => Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW);
       const nonFullSpecs = activeSpecs.filter(s => !(Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW));
 
-      // evalPieces: use standard tryPlace (1D or 2D based on piece heights)
+      // evalPieces: prefer smallest board that fits.
+      // A larger board only wins if it places MORE pieces, or util gain > 8%.
       function evalPieces(pieces) {
         const result = tryPlace(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
         const util = usedArea / boardArea;
-        if (util > bestUtil) {
-          bestUtil = util;
-          bestResult = result;
-          bestBoard = { ...board, usableW, usableH, boardArea };
+        const curBoardArea = bestBoard ? bestBoard.boardArea : Infinity;
+        const isSmaller = boardArea < curBoardArea;
+        const placesMore = result.placed.length > (bestResult ? bestResult.placed.length : 0);
+        const bigUtilGain = util > bestUtil + 0.08;
+        if (!bestResult || isSmaller || placesMore || bigUtilGain) {
+          if (!bestResult || isSmaller || placesMore || bigUtilGain) {
+            bestUtil = util;
+            bestResult = result;
+            bestBoard = { ...board, usableW, usableH, boardArea };
+          }
         }
       }
 
       // evalStrips: use tryPlaceVerticalStrips — allows mixed-fh strips side by side.
-      // Each strip is independent so fh=2430 and fh=2180 can coexist on the same board.
-      // Global-aware scoring: for each spec type mixed in, add the waste area that would
-      // otherwise be wasted if that spec ran alone on its own sheet.
+      // Scoring: pure utilisation (usedArea / boardArea).
+      // Prefer smallest board: a larger board only wins if it places MORE pieces,
+      // or its util is more than 8% higher than the current best.
       function evalStrips(pieces) {
         const result = tryPlaceVerticalStrips(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
-        // For each unique spec type placed, estimate the waste saved vs running alone.
-        // Alone: best fit = floor(boardW / stripW) strips → aloneUtil = n*stripW*fh / boardArea
-        // Mixed: the wasted rightmost gap is shared/eliminated.
-        const placedSpecIds = new Set(result.placed.map(p => p.specId));
-        let savedWaste = 0;
-        placedSpecIds.forEach(sid => {
-          const spec = activeSpecs.find(s => s.id === sid);
-          if (!spec) return;
-          const sw = Math.min(spec.w, spec.h);
-          const sh = Math.max(spec.w, spec.h);
-          const aloneCount = Math.floor(usableW / sw);
-          const aloneUsed = aloneCount * sw * sh;
-          const aloneWaste = boardArea - aloneUsed;
-          savedWaste += aloneWaste;
-        });
-        // Score: actual used area + estimated waste saved by mixing, normalised
-        const score = (usedArea + savedWaste * 0.5) / boardArea;
-        if (score > bestUtil) {
-          bestUtil = score;
+        const util = usedArea / boardArea;
+        const curBoardArea = bestBoard ? bestBoard.boardArea : Infinity;
+        const isSmaller = boardArea < curBoardArea;
+        const placesMore = result.placed.length > (bestResult ? bestResult.placed.length : 0);
+        const bigUtilGain = util > bestUtil + 0.08;
+        if (!bestResult || isSmaller || placesMore || bigUtilGain) {
+          bestUtil = util;
           bestResult = result;
           bestBoard = { ...board, usableW, usableH, boardArea };
         }
