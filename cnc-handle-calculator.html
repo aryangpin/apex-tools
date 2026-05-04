@@ -102,6 +102,7 @@
     padding: 12px 14px;
   }
   .input-row .unit { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 0 14px 0 0; }
+  .input-row input::placeholder { color: var(--muted); opacity: 0.5; font-weight: 400; font-size: 14px; }
   .input-row.auto-fill { border-color: var(--accent); opacity: 0.85; }
   .input-row.auto-fill input { color: var(--accent); }
   .auto-badge {
@@ -206,19 +207,19 @@
       <!-- Frame mode inputs -->
       <div class="input-group" id="grp-frameHeight">
         <label>Frame Height without Embedment</label>
-        <div class="input-row"><input type="number" id="frameHeight" oninput="calculate()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="frameHeight" oninput="calculate()" placeholder="e.g. 2100"><span class="unit">mm</span></div>
       </div>
       <div class="input-group" id="grp-locksetFrame">
         <label>Lockset Height</label>
-        <div class="input-row"><input type="number" id="locksetFrame" oninput="calculate()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="locksetFrame" oninput="calculate()" placeholder="e.g. 1000"><span class="unit">mm</span></div>
       </div>
       <div class="input-group" id="grp-profileY">
         <label>Profile Y</label>
-        <div class="input-row"><input type="number" id="profileYInput" oninput="calcFrameBalance()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="profileYInput" oninput="calcFrameBalance()" placeholder="e.g. 50"><span class="unit">mm</span></div>
       </div>
       <div class="input-group" id="grp-stopGap">
         <label>Stop Gap</label>
-        <div class="input-row"><input type="number" id="stopGap" oninput="calcFrameBalance()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="stopGap" oninput="calcFrameBalance()" placeholder="e.g. 13"><span class="unit">mm</span></div>
       </div>
       <div class="input-group" id="grp-frameBalance">
         <label>Frame Balance <span style="color:var(--accent);font-size:9px;margin-left:4px;">AUTO</span></label>
@@ -228,11 +229,11 @@
       <!-- Door Only inputs -->
       <div class="input-group hidden" id="grp-doorH">
         <label>Door Height 门的高度</label>
-        <div class="input-row"><input type="number" id="doorH" oninput="calculate()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="doorH" oninput="calculate()" placeholder="e.g. 2053"><span class="unit">mm</span></div>
       </div>
       <div class="input-group hidden" id="grp-locksetDoor">
         <label>Lockset Height</label>
-        <div class="input-row"><input type="number" id="locksetDoor" oninput="calculate()"><span class="unit">mm</span></div>
+        <div class="input-row"><input type="number" id="locksetDoor" oninput="calculate()" placeholder="e.g. 1000"><span class="unit">mm</span></div>
       </div>
 
       <!-- Auto gap (always visible) -->
