@@ -1,16 +1,17 @@
-const CACHE_NAME = 'apexjaya-tools-v1';
+const CACHE_NAME = 'apexjaya-tools-v2';
 
-// All pages to cache for offline use
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/Frame_costing_calculator.html',
+  '/Frame_costing_calculator_Frame_(EG_Classic).html',
+  '/Frame_costing_calculator_(Zincalumn).html',
   '/door-leaf-costing-v2.html',
   '/cnc-handle-calculator.html',
   '/material-length-calculator.html',
   '/metal-frame-opening.html',
   '/steel-sheet-calculator-v2.html',
   '/nesting-tool.html',
+  '/Door-Leaf-calculator.html',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
@@ -27,38 +28,46 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate - clean old caches
+// Activate - clean ALL old caches immediately
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys
           .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+          .map(key => {
+            console.log('[SW] Deleting old cache:', key);
+            return caches.delete(key);
+          })
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch - serve from cache, fallback to network
+// Fetch - NETWORK FIRST, fallback to cache (always get latest version)
 self.addEventListener('fetch', event => {
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Cache new successful responses
+    fetch(event.request)
+      .then(response => {
+        // Got fresh response from network - update cache
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => {
-        // Offline fallback for HTML pages
-        if (event.request.destination === 'document') {
-          return caches.match('/index.html');
-        }
-      });
-    })
+      })
+      .catch(() => {
+        // Network failed - fallback to cache (offline mode)
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          if (event.request.destination === 'document') {
+            return caches.match('/index.html');
+          }
+        });
+      })
   );
 });
