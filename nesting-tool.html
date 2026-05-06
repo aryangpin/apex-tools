@@ -521,7 +521,7 @@ function runOptimize() {
   const kerfW = kerfBorder * 2;
   const kerfH = kerfBorder * 2;
 
-  const boardSpecs = getBoardSpecs();
+  const boardSpecs = getBoardSpecs().sort((a, b) => a.w * a.h - b.w * b.h);
   if (!boardSpecs.length) { alert('Please add at least one board!'); return; }
 
   const specs = getSpecs();
@@ -566,43 +566,33 @@ function runOptimize() {
       const fullLengthSpecs = activeSpecs.filter(s => Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW);
       const nonFullSpecs   = activeSpecs.filter(s => !(Math.max(s.w, s.h) > usableW && Math.min(s.w, s.h) <= usableW));
 
+      // evalPieces: prefer highest utilization (usedArea / boardArea).
+      // Tie-break: smaller board wins. This naturally avoids large boards
+      // unless they genuinely pack more area per unit of material used.
       function evalPieces(pieces) {
         const result = tryPlace(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
+        if (result.placed.length === 0) return;
         const util = usedArea / boardArea;
-        if (util > bestUtil) {
+        const isBetter = util > bestUtil + 0.001; // strictly better util
+        const isSameUtilSmallerBoard = Math.abs(util - bestUtil) <= 0.001 && boardArea < (bestBoard ? bestBoard.boardArea : Infinity);
+        if (!bestResult || isBetter || isSameUtilSmallerBoard) {
           bestUtil = util;
           bestResult = result;
           bestBoard = { ...board, usableW, usableH, boardArea };
         }
       }
 
-      // evalStrips: use tryPlaceVerticalStrips — allows mixed-fh strips side by side.
-      // Each strip is independent so fh=2430 and fh=2180 can coexist on the same board.
-      // Global-aware scoring: for each spec type mixed in, add the waste area that would
-      // otherwise be wasted if that spec ran alone on its own sheet.
+      // evalStrips: same scoring — pure utilization, tie-break smaller board.
       function evalStrips(pieces) {
         const result = tryPlaceVerticalStrips(pieces, usableW, usableH);
         const usedArea = result.placed.reduce((s, p) => s + p.w * p.h, 0);
-        // For each unique spec type placed, estimate the waste saved vs running alone.
-        // Alone: best fit = floor(boardW / stripW) strips → aloneUtil = n*stripW*fh / boardArea
-        // Mixed: the wasted rightmost gap is shared/eliminated.
-        const placedSpecIds = new Set(result.placed.map(p => p.specId));
-        let savedWaste = 0;
-        placedSpecIds.forEach(sid => {
-          const spec = activeSpecs.find(s => s.id === sid);
-          if (!spec) return;
-          const sw = Math.min(spec.w, spec.h);
-          const sh = Math.max(spec.w, spec.h);
-          const aloneCount = Math.floor(usableW / sw);
-          const aloneUsed = aloneCount * sw * sh;
-          const aloneWaste = boardArea - aloneUsed;
-          savedWaste += aloneWaste;
-        });
-        // Score: actual used area + estimated waste saved by mixing, normalised
-        const score = (usedArea + savedWaste * 0.5) / boardArea;
-        if (score > bestUtil) {
-          bestUtil = score;
+        if (result.placed.length === 0) return;
+        const util = usedArea / boardArea;
+        const isBetter = util > bestUtil + 0.001;
+        const isSameUtilSmallerBoard = Math.abs(util - bestUtil) <= 0.001 && boardArea < (bestBoard ? bestBoard.boardArea : Infinity);
+        if (!bestResult || isBetter || isSameUtilSmallerBoard) {
+          bestUtil = util;
           bestResult = result;
           bestBoard = { ...board, usableW, usableH, boardArea };
         }
@@ -631,7 +621,35 @@ function runOptimize() {
         }
       } else if (fullLengthSpecs.length > 0 && nonFullSpecs.length > 0) {
         // Mixed situation: some specs full-length, some not.
-        // Use evalStrips for the full-length group (supports mixed fh).
+        // Step 1: enumerate strip combos for full-length specs.
+        // Step 2: for each strip combo result, try to backfill non-full specs
+        //         into the free rects left by the strips.
+        function evalMixed(stripPieces) {
+          const stripResult = tryPlaceVerticalStrips(stripPieces, usableW, usableH);
+          if (stripResult.placed.length === 0) return;
+          // Clone free rects so backfill doesn't mutate the strip result
+          const freeRects = stripResult.freeRects.map(r => ({...r}));
+          const extraPlaced = [];
+          // Try to fit each non-full spec into leftover free rects
+          const nonFullQueue = [];
+          nonFullSpecs.forEach(s => { for (let i = 0; i < remaining[s.id]; i++) nonFullQueue.push({ specId: s.id, w: s.w, h: s.h, color: s.color, name: s.name }); });
+          nonFullQueue.sort((a,b) => b.w*b.h - a.w*a.h);
+          for (const piece of nonFullQueue) {
+            const placed = placeSingleIntoFreeRects(piece, freeRects);
+            if (placed) extraPlaced.push(placed);
+          }
+          const allPlaced = [...stripResult.placed, ...extraPlaced];
+          const usedArea = allPlaced.reduce((s, p) => s + p.w * p.h, 0);
+          if (allPlaced.length === 0) return;
+          const util = usedArea / boardArea;
+          const isBetter = util > bestUtil + 0.001;
+          const isSameUtilSmallerBoard = Math.abs(util - bestUtil) <= 0.001 && boardArea < (bestBoard ? bestBoard.boardArea : Infinity);
+          if (!bestResult || isBetter || isSameUtilSmallerBoard) {
+            bestUtil = util;
+            bestResult = { placed: allPlaced, unplaced: stripResult.unplaced, freeRects };
+            bestBoard = { ...board, usableW, usableH, boardArea };
+          }
+        }
         const combos = enumStripCombos(fullLengthSpecs, usableW, remaining);
         for (const combo of combos) {
           const pieces = [];
@@ -641,9 +659,9 @@ function runOptimize() {
             for (let i = 0; i < cnt; i++)
               pieces.push({ specId: spec.id, w: spec.w, h: spec.h, color: spec.color, name: spec.name });
           }
-          if (pieces.length > 0) evalStrips(pieces);
+          if (pieces.length > 0) evalMixed(pieces);
         }
-        // Also try 2D for non-full-length specs
+        // Also try pure 2D for non-full-length specs (fallback)
         for (const primary of nonFullSpecs) {
           const fillers = activeSpecs.filter(s => s.id !== primary.id).sort((a, b) => (b.w * b.h) - (a.w * a.h));
           const pieces = [];
