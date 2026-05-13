@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fire Door BOM v2</title>
+<title>MGO Fire Door BOM v3</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -66,6 +66,13 @@ h1 span{color:var(--accent);}
 .input-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1);}
 .input-wrap .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:var(--muted);pointer-events:none;}
 .mr36-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(167,139,250,.12);color:var(--purple);margin-left:6px;}
+
+/* LEAF TYPE TOGGLE */
+.leaf-toggle{display:flex;gap:0;border-radius:7px;overflow:hidden;border:1px solid var(--border2);flex-shrink:0;}
+.leaf-btn{background:transparent;border:none;font-family:var(--mono);font-size:10px;font-weight:700;padding:7px 12px;cursor:pointer;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;transition:all .15s;}
+.leaf-btn.active-single{background:var(--accent);color:#000;}
+.leaf-btn.active-double{background:var(--purple);color:#fff;}
+.leaf-btn:not(.active-single):not(.active-double):hover{color:var(--text);background:var(--surface2);}
 .btn-add-door{width:100%;background:transparent;border:1px dashed var(--border2);border-radius:12px;color:var(--muted2);font-family:var(--mono);font-size:12px;padding:14px;cursor:pointer;transition:all .15s;margin-bottom:20px;letter-spacing:.05em;}
 .btn-add-door:hover{border-color:var(--accent);color:var(--accent);}
 .btn-calc{width:100%;background:var(--accent);color:#000;border:none;border-radius:10px;font-family:var(--mono);font-size:14px;font-weight:700;padding:16px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:opacity .15s,transform .1s;margin-bottom:36px;}
@@ -168,7 +175,7 @@ table.dt tfoot td{border-top:1px solid var(--border2);border-bottom:none;color:v
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sb-header">
-    <div class="sb-logo">&#128293; BOM Profiles</div>
+    <div class="sb-logo">&#128293; BOM v3</div>
     <button class="sb-new" onclick="newProfile()">+ New Profile</button>
   </div>
   <div class="sb-list" id="sbList"></div>
@@ -183,8 +190,8 @@ table.dt tfoot td{border-top:1px solid var(--border2);border-bottom:none;color:v
 <div class="page">
 
   <div class="header">
-    <div class="tag">APEX JAYA · Fire Door</div>
-    <h1>MGO Fire Door <span>BOM</span> v2</h1>
+    <div class="tag">APEX JAYA · MGO Fire Door · Single &amp; Double Leaf</div>
+    <h1>MGO Fire Door <span>BOM</span> v3</h1>
   </div>
 
   <div class="door-list" id="doorList"></div>
@@ -423,6 +430,16 @@ function fireSeal(dw,dh){ return (dh*2 + dw) / 1000; } // metres
 function mr36Size(dw,dh){return(dw<950&&dh<=2134)?'3×7':'4×8';}
 function mgoFaceSize(dw,dh){return(dw<950&&dh<=2134)?'3×7':'4×8';}
 
+// ── DOUBLE LEAF HELPERS ────────────────────────────────────────────────────────
+function fireSealDouble(dw,dh){ const leafW=dw/2; return (dh*2+leafW)/1000*2; }
+// MR3.6 double: size by leafW; qty by leafW vs half-board (3×7 half=457, 4×8 half=609)
+function mr36Double(dw,dh){
+  const leafW=dw/2;
+  const size=(leafW<950&&dh<=2134)?'3×7':'4×8';
+  const half=size==='3×7'?457:609;
+  return {size, qty:leafW<=half?2:4};
+}
+
 function calcFull(dw,dh){
   const bsM=BS/1000;
   const mnA=dh/1000*2;
@@ -452,30 +469,59 @@ function addDoor(def={}){
   div.innerHTML=`
     <div class="door-row-header">
       <span class="door-row-label">Door #${n}</span>
+      <div class="leaf-toggle">
+        <button class="leaf-btn active-single" id="d${n}_leafbtn_s" onclick="setLeaf(${n},'single')">Single</button>
+        <button class="leaf-btn" id="d${n}_leafbtn_d" onclick="setLeaf(${n},'double')">Double</button>
+      </div>
       <button class="btn-remove" onclick="removeDoor(${n})">×</button>
     </div>
     <div class="door-fields">
       <div class="field"><label>Door Type Name</label>
         <div class="input-wrap"><input type="text" id="d${n}_type" value="${def.type||''}" placeholder="e.g. D1, FD-900..."></div></div>
-      <div class="field"><label>Width (mm)</label>
-        <div class="input-wrap"><input type="number" id="d${n}_w" value="${def.w||1100}" min="500" max="2400" oninput="updateBadge(${n})"><span class="unit">mm</span></div></div>
+      <div class="field"><label id="d${n}_wlabel">Width (mm)</label>
+        <div class="input-wrap"><input type="number" id="d${n}_w" value="${def.w||1100}" min="500" max="4800" oninput="updateBadge(${n})"><span class="unit">mm</span></div></div>
       <div class="field"><label>Height (mm)</label>
         <div class="input-wrap"><input type="number" id="d${n}_h" value="${def.h||2400}" min="1800" max="3600" oninput="updateBadge(${n})"><span class="unit">mm</span></div></div>
-      <div class="field"><label>Qty (doors)</label>
+      <div class="field"><label>Qty (sets)</label>
         <div class="input-wrap"><input type="number" id="d${n}_qty" value="${def.qty||1}" min="1"><span class="unit">pcs</span></div></div>
     </div>
-    <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted);">
-      MR Ply 3.6 → <span id="d${n}_badge" class="mr36-badge">—</span>
-    </div>`;
+    <div style="margin-top:10px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+      <span id="d${n}_leafinfo" style="font-family:var(--mono);font-size:10px;color:var(--muted);"></span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">MR Ply 3.6 → <span id="d${n}_badge" class="mr36-badge">—</span></span>
+    </div>
+    <input type="hidden" id="d${n}_leaf" value="${def.leaf||'single'}">`;
   document.getElementById('doorList').appendChild(div);
+  // restore leaf type if saved
+  if(def.leaf==='double') setLeaf(n,'double');
+  updateBadge(n);
+}
+
+function setLeaf(n, type){
+  document.getElementById('d'+n+'_leaf').value=type;
+  const bs=document.getElementById('d'+n+'_leafbtn_s');
+  const bd=document.getElementById('d'+n+'_leafbtn_d');
+  const wlabel=document.getElementById('d'+n+'_wlabel');
+  bs.className='leaf-btn'+(type==='single'?' active-single':'');
+  bd.className='leaf-btn'+(type==='double'?' active-double':'');
+  wlabel.textContent=type==='double'?'Total Width (mm)':'Width (mm)';
   updateBadge(n);
 }
 function updateBadge(n){
   const dw=parseFloat(document.getElementById('d'+n+'_w').value)||0;
   const dh=parseFloat(document.getElementById('d'+n+'_h').value)||0;
   const badge=document.getElementById('d'+n+'_badge');
-  if(!dw||!dh){badge.textContent='—';return;}
-  badge.textContent=mr36Size(dw,dh)+' × 2 sheets/door';
+  const info=document.getElementById('d'+n+'_leafinfo');
+  const leaf=document.getElementById('d'+n+'_leaf')?.value||'single';
+  if(!dw||!dh){badge.textContent='—';if(info)info.textContent='';return;}
+  if(leaf==='double'){
+    const leafW=dw/2;
+    const r36=mr36Double(dw,dh);
+    badge.textContent=r36.size+' × '+r36.qty+' sheets/set';
+    if(info)info.textContent='Each leaf: '+leafW.toFixed(0)+'mm ('+dw+'÷2)';
+  } else {
+    badge.textContent=mr36Size(dw,dh)+' × 2 sheets/door';
+    if(info)info.textContent='';
+  }
 }
 function removeDoor(n){const el=document.getElementById('door_'+n);if(el){el.remove();autoSave();}}
 
@@ -502,19 +548,44 @@ function calculate(){
     const dh=parseFloat(document.getElementById('d'+n+'_h').value)||0;
     const qty=parseFloat(document.getElementById('d'+n+'_qty').value)||1;
     const dtype=document.getElementById('d'+n+'_type').value.trim()||('Door #'+n);
+    const leaf=document.getElementById('d'+n+'_leaf')?.value||'single';
     if(!dw||!dh)return;
-    const c=calcFull(dw,dh);
-    const size36=mr36Size(dw,dh);
-    const tMGO=c.mgo*qty;
-    const tMGOSkeleton=c.mgoSkeleton*qty;
-    const tMGOFace=c.mgoFacePcs*qty; // always 2×qty
-    const tMR52=c.mr52*qty,tMR36=MR36_PER_DOOR*qty,tRW=c.rw*qty,tFS=c.fs*qty;
+
+    let tMGO,tMGOSkeleton,tMGOFace,tMGOFaceSize,tMR52,tMR36,size36,tRW,tFS,leafW=null,mr36qty;
+
+    if(leaf==='double'){
+      leafW=dw/2;
+      const c=calcFull(leafW,dh);
+      const r36=mr36Double(dw,dh);
+      size36=r36.size; mr36qty=r36.qty;
+      tMGOSkeleton=c.mgoSkeleton*2*qty;
+      tMGOFace=c.mgoFacePcs*2*qty;       // 4 face panels per set
+      tMGOFaceSize=c.faceSize;
+      tMGO=tMGOSkeleton+tMGOFace;
+      tMR52=c.mr52*2*qty;
+      tMR36=r36.qty*qty;
+      tRW=c.rw*2*qty;
+      tFS=fireSealDouble(dw,dh)*qty;
+      _results.push({leaf,dtype,dw,dh,leafW,qty,size36,mr36qty,tMR36,tMGOSkeleton,tMGOFace,tMGOFaceSize,...c,tMGO,tMR52,tRW,tFS});
+    } else {
+      const c=calcFull(dw,dh);
+      size36=mr36Size(dw,dh); mr36qty=2;
+      tMGOSkeleton=c.mgoSkeleton*qty;
+      tMGOFace=c.mgoFacePcs*qty;
+      tMGOFaceSize=c.faceSize;
+      tMGO=tMGOSkeleton+tMGOFace;
+      tMR52=c.mr52*qty;
+      tMR36=MR36_PER_DOOR*qty;
+      tRW=c.rw*qty;
+      tFS=c.fs*qty;
+      _results.push({leaf,dtype,dw,dh,leafW:null,qty,size36,mr36qty,tMR36,tMGOSkeleton,tMGOFace,tMGOFaceSize,...c,tMGO,tMR52,tRW,tFS});
+    }
+
     totMGO+=tMGO;
     totMGOSkeleton+=tMGOSkeleton;
-    if(c.faceSize==='3×7')totMGOFace3x7+=tMGOFace; else totMGOFace4x8+=tMGOFace;
-    totMR52+=tMR52;totRW+=tRW;totFS+=tFS;
-    if(size36==='3×7')tot36_3x7+=tMR36;else tot36_4x8+=tMR36;
-    _results.push({dtype,dw,dh,qty,size36,tMR36,tMGOSkeleton,tMGOFace,tMGOFaceSize:c.faceSize,...c,tMGO,tMR52,tRW,tFS});
+    if(tMGOFaceSize==='3×7')totMGOFace3x7+=tMGOFace; else totMGOFace4x8+=tMGOFace;
+    totMR52+=tMR52; totRW+=tRW; totFS+=tFS;
+    if(size36==='3×7')tot36_3x7+=tMR36; else tot36_4x8+=tMR36;
   });
 
   if(!_results.length){alert('No valid door data!');return;}
@@ -544,14 +615,23 @@ function calculate(){
     const mr36_4x8 = r.size36==='4×8' ? r.tMR36 : 0;
     const face3x7 = r.tMGOFaceSize==='3×7' ? r.tMGOFace : 0;
     const face4x8 = r.tMGOFaceSize==='4×8' ? r.tMGOFace : 0;
-    const mgo4x8 = r.tMGOSkeleton + face4x8; // skeleton always 4×8, plus face if 4×8
-    const mgo3x7 = face3x7; // only face panels that are 3×7
+    const mgo4x8 = r.tMGOSkeleton + face4x8;
+    const mgo3x7 = face3x7;
+    const leafTag = r.leaf==='double'
+      ? `<span style="font-size:9px;background:rgba(167,139,250,.15);color:var(--purple);padding:1px 5px;border-radius:3px;margin-left:4px;">DBL</span>`
+      : `<span style="font-size:9px;background:rgba(0,229,160,.1);color:var(--accent);padding:1px 5px;border-radius:3px;margin-left:4px;">SGL</span>`;
+    const dimSub = r.leaf==='double'
+      ? `<br><span style="font-size:10px;color:var(--purple);">leaf: ${r.leafW}×${r.dh}</span>`
+      : '';
+    const mgoSub = r.leaf==='double'
+      ? `<br><span style="font-size:10px;color:var(--muted);">${r.mgoSkeleton.toFixed(3)}/leaf×2</span>`
+      : '';
     const tr=document.createElement('tr');
     tr.innerHTML=`
-      <td>${r.dtype}</td>
-      <td>${r.dw}×${r.dh}</td>
+      <td>${r.dtype}${leafTag}</td>
+      <td>${r.dw}×${r.dh}${dimSub}</td>
       <td>${r.qty}</td>
-      <td style="color:var(--accent);font-weight:600;">${mgo4x8>0?mgo4x8.toFixed(2):'—'}</td>
+      <td style="color:var(--accent);font-weight:600;">${mgo4x8>0?mgo4x8.toFixed(2):'—'}${mgoSub}</td>
       <td style="color:var(--accent);font-weight:600;">${mgo3x7>0?mgo3x7.toFixed(2):'—'}</td>
       <td style="color:var(--accent2);font-weight:600;">${r.tMR52.toFixed(2)}</td>
       <td style="color:var(--purple);font-weight:600;">${mr36_3x7>0?mr36_3x7:'—'}</td>
@@ -796,8 +876,8 @@ function renderFormula(){
 }
 
 // ── PROFILE SYSTEM ─────────────────────────────────────────────────────────────
-const STORE_KEY='mgobom_profiles';
-const ACTIVE_KEY='mgobom_active';
+const STORE_KEY='mgobom_v3_profiles';
+const ACTIVE_KEY='mgobom_v3_active';
 
 function getDoors(){
   const doors=[];
@@ -807,7 +887,8 @@ function getDoors(){
       type:(document.getElementById('d'+n+'_type')||{}).value||'',
       w:parseFloat((document.getElementById('d'+n+'_w')||{}).value)||0,
       h:parseFloat((document.getElementById('d'+n+'_h')||{}).value)||0,
-      qty:parseFloat((document.getElementById('d'+n+'_qty')||{}).value)||1
+      qty:parseFloat((document.getElementById('d'+n+'_qty')||{}).value)||1,
+      leaf:(document.getElementById('d'+n+'_leaf')||{}).value||'single'
     });
   });
   return doors;
@@ -816,7 +897,7 @@ function applyDoors(doors){
   if(!doors||!doors.length)return;
   document.getElementById('doorList').innerHTML='';
   dc=0;
-  doors.forEach(d=>addDoor({type:d.type,w:d.w,h:d.h,qty:d.qty}));
+  doors.forEach(d=>addDoor({type:d.type,w:d.w,h:d.h,qty:d.qty,leaf:d.leaf||'single'}));
 }
 function loadProfiles(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{};}catch(e){return{};}}
 function saveProfiles(p){try{localStorage.setItem(STORE_KEY,JSON.stringify(p));}catch(e){}}
