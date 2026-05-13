@@ -199,7 +199,7 @@ table.dt tfoot td{border-top:1px solid var(--border2);border-bottom:none;color:v
       <div class="summary-card mgo">
         <div class="s-label"><span class="dot mgo"></span>MGO Board</div>
         <div class="s-val" id="sum_mgo">—</div>
-        <div class="s-sub">sheets · 6×4'×8'</div>
+        <div class="s-sub" id="sum_mgo_sub">sheets total</div>
       </div>
       <div class="summary-card mr52">
         <div class="s-label"><span class="dot mr52"></span>MR Ply 5.2</div>
@@ -237,7 +237,8 @@ table.dt tfoot td{border-top:1px solid var(--border2);border-bottom:none;color:v
             <th>Door Type</th>
             <th>W × H (mm)</th>
             <th>Qty</th>
-            <th><span class="dot mgo"></span>MGO Board</th>
+            <th><span class="dot mgo"></span>MGO 6×4'×8'</th>
+            <th><span class="dot mgo"></span>MGO 6×3'×7'</th>
             <th><span class="dot mr52"></span>MR Ply 5.2</th>
             <th><span class="dot mr36"></span>MR Ply 3.6 (3×7)</th>
             <th><span class="dot mr36"></span>MR Ply 3.6 (4×8)</th>
@@ -420,6 +421,7 @@ const FRAME_W=300,FRAME_H=450;
 function fireSeal(dw,dh){ return (dh*2 + dw) / 1000; } // metres
 
 function mr36Size(dw,dh){return(dw<950&&dh<=2134)?'3×7':'4×8';}
+function mgoFaceSize(dw,dh){return(dw<950&&dh<=2134)?'3×7':'4×8';}
 
 function calcFull(dw,dh){
   const bsM=BS/1000;
@@ -432,11 +434,14 @@ function calcFull(dw,dh){
   const pA=tmA>0?mnA/tmA:0;
   const pB=tmB>0?mnB/tmB:0;
   const pC=tmC>0?mnC/tmC:0;
-  const mgo=pA*MGO_A+pB*MGO_B+pC*MGO_C+2;
+  const mgoSkeleton=pA*MGO_A+pB*MGO_B+pC*MGO_C; // skeleton only, no face
+  const mgoFacePcs=2; // always 2 face panels
+  const mgo=mgoSkeleton+mgoFacePcs; // total (unchanged)
+  const faceSize=mgoFaceSize(dw,dh);
   const mr52=pA*MR52_A+pB*MR52_B+pC*MR52_C;
   const rw=((dw-FRAME_W)*(dh-FRAME_H))/(RW_W*RW_L);
   const fs=fireSeal(dw,dh);
-  return{bsM,mnA,mnB,mnC,tmA,tmB,tmC,pA,pB,pC,mgo,mr52,rw,fs};
+  return{bsM,mnA,mnB,mnC,tmA,tmB,tmC,pA,pB,pC,mgoSkeleton,mgoFacePcs,faceSize,mgo,mr52,rw,fs};
 }
 
 // ── DOOR ROW UI ────────────────────────────────────────────────────────────────
@@ -488,7 +493,7 @@ let _results=[];
 function calculate(){
   const rows=document.querySelectorAll('.door-row');
   if(!rows.length){alert('Add at least one door type!');return;}
-  let totMGO=0,totMR52=0,totRW=0,tot36_3x7=0,tot36_4x8=0,totFS=0;
+  let totMGO=0,totMGOSkeleton=0,totMGOFace3x7=0,totMGOFace4x8=0,totMR52=0,totRW=0,tot36_3x7=0,tot36_4x8=0,totFS=0;
   _results=[];
 
   rows.forEach(row=>{
@@ -500,17 +505,28 @@ function calculate(){
     if(!dw||!dh)return;
     const c=calcFull(dw,dh);
     const size36=mr36Size(dw,dh);
-    const tMGO=c.mgo*qty,tMR52=c.mr52*qty,tMR36=MR36_PER_DOOR*qty,tRW=c.rw*qty,tFS=c.fs*qty;
-    totMGO+=tMGO;totMR52+=tMR52;totRW+=tRW;totFS+=tFS;
+    const tMGO=c.mgo*qty;
+    const tMGOSkeleton=c.mgoSkeleton*qty;
+    const tMGOFace=c.mgoFacePcs*qty; // always 2×qty
+    const tMR52=c.mr52*qty,tMR36=MR36_PER_DOOR*qty,tRW=c.rw*qty,tFS=c.fs*qty;
+    totMGO+=tMGO;
+    totMGOSkeleton+=tMGOSkeleton;
+    if(c.faceSize==='3×7')totMGOFace3x7+=tMGOFace; else totMGOFace4x8+=tMGOFace;
+    totMR52+=tMR52;totRW+=tRW;totFS+=tFS;
     if(size36==='3×7')tot36_3x7+=tMR36;else tot36_4x8+=tMR36;
-    _results.push({dtype,dw,dh,qty,size36,tMR36,...c,tMGO,tMR52,tRW,tFS});
+    _results.push({dtype,dw,dh,qty,size36,tMR36,tMGOSkeleton,tMGOFace,tMGOFaceSize:c.faceSize,...c,tMGO,tMR52,tRW,tFS});
   });
 
   if(!_results.length){alert('No valid door data!');return;}
   const totMR36=tot36_3x7+tot36_4x8;
 
-  // Summary
+  // Summary card — MGO total unchanged
   document.getElementById('sum_mgo').textContent=totMGO.toFixed(2);
+  let mgoSub='sheets total';
+  if(totMGOFace3x7>0&&totMGOFace4x8>0) mgoSub=`4×8: ${(totMGOSkeleton+totMGOFace4x8).toFixed(1)} + 3×7: ${totMGOFace3x7.toFixed(1)}`;
+  else if(totMGOFace3x7>0) mgoSub=`4×8: ${totMGOSkeleton.toFixed(1)} + 3×7: ${totMGOFace3x7.toFixed(1)}`;
+  else mgoSub=`sheets · all 6×4'×8'`;
+  document.getElementById('sum_mgo_sub').textContent=mgoSub;
   document.getElementById('sum_mr52').textContent=totMR52.toFixed(2);
   document.getElementById('sum_mr36').textContent=totMR36.toFixed(1);
   document.getElementById('sum_rw').textContent=totRW.toFixed(2);
@@ -521,17 +537,22 @@ function calculate(){
   else mr36Sub='sheets · all 4×8';
   document.getElementById('sum_mr36_sub').textContent=mr36Sub;
 
-  // Breakdown table — totals only per door type
+  // Breakdown table
   const tbody=document.getElementById('detailBody');tbody.innerHTML='';
   _results.forEach(r=>{
     const mr36_3x7 = r.size36==='3×7' ? r.tMR36 : 0;
     const mr36_4x8 = r.size36==='4×8' ? r.tMR36 : 0;
+    const face3x7 = r.tMGOFaceSize==='3×7' ? r.tMGOFace : 0;
+    const face4x8 = r.tMGOFaceSize==='4×8' ? r.tMGOFace : 0;
+    const mgo4x8 = r.tMGOSkeleton + face4x8; // skeleton always 4×8, plus face if 4×8
+    const mgo3x7 = face3x7; // only face panels that are 3×7
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${r.dtype}</td>
       <td>${r.dw}×${r.dh}</td>
       <td>${r.qty}</td>
-      <td style="color:var(--accent);font-weight:600;">${r.tMGO.toFixed(2)}</td>
+      <td style="color:var(--accent);font-weight:600;">${mgo4x8>0?mgo4x8.toFixed(2):'—'}</td>
+      <td style="color:var(--accent);font-weight:600;">${mgo3x7>0?mgo3x7.toFixed(2):'—'}</td>
       <td style="color:var(--accent2);font-weight:600;">${r.tMR52.toFixed(2)}</td>
       <td style="color:var(--purple);font-weight:600;">${mr36_3x7>0?mr36_3x7:'—'}</td>
       <td style="color:var(--purple);font-weight:600;">${mr36_4x8>0?mr36_4x8:'—'}</td>
@@ -542,19 +563,22 @@ function calculate(){
 
   // Purchase summary rows
   const ps=document.getElementById('purchaseSummary');
-  const pRows=[
-    {dot:'mgo', label:'MGO Board 6×4\'×8\'',      val:totMGO.toFixed(2),  unit:'sheets'},
-    {dot:'mr52',label:'MR Plywood 5.2 × 4\'×8\'', val:totMR52.toFixed(2), unit:'sheets'},
-  ];
+  const pRows=[];
+  // MGO: skeleton always 4×8, merge with face4×8; face3×7 separate
+  const totMGO4x8 = totMGOSkeleton + totMGOFace4x8;
+  const totMGO3x7 = totMGOFace3x7;
+  if(totMGO4x8>0) pRows.push({dot:'mgo', label:"MGO Board 6×4'×8'", val:totMGO4x8.toFixed(2), unit:'sheets'});
+  if(totMGO3x7>0) pRows.push({dot:'mgo', label:"MGO Board 6×3'×7'", val:totMGO3x7.toFixed(2), unit:'sheets'});
+  pRows.push({dot:'mr52',label:'MR Plywood 5.2 × 4\'×8\'', val:totMR52.toFixed(2), unit:'sheets'});
   if(tot36_3x7>0) pRows.push({dot:'mr36',label:'MR Plywood 3.6 × 3\'×7\'', val:tot36_3x7.toFixed(1), unit:'sheets'});
   if(tot36_4x8>0) pRows.push({dot:'mr36',label:'MR Plywood 3.6 × 4\'×8\'', val:tot36_4x8.toFixed(1), unit:'sheets'});
   pRows.push({dot:'rw', label:'Rock Wool 25×600×1200mm', val:totRW.toFixed(2), unit:'pcs'});
   pRows.push({dot:'fs', label:'Fire Seal 12×2mm', val:totFS.toFixed(2), unit:'m'});
 
   ps.innerHTML = pRows.map((p,i)=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;${i<pRows.length-1?'border-bottom:1px solid var(--border);':''}">
-      <span style="font-family:var(--mono);font-size:12px;color:var(--muted2);"><span class="dot ${p.dot}"></span>${p.label}</span>
-      <span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text);">${p.val} <span style="font-size:11px;color:var(--muted);font-weight:400;">${p.unit}</span></span>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:${p.sub?'7px 16px 7px 28px':'10px 16px'};${i<pRows.length-1?'border-bottom:1px solid var(--border);':''}${p.total?'background:rgba(0,229,160,0.05);':''}${p.sub?'opacity:0.8;':''}">
+      <span style="font-family:var(--mono);font-size:${p.sub?'11px':'12px'};color:var(--muted2);"><span class="dot ${p.dot}"></span>${p.label}${p.sub?' <span style="font-size:9px;color:var(--muted);">↳</span>':''}</span>
+      <span style="font-family:var(--mono);font-size:${p.total?'20px':'18px'};font-weight:700;color:${p.total?'var(--accent)':'var(--text)'};">${p.val} <span style="font-size:11px;color:var(--muted);font-weight:400;">${p.unit}</span></span>
     </div>`).join('');
 
   // Show
