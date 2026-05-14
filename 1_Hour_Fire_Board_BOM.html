@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fire Board Door BOM v3 — Smart</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f12; --surface:#141720; --surface2:#1c2030; --surface3:#232840;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+  --accent:#ff6b35; --accent2:#facc15; --accent3:#00e5a0; --purple:#a78bfa;
+  --red:#ff4d6d; --green:#22c55e; --blue:#38bdf8;
+  --text:#e8eaf0; --muted:#6b7280; --muted2:#9ca3af;
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding:36px 24px 60px;font-size:14px;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,107,53,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,107,53,0.02) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;}
+.page{max-width:1280px;margin:0 auto;position:relative;z-index:1;}
+
+/* SIDEBAR */
+.sidebar{width:190px;background:var(--surface);border-right:1px solid var(--border2);display:flex;flex-direction:column;height:100vh;position:fixed;top:0;left:0;z-index:50;}
+.sb-header{padding:14px 12px 10px;border-bottom:1px solid var(--border2);display:flex;flex-direction:column;gap:8px;}
+.sb-logo{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;}
+.sb-new{width:100%;background:var(--accent);color:#000;border:none;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;padding:7px;cursor:pointer;letter-spacing:.05em;transition:opacity .15s;}
+.sb-new:hover{opacity:.85;}
+.sb-list{flex:1;overflow-y:auto;padding:6px;}
+.sb-item{padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;display:flex;align-items:flex-start;gap:6px;transition:background .15s;border:1px solid transparent;}
+.sb-item:hover{background:var(--surface2);}
+.sb-item.active{background:var(--surface2);border-color:var(--border2);}
+.sb-item-name{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-item-date{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;}
+.sb-actions{display:flex;gap:2px;align-items:center;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.sb-item:hover .sb-actions{opacity:1;}
+.sb-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;transition:color .15s;}
+.sb-btn:hover{color:var(--accent);}
+.sb-btn.del:hover{color:var(--red);}
+.sb-rename-input{width:100%;background:var(--surface3);border:1px solid var(--accent);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:11px;padding:2px 5px;outline:none;}
+.sb-footer{padding:10px 12px;border-top:1px solid var(--border2);display:flex;flex-direction:column;gap:6px;}
+.sb-io-btn{width:100%;background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--muted2);font-family:var(--mono);font-size:10px;padding:6px;cursor:pointer;text-align:left;letter-spacing:.05em;transition:all .15s;}
+.sb-io-btn:hover{border-color:var(--accent);color:var(--accent);}
+.autosave-tag{font-family:var(--mono);font-size:9px;color:var(--accent);text-align:center;min-height:14px;letter-spacing:.05em;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+.header{margin-bottom:24px;}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+h1{font-size:28px;font-weight:800;letter-spacing:-.02em;}
+h1 span{color:var(--accent);}
+.v3-badge{display:inline-block;background:var(--accent3);color:#000;font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;margin-left:8px;letter-spacing:.1em;vertical-align:middle;}
+
+/* DOOR ROWS */
+.door-list{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;}
+.door-row{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:16px 20px;}
+.door-row.has-warning{border-color:rgba(250,204,21,0.4);}
+.door-row-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.door-row-label{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;font-weight:700;}
+.btn-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:0 4px;transition:color .15s;}
+.btn-remove:hover{color:var(--red);}
+.door-fields{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;align-items:end;}
+@media(max-width:600px){.door-fields{grid-template-columns:1fr 1fr;}}
+.field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted2);text-transform:uppercase;margin-bottom:6px;}
+.input-wrap{position:relative;}
+.input-wrap input{width:100%;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:16px;font-weight:700;padding:10px 44px 10px 12px;outline:none;transition:border-color .15s,box-shadow .15s;-moz-appearance:textfield;}
+.input-wrap input[type=text]{font-size:13px;padding-right:12px;}
+.input-wrap input::-webkit-inner-spin-button,.input-wrap input::-webkit-outer-spin-button{-webkit-appearance:none;}
+.input-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,107,53,.1);}
+.input-wrap input.warn{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(250,204,21,.1);}
+.input-wrap .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:var(--muted);pointer-events:none;}
+.size-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(250,204,21,.12);color:var(--accent2);margin-left:6px;}
+
+/* WARNING BANNER */
+.warn-banner{margin-top:10px;padding:8px 12px;background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.3);border-radius:6px;font-family:var(--mono);font-size:10px;color:var(--accent2);line-height:1.6;}
+.warn-banner strong{color:var(--accent2);}
+
+/* SMART SIZE OVERRIDE */
+.size-override{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.size-override label{font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;}
+.size-toggle{display:flex;gap:0;border-radius:6px;overflow:hidden;border:1px solid var(--border2);}
+.size-btn{background:transparent;border:none;font-family:var(--mono);font-size:10px;font-weight:700;padding:5px 10px;cursor:pointer;color:var(--muted);letter-spacing:.05em;transition:all .15s;}
+.size-btn.active-37{background:var(--accent3);color:#000;}
+.size-btn.active-48{background:var(--blue);color:#000;}
+.size-btn:not(.active-37):not(.active-48):hover{color:var(--text);background:var(--surface2);}
+
+/* LEAF TYPE TOGGLE */
+.leaf-toggle{display:flex;gap:0;border-radius:7px;overflow:hidden;border:1px solid var(--border2);flex-shrink:0;}
+.leaf-btn{background:transparent;border:none;font-family:var(--mono);font-size:10px;font-weight:700;padding:7px 12px;cursor:pointer;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;transition:all .15s;}
+.leaf-btn.active-single{background:var(--accent);color:#000;}
+.leaf-btn.active-double{background:var(--purple);color:#fff;}
+.leaf-btn:not(.active-single):not(.active-double):hover{color:var(--text);background:var(--surface2);}
+
+.btn-add-door{width:100%;background:transparent;border:1px dashed var(--border2);border-radius:12px;color:var(--muted2);font-family:var(--mono);font-size:12px;padding:14px;cursor:pointer;transition:all .15s;margin-bottom:20px;letter-spacing:.05em;}
+.btn-add-door:hover{border-color:var(--accent);color:var(--accent);}
+.btn-calc{width:100%;background:var(--accent);color:#000;border:none;border-radius:10px;font-family:var(--mono);font-size:14px;font-weight:700;padding:16px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;transition:opacity .15s,transform .1s;margin-bottom:36px;}
+.btn-calc:hover{opacity:.88;}
+.btn-calc:active{transform:scale(.99);}
+
+/* RESULTS */
+.results-area{display:none;}
+.results-area.show{display:block;}
+.divider{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.divider-line{flex:1;height:1px;background:var(--border);}
+.divider span{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+
+.summary-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:28px;}
+@media(max-width:900px){.summary-cards{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:500px){.summary-cards{grid-template-columns:repeat(2,1fr);}}
+.summary-card{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;}
+.summary-card .s-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;}
+.summary-card .s-val{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;}
+.summary-card .s-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;}
+.summary-card.fb .s-val{color:var(--accent);}
+.summary-card.mr36 .s-val{color:var(--purple);}
+.summary-card.fs .s-val{color:var(--accent2);}
+.summary-card.sp14 .s-val{color:#34d399;}
+.summary-card.sp8 .s-val{color:#67e8f9;}
+
+/* SAVINGS BANNER */
+.savings-banner{background:rgba(0,229,160,0.07);border:1px solid rgba(0,229,160,0.25);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:none;}
+.savings-banner.show{display:block;}
+.savings-banner .sb-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
+.savings-row{display:flex;gap:20px;flex-wrap:wrap;}
+.savings-item{font-family:var(--mono);font-size:12px;color:var(--muted2);}
+.savings-item strong{color:var(--accent3);}
+
+/* TABS */
+.tabs-bar{display:flex;gap:2px;border-bottom:1px solid var(--border2);margin-bottom:20px;}
+.tab-btn{font-family:var(--mono);font-size:11px;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:8px 16px 10px;cursor:pointer;transition:color .15s;letter-spacing:.06em;text-transform:uppercase;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* DETAIL TABLE */
+.detail-wrap{overflow-x:auto;margin-bottom:16px;}
+table.dt{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;white-space:nowrap;table-layout:auto;}
+table.dt th{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border2);text-align:right;white-space:nowrap;}
+table.dt th:first-child{text-align:left;}
+table.dt th:nth-child(2){text-align:left;}
+table.dt td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--muted2);text-align:right;white-space:nowrap;}
+table.dt td:first-child,table.dt td:nth-child(2){text-align:left;color:var(--text);}
+table.dt tr:hover td{background:rgba(255,255,255,.015);}
+table.dt tfoot td{border-top:1px solid var(--border2);border-bottom:none;color:var(--text);font-weight:700;font-size:13px;padding-top:13px;}
+.cut-tag{display:inline-block;font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:2px;background:rgba(0,229,160,0.15);color:var(--accent3);margin-left:4px;vertical-align:middle;}
+.warn-tag{display:inline-block;font-family:var(--mono);font-size:8px;padding:1px 5px;border-radius:2px;background:rgba(250,204,21,0.15);color:var(--accent2);margin-left:4px;vertical-align:middle;}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+.dot.fb{background:var(--accent);}
+.dot.mr36{background:var(--purple);}
+.dot.fs{background:var(--accent2);}
+.dot.sp14{background:#34d399;}
+.dot.sp8{background:#67e8f9;}
+
+/* CUT OPTIMIZATION TABLE */
+.cut-section{margin-top:28px;}
+.cut-section-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;padding:8px 14px;background:rgba(0,229,160,0.05);border:1px solid rgba(0,229,160,0.15);border-radius:8px;}
+table.cut-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+table.cut-table th{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border2);text-align:left;}
+table.cut-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted2);vertical-align:top;}
+table.cut-table td:first-child{color:var(--accent3);font-weight:700;}
+table.cut-table .cuts-list{color:var(--muted2);font-size:10px;line-height:1.8;}
+table.cut-table .waste-pct{color:var(--muted);}
+table.cut-table .waste-pct.low{color:var(--accent3);}
+table.cut-table .waste-pct.mid{color:var(--accent2);}
+table.cut-table .waste-pct.high{color:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-header">
+    <div class="sb-logo">🔥 FB BOM v3</div>
+    <button class="sb-new" onclick="newProfile()">+ New Profile</button>
+  </div>
+  <div class="sb-list" id="sbList"></div>
+  <div class="sb-footer">
+    <button class="sb-io-btn" onclick="importJSON()">⬆ Import JSON</button>
+    <button class="sb-io-btn" onclick="exportJSON()">⬇ Export JSON</button>
+    <div class="autosave-tag" id="autosave_tag"></div>
+  </div>
+</div>
+
+<div style="margin-left:190px;position:relative;z-index:1;">
+<div class="page">
+
+  <div class="header">
+    <div class="tag">APEX JAYA · 38mm Fire Board Door · Smart BOM</div>
+    <h1>Fire Board Door <span>BOM</span> <span class="v3-badge">v3 SMART</span></h1>
+  </div>
+
+  <div class="door-list" id="doorList"></div>
+  <button class="btn-add-door" onclick="addDoor()">+ Add Door Type</button>
+  <button class="btn-calc" onclick="calculate()">⚡ Calculate Smart BOM</button>
+
+  <div class="results-area" id="resultsArea">
+
+    <!-- SAVINGS BANNER -->
+    <div class="savings-banner" id="savingsBanner">
+      <div class="sb-title">✂ 切割优化节省</div>
+      <div class="savings-row" id="savingsRow"></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" onclick="switchTab('breakdown',this)">Breakdown</button>
+      <button class="tab-btn" onclick="switchTab('cutplan',this)">✂ Cut Plan</button>
+      <button class="tab-btn" onclick="switchTab('formula',this)">Formula</button>
+    </div>
+
+    <!-- TAB: BREAKDOWN -->
+    <div class="tab-content active" id="tab_breakdown">
+      <div class="detail-wrap">
+        <table class="dt">
+          <thead><tr>
+            <th>Door Type</th>
+            <th>W × H (mm)</th>
+            <th>Qty</th>
+            <th><span class="dot fb"></span>FB 3'×7'</th>
+            <th><span class="dot fb"></span>FB 4'×8'</th>
+            <th><span class="dot mr36"></span>MR 3.6 (3×7)</th>
+            <th><span class="dot mr36"></span>MR 3.6 (4×8)</th>
+            <th style="color:#34d399;"><span class="dot sp14"></span>Sapelli 7'</th>
+            <th style="color:#67e8f9;"><span class="dot sp8"></span>Sapelli 8'</th>
+            <th style="color:var(--accent2);">Fire Seal (m)</th>
+          </tr></thead>
+          <tbody id="detailBody"></tbody>
+          <tfoot id="detailFoot"></tfoot>
+        </table>
+      </div>
+      <div style="margin-top:24px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;">Purchase Order Summary</div>
+        <div id="purchaseSummary" style="padding:4px 0;"></div>
+      </div>
+    </div>
+
+    <!-- TAB: CUT PLAN -->
+    <div class="tab-content" id="tab_cutplan">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);margin-bottom:20px;padding:12px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent3);line-height:1.8;">
+        <strong style="color:var(--accent3);">智能切割计划</strong> — 把所有门的需求合并，计算每张 board 最优切法，减少浪费。<br>
+        <span style="color:var(--muted);">废料率 &lt;10% 🟢 绿色 · 10-20% 🟡 黄色 · &gt;20% 🔴 红色</span>
+      </div>
+      <div id="cutPlanContent"></div>
+    </div>
+
+    <!-- TAB: FORMULA -->
+    <div class="tab-content" id="tab_formula">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);margin-bottom:20px;padding:12px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);line-height:1.8;">
+        <strong style="color:var(--text);">v3 修复的公式逻辑</strong><br>
+        <span style="color:var(--accent);">Sheet size 判断（已修复）</span>：W ≤ 914 <strong>AND</strong> H ≤ 2134 → 3'×7'，否则 4'×8'<br>
+        Fire Board：<strong style="color:var(--accent);">1 sheet/leaf</strong>（core only），ceil(W ÷ boardW)<br>
+        MR Plywood 3.6：2 sheets/leaf（front + back），ceil(W ÷ boardW) × 2<br>
+        Fire Seal：<strong style="color:var(--accent2);">(4H + 3W) ÷ 1000 metres</strong> per leaf<br>
+        Sapelli 7'：legs，H ≤ 2134 → 7'；Sapelli 8'：H &gt; 2134 → 8'<br>
+        Rails：W×2 ≤ 2134 → 1×7' 切两条；W×2 ≤ 2438 → 1×8'；否则 2 根<br>
+        <span style="color:var(--accent2);">⚠ 临界点警告</span>：W 在 904–924mm 或 H 在 2124–2144mm 时自动提示确认
+      </div>
+    </div>
+
+  </div><!-- /results-area -->
+
+</div><!-- /page -->
+</div><!-- /margin wrapper -->
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────────
+const BOARD_3x7_W = 914;   // mm
+const BOARD_3x7_H = 2134;  // mm
+const BOARD_4x8_W = 1219;  // mm
+const BOARD_4x8_H = 2438;  // mm
+const SP7_LEN = 2134;
+const SP8_LEN = 2438;
+const WARN_MARGIN = 10; // mm boundary warning range
+
+// ── SMART SHEET SIZE (FIXED) ───────────────────────────────────────────────────
+// v3 fix: both W AND H must qualify for 3x7; if either exceeds limit → 4x8
+function sheetSize(dw, dh) {
+  return (dw <= BOARD_3x7_W && dh <= BOARD_3x7_H) ? '3×7' : '4×8';
+}
+function boardDims(size) {
+  return size === '3×7'
+    ? { w: BOARD_3x7_W, h: BOARD_3x7_H }
+    : { w: BOARD_4x8_W, h: BOARD_4x8_H };
+}
+
+// Check if dimension is near a boundary (warning zone)
+function nearBoundary(dw, dh) {
+  const warnW = Math.abs(dw - BOARD_3x7_W) <= WARN_MARGIN;
+  const warnH = Math.abs(dh - BOARD_3x7_H) <= WARN_MARGIN;
+  return { warnW, warnH, any: warnW || warnH };
+}
+
+// Fire Seal: (4H + 3W) ÷ 1000 metres per leaf
+function fireSeal(dw, dh) { return (dh * 4 + dw * 3) / 1000; }
+
+// Sapelli logic (unchanged from v2, correct)
+function sapelli(dw, dh) {
+  const legUse7 = dh <= SP7_LEN;
+  const sp7_legs = legUse7 ? 2 : 0;
+  const sp8_legs = legUse7 ? 0 : 2;
+  let sp7_rails = 0, sp8_rails = 0;
+  if      (dw * 2 <= SP7_LEN) { sp7_rails = 1; }
+  else if (dw * 2 <= SP8_LEN) { sp8_rails = 1; }
+  else if (dw <= SP7_LEN)     { sp7_rails = 2; }
+  else                        { sp8_rails = 2; }
+  return { sp7: sp7_legs + sp7_rails, sp8: sp8_legs + sp8_rails,
+           sp7_legs, sp8_legs, sp7_rails, sp8_rails, legUse7, railUse7: dw <= SP7_LEN };
+}
+
+function sapelliDouble(dw, dh) {
+  const s = sapelli(dw, dh);
+  return {
+    sp7: s.sp7_legs * 2 + s.sp7_rails, sp8: s.sp8_legs * 2 + s.sp8_rails,
+    sp7_legs: s.sp7_legs * 2, sp8_legs: s.sp8_legs * 2,
+    sp7_rails: s.sp7_rails, sp8_rails: s.sp8_rails,
+    legUse7: s.legUse7, railUse7: s.railUse7
+  };
+}
+
+// ── SMART SIZE SELECTION: picks whichever size needs fewer sheets ──────────────
+// For a given pieceW and piecesNeeded count, returns {size, sheetsNeeded}
+function bestSize(pieceW, dh, piecesCount, overrideSize) {
+  if (overrideSize) {
+    const bd = boardDims(overrideSize);
+    const fits = Math.floor(bd.w / pieceW);
+    return { size: overrideSize, sheetsNeeded: Math.ceil(piecesCount / fits), fits };
+  }
+  // Try both sizes, pick fewer sheets (ties: prefer 3×7 as cheaper)
+  const opt37 = (() => {
+    if (dh > BOARD_3x7_H) return null; // height doesn't fit
+    const bd = boardDims('3×7');
+    const fits = Math.floor(bd.w / pieceW);
+    if (!fits) return null;
+    return { size: '3×7', sheetsNeeded: Math.ceil(piecesCount / fits), fits };
+  })();
+  const opt48 = (() => {
+    const bd = boardDims('4×8');
+    const fits = Math.floor(bd.w / pieceW);
+    if (!fits) return null;
+    return { size: '4×8', sheetsNeeded: Math.ceil(piecesCount / fits), fits };
+  })();
+  if (!opt37 && !opt48) return { size: '4×8', sheetsNeeded: 1, fits: 1 };
+  if (!opt37) return opt48;
+  if (!opt48) return opt37;
+  // Pick fewer sheets; tie → 3×7
+  return opt37.sheetsNeeded <= opt48.sheetsNeeded ? opt37 : opt48;
+}
+
+// ── SINGLE LEAF SHEETS ─────────────────────────────────────────────────────────
+function singleSheets(dw, dh, overrideSize) {
+  // FB: 1 piece per door (core); MR: 2 pieces per door (front+back)
+  const fb = bestSize(dw, dh, 1, overrideSize);
+  const mr = bestSize(dw, dh, 2, overrideSize);
+  return { size: fb.size, sizeMR: mr.size, fbQty: fb.sheetsNeeded, mrQty: mr.sheetsNeeded };
+}
+
+// ── DOUBLE LEAF SHEETS ─────────────────────────────────────────────────────────
+// 2 leaves, each leafW wide.
+// FB: 2 pieces total (1 per leaf core); MR: 4 pieces total (2 per leaf × 2 faces)
+function doubleSheets(dw, dh, overrideSize) {
+  const leafW = dw / 2;
+  const fb = bestSize(leafW, dh, 2, overrideSize);
+  const mr = bestSize(leafW, dh, 4, overrideSize);
+  return { size: fb.size, sizeMR: mr.size, fbQty: fb.sheetsNeeded, mrQty: mr.sheetsNeeded, leavesPerBoard: fb.fits };
+}
+
+// ── CUT OPTIMIZATION ENGINE ────────────────────────────────────────────────────
+// Groups all doors by sheet size, then bins pieces onto sheets using 1D strip cutting
+// Each sheet provides boardW of usable width per face
+function optimizeCuts(results) {
+  // Collect all pieces needed: {size, doorW, label, count}
+  const piecesNeeded = { '3×7': [], '4×8': [] };
+
+  results.forEach(r => {
+    const bd = boardDims(r.sizeFB);
+    const doorW = r.leaf === 'double' ? r.dw / 2 : r.dw;
+    // How many pieces of width doorW fit per sheet?
+    const fitsPerSheet = Math.floor(bd.w / doorW);
+    for (let i = 0; i < r.qty; i++) {
+      piecesNeeded[r.sizeFB].push({ doorW, label: r.dtype, fitsPerSheet });
+    }
+  });
+
+  const plans = {};
+  ['3×7', '4×8'].forEach(size => {
+    if (!piecesNeeded[size].length) return;
+    const bd = boardDims(size);
+    const pieces = piecesNeeded[size];
+
+    // Group same-width pieces
+    const groups = {};
+    pieces.forEach(p => {
+      if (!groups[p.doorW]) groups[p.doorW] = { doorW: p.doorW, count: 0, fitsPerSheet: p.fitsPerSheet };
+      groups[p.doorW].count++;
+    });
+
+    const sheets = [];
+    Object.values(groups).forEach(g => {
+      const sheetsNeeded = Math.ceil(g.count / g.fitsPerSheet);
+      const lastSheetCount = g.count % g.fitsPerSheet || g.fitsPerSheet;
+      for (let s = 0; s < sheetsNeeded; s++) {
+        const cuts = s < sheetsNeeded - 1 ? g.fitsPerSheet : lastSheetCount;
+        const usedW = cuts * g.doorW;
+        const wasteW = bd.w - usedW;
+        const wastePct = (wasteW / bd.w * 100).toFixed(1);
+        sheets.push({
+          size, boardW: bd.w, boardH: bd.h,
+          cuts, doorW: g.doorW, usedW, wasteW, wastePct,
+          label: `${g.doorW}mm ×${cuts}`,
+        });
+      }
+    });
+    plans[size] = sheets;
+  });
+  return plans;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function n2(v) { return typeof v === 'number' ? v.toFixed(2) : v; }
+let dc = 0;
+
+// ── DOOR ROW UI ───────────────────────────────────────────────────────────────
+function addDoor(def = {}) {
+  dc++;
+  const n = dc;
+  const div = document.createElement('div');
+  div.className = 'door-row'; div.id = 'door_' + n;
+  div.innerHTML = `
+    <div class="door-row-header">
+      <span class="door-row-label">Door #${n}</span>
+      <div class="leaf-toggle">
+        <button class="leaf-btn active-single" id="d${n}_leafbtn_s" onclick="setLeaf(${n},'single')">Single</button>
+        <button class="leaf-btn" id="d${n}_leafbtn_d" onclick="setLeaf(${n},'double')">Double</button>
+      </div>
+      <button class="btn-remove" onclick="removeDoor(${n})">×</button>
+    </div>
+    <div class="door-fields">
+      <div class="field"><label>Door Type Name</label>
+        <div class="input-wrap"><input type="text" id="d${n}_type" value="${def.type||''}" placeholder="e.g. FBD-900"></div></div>
+      <div class="field"><label id="d${n}_wlabel">Width (mm)</label>
+        <div class="input-wrap"><input type="number" id="d${n}_w" value="${def.w||900}" min="400" max="4800" oninput="updateBadge(${n})"><span class="unit">mm</span></div></div>
+      <div class="field"><label>Height (mm)</label>
+        <div class="input-wrap"><input type="number" id="d${n}_h" value="${def.h||2100}" min="1800" max="3600" oninput="updateBadge(${n})"><span class="unit">mm</span></div></div>
+      <div class="field"><label>Qty (sets)</label>
+        <div class="input-wrap"><input type="number" id="d${n}_qty" value="${def.qty||1}" min="1"><span class="unit">pcs</span></div></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+      <span id="d${n}_leafinfo" style="font-family:var(--mono);font-size:10px;color:var(--muted);"></span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">Sheet → <span id="d${n}_badge" class="size-badge">—</span></span>
+    </div>
+    <div id="d${n}_warnbox"></div>
+    <input type="hidden" id="d${n}_leaf" value="${def.leaf||'single'}">
+    <input type="hidden" id="d${n}_override" value="${def.override||''}">`;
+  document.getElementById('doorList').appendChild(div);
+  if (def.leaf === 'double') setLeaf(n, 'double');
+  updateBadge(n);
+}
+
+function setLeaf(n, type) {
+  document.getElementById('d'+n+'_leaf').value = type;
+  const bs = document.getElementById('d'+n+'_leafbtn_s');
+  const bd = document.getElementById('d'+n+'_leafbtn_d');
+  const wlabel = document.getElementById('d'+n+'_wlabel');
+  bs.className = 'leaf-btn' + (type==='single' ? ' active-single' : '');
+  bd.className = 'leaf-btn' + (type==='double' ? ' active-double' : '');
+  wlabel.textContent = type==='double' ? 'Total Width (mm)' : 'Width (mm)';
+  updateBadge(n);
+}
+
+function setOverride(n, val) {
+  document.getElementById('d'+n+'_override').value = val;
+  updateBadge(n);
+  // update button styles
+  ['37','48','auto'].forEach(v => {
+    const btn = document.getElementById('d'+n+'_sz_'+v);
+    if (!btn) return;
+    btn.className = 'size-btn' + (val===v ? (v==='37'?' active-37':v==='48'?' active-48':'') : '');
+  });
+}
+
+function updateBadge(n) {
+  const dw = parseFloat(document.getElementById('d'+n+'_w').value)||0;
+  const dh = parseFloat(document.getElementById('d'+n+'_h').value)||0;
+  const leaf = document.getElementById('d'+n+'_leaf')?.value||'single';
+  const override = document.getElementById('d'+n+'_override')?.value||'';
+  const badge = document.getElementById('d'+n+'_badge');
+  const info = document.getElementById('d'+n+'_leafinfo');
+  const warnbox = document.getElementById('d'+n+'_warnbox');
+  const row = document.getElementById('door_'+n);
+
+  if (!dw||!dh) { badge.textContent='—'; info.textContent=''; warnbox.innerHTML=''; return; }
+
+  const checkW = leaf==='double' ? dw/2 : dw;
+  const boundary = nearBoundary(checkW, dh);
+  const overrideSize = override==='37'?'3×7':override==='48'?'4×8':null;
+
+  if (leaf==='double') {
+    const ds = doubleSheets(dw, dh, overrideSize);
+    const fbLabel = ds.size === ds.sizeMR ? ds.size : `FB:${ds.size} MR:${ds.sizeMR}`;
+    badge.textContent = fbLabel + ' · FB:' + ds.fbQty + ' MR:' + ds.mrQty + ' sheets/set';
+    info.textContent = 'Each leaf: ' + (dw/2).toFixed(0) + 'mm';
+  } else {
+    const ss = singleSheets(dw, dh, overrideSize);
+    const fbLabel = ss.size === ss.sizeMR ? ss.size : `FB:${ss.size} MR:${ss.sizeMR}`;
+    badge.textContent = fbLabel + ' · FB:' + ss.fbQty + ' MR:' + ss.mrQty + ' sheets/door';
+    info.textContent = '';
+  }
+
+  if (boundary.any) {
+    row.classList.add('has-warning');
+    let msgs = [];
+    if (boundary.warnW) msgs.push(`⚠ 宽度 ${checkW}mm 接近临界点 914mm — Auto 会选更省的 size，可手动覆盖`);
+    if (boundary.warnH) msgs.push(`⚠ 高度 ${dh}mm 接近临界点 2134mm — Auto 会选更省的 size，可手动覆盖`);
+
+    const overrideVal = document.getElementById('d'+n+'_override').value||'';
+    warnbox.innerHTML = `
+      <div class="warn-banner">
+        ${msgs.join('<br>')}
+        <div class="size-override" style="margin-top:8px;">
+          <label>手动选 Size：</label>
+          <div class="size-toggle">
+            <button class="size-btn${overrideVal==='37'?' active-37':''}" id="d${n}_sz_37" onclick="setOverride(${n},'37')">3'×7'</button>
+            <button class="size-btn${overrideVal==='48'?' active-48':''}" id="d${n}_sz_48" onclick="setOverride(${n},'48')">4'×8'</button>
+            <button class="size-btn" id="d${n}_sz_auto" onclick="setOverride(${n},'')">Auto ✓</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    row.classList.remove('has-warning');
+    warnbox.innerHTML = '';
+  }
+}
+
+function removeDoor(n) { const el=document.getElementById('door_'+n); if(el){el.remove();autoSave();} }
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab_'+name).classList.add('active');
+}
+
+// ── CALCULATE ─────────────────────────────────────────────────────────────────
+let _results = [];
+function calculate() {
+  const rows = document.querySelectorAll('.door-row');
+  if (!rows.length) { alert('Add at least one door type!'); return; }
+
+  let tot_fb_3x7=0, tot_fb_4x8=0, tot_mr36_3x7=0, tot_mr36_4x8=0, totFS=0, totSP7=0, totSP8=0;
+  _results = [];
+
+  rows.forEach(row => {
+    const n = row.id.replace('door_','');
+    const dw = parseFloat(document.getElementById('d'+n+'_w').value)||0;
+    const dh = parseFloat(document.getElementById('d'+n+'_h').value)||0;
+    const qty = parseFloat(document.getElementById('d'+n+'_qty').value)||1;
+    const dtype = document.getElementById('d'+n+'_type').value.trim() || ('Door #'+n);
+    const leaf = document.getElementById('d'+n+'_leaf')?.value||'single';
+    const override = document.getElementById('d'+n+'_override')?.value||'';
+    if (!dw||!dh) return;
+
+    const overrideSize = override==='37'?'3×7':override==='48'?'4×8':null;
+
+    let sheets, tFS, tSP7, tSP8, sp;
+    if (leaf==='double') {
+      sheets = doubleSheets(dw, dh, overrideSize);
+      tFS = fireSeal(dw, dh) * 2 * qty;
+      sp = sapelliDouble(dw, dh);
+    } else {
+      sheets = singleSheets(dw, dh, overrideSize);
+      tFS = fireSeal(dw, dh) * qty;
+      sp = sapelli(dw, dh);
+    }
+
+    tSP7 = sp.sp7 * qty;
+    tSP8 = sp.sp8 * qty;
+
+    const tFB = sheets.fbQty * qty;
+    const tMR = sheets.mrQty * qty;
+
+    _results.push({
+      leaf, dtype, dw, dh, qty, sizeFB: sheets.size, sizeMR: sheets.sizeMR,
+      fbQtyPerDoor: sheets.fbQty, mrQtyPerDoor: sheets.mrQty,
+      tFB, tMR, tFS, sp7PerDoor: sp.sp7, sp8PerDoor: sp.sp8, tSP7, tSP8,
+      sp7_legs: sp.sp7_legs, sp8_legs: sp.sp8_legs,
+      sp7_rails: sp.sp7_rails, sp8_rails: sp.sp8_rails,
+      legUse7: sp.legUse7, railUse7: sp.railUse7
+    });
+
+    if (sheets.size==='3×7') { tot_fb_3x7+=tFB; } else { tot_fb_4x8+=tFB; }
+    if (sheets.sizeMR==='3×7') { tot_mr36_3x7+=tMR; } else { tot_mr36_4x8+=tMR; }
+    totFS += tFS;
+    totSP7 += tSP7;
+    totSP8 += tSP8;
+  });
+
+  if (!_results.length) { alert('No valid door data!'); return; }
+
+  renderBreakdown();
+  renderCutPlan();
+  document.getElementById('resultsArea').classList.add('show');
+  autoSave();
+}
+
+function renderBreakdown() {
+  const tbody = document.getElementById('detailBody');
+  const tfoot = document.getElementById('detailFoot');
+  tbody.innerHTML = ''; tfoot.innerHTML = '';
+
+  let tot_fb_3x7=0,tot_fb_4x8=0,tot_mr36_3x7=0,tot_mr36_4x8=0,totFS=0,totSP7=0,totSP8=0;
+
+  _results.forEach(r => {
+    const boundary = nearBoundary(r.leaf==='double'?r.dw/2:r.dw, r.dh);
+    const warnTag = boundary.any ? '<span class="warn-tag">⚠临界</span>' : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.dtype}${warnTag} <span style="color:var(--muted);font-size:10px;">${r.leaf==='double'?'[D]':'[S]'}</span></td>
+      <td>${r.dw} × ${r.dh}</td>
+      <td>${r.qty}</td>
+      <td>${r.sizeFB==='3×7' ? r.tFB : '–'}</td>
+      <td>${r.sizeFB==='4×8' ? r.tFB : '–'}</td>
+      <td>${r.sizeMR==='3×7' ? r.tMR : '–'}</td>
+      <td>${r.sizeMR==='4×8' ? r.tMR : '–'}</td>
+      <td>${r.tSP7}</td>
+      <td>${r.tSP8}</td>
+      <td>${n2(r.tFS)}</td>`;
+    tbody.appendChild(tr);
+
+    if(r.sizeFB==='3×7'){tot_fb_3x7+=r.tFB;}else{tot_fb_4x8+=r.tFB;}
+    if(r.sizeMR==='3×7'){tot_mr36_3x7+=r.tMR;}else{tot_mr36_4x8+=r.tMR;}
+    totFS+=r.tFS; totSP7+=r.tSP7; totSP8+=r.tSP8;
+  });
+
+  tfoot.innerHTML = `<tr>
+    <td colspan="3">TOTAL</td>
+    <td>${tot_fb_3x7||'–'}</td>
+    <td>${tot_fb_4x8||'–'}</td>
+    <td>${tot_mr36_3x7||'–'}</td>
+    <td>${tot_mr36_4x8||'–'}</td>
+    <td>${totSP7}</td>
+    <td>${totSP8}</td>
+    <td>${n2(totFS)}</td>
+  </tr>`;
+
+  // Purchase Summary
+  const ps = document.getElementById('purchaseSummary');
+  const items = [
+    tot_fb_3x7>0 && {label:'Fire Board 3\'×7\'', qty:tot_fb_3x7, color:'var(--accent)'},
+    tot_fb_4x8>0 && {label:'Fire Board 4\'×8\'', qty:tot_fb_4x8, color:'var(--accent)'},
+    tot_mr36_3x7>0 && {label:'MR Plywood 3.6 3\'×7\'', qty:tot_mr36_3x7, color:'var(--purple)'},
+    tot_mr36_4x8>0 && {label:'MR Plywood 3.6 4\'×8\'', qty:tot_mr36_4x8, color:'var(--purple)'},
+    {label:'Fire Seal 20×2', qty:n2(totFS)+'m', color:'var(--accent2)'},
+    totSP7>0 && {label:'Sapelli FJ 38×26×7\'', qty:totSP7+' pcs', color:'#34d399'},
+    totSP8>0 && {label:'Sapelli FJ 38×26×8\'', qty:totSP8+' pcs', color:'#67e8f9'},
+  ].filter(Boolean);
+  ps.innerHTML = items.map(it=>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted2);">${it.label}</span>
+      <span style="font-family:var(--mono);font-size:16px;font-weight:700;color:${it.color};">${it.qty}</span>
+    </div>`).join('');
+}
+
+function renderCutPlan() {
+  const plans = optimizeCuts(_results);
+  const container = document.getElementById('cutPlanContent');
+  container.innerHTML = '';
+
+  let totalSheets = 0;
+  let naiveSheets = _results.reduce((s,r) => s + r.tFB + r.tMR, 0);
+
+  ['3×7','4×8'].forEach(size => {
+    if (!plans[size]) return;
+    const sheets = plans[size];
+    totalSheets += sheets.length;
+
+    const sec = document.createElement('div');
+    sec.className = 'cut-section';
+    sec.innerHTML = `<div class="cut-section-title">✂ ${size} Fire Board — ${sheets.length} sheets needed</div>`;
+
+    const table = document.createElement('table');
+    table.className = 'cut-table';
+    table.innerHTML = `<thead><tr>
+      <th>Sheet #</th>
+      <th>Board size</th>
+      <th>Cuts (door widths)</th>
+      <th>Used width</th>
+      <th>Waste</th>
+      <th>Waste %</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    sheets.forEach((s, i) => {
+      const pct = parseFloat(s.wastePct);
+      const wasteCls = pct < 10 ? 'low' : pct < 20 ? 'mid' : 'high';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>#${i+1}</td>
+        <td>${s.size}</td>
+        <td><div class="cuts-list">${s.label}</div></td>
+        <td>${s.usedW}mm</td>
+        <td>${s.wasteW}mm</td>
+        <td><span class="waste-pct ${wasteCls}">${s.wastePct}%</span></td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    sec.appendChild(table);
+    container.appendChild(sec);
+  });
+
+  // Savings banner
+  const saved = naiveSheets - totalSheets;
+  if (saved > 0) {
+    document.getElementById('savingsBanner').classList.add('show');
+    document.getElementById('savingsRow').innerHTML =
+      `<div class="savings-item">优化前：<strong>${naiveSheets} sheets</strong></div>
+       <div class="savings-item">优化后：<strong>${totalSheets} sheets</strong></div>
+       <div class="savings-item">节省：<strong>🎉 ${saved} sheets</strong></div>`;
+  } else {
+    document.getElementById('savingsBanner').classList.remove('show');
+  }
+}
+
+// ── LOCAL STORAGE / PROFILES ──────────────────────────────────────────────────
+const STORE_KEY = 'fbBomV3_profiles';
+const ACTIVE_KEY = 'fbBomV3_active';
+function loadProfiles() { try { return JSON.parse(localStorage.getItem(STORE_KEY)||'{}'); } catch(e){return{};} }
+function saveProfiles(ps) { localStorage.setItem(STORE_KEY, JSON.stringify(ps)); }
+function getActiveId() { return localStorage.getItem(ACTIVE_KEY)||''; }
+function setActiveId(id) { localStorage.setItem(ACTIVE_KEY, id); }
+
+function getDoors() {
+  const rows = document.querySelectorAll('.door-row');
+  return Array.from(rows).map(row => {
+    const n = row.id.replace('door_','');
+    return {
+      type: document.getElementById('d'+n+'_type')?.value||'',
+      w: parseFloat(document.getElementById('d'+n+'_w')?.value)||900,
+      h: parseFloat(document.getElementById('d'+n+'_h')?.value)||2100,
+      qty: parseFloat(document.getElementById('d'+n+'_qty')?.value)||1,
+      leaf: document.getElementById('d'+n+'_leaf')?.value||'single',
+      override: document.getElementById('d'+n+'_override')?.value||'',
+    };
+  });
+}
+
+function applyDoors(doors) {
+  document.getElementById('doorList').innerHTML=''; dc=0;
+  doors.forEach(d=>addDoor(d));
+}
+
+let _saveTimer = null;
+function autoSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(()=>{
+    const id = getActiveId(); if(!id) return;
+    const ps = loadProfiles(); if(!ps[id]) return;
+    ps[id].doors = getDoors();
+    ps[id].updated = new Date().toISOString();
+    saveProfiles(ps);
+    const tag = document.getElementById('autosave_tag');
+    tag.textContent='Saved ✓';
+    setTimeout(()=>{tag.textContent='';},1500);
+    renderSidebar();
+  },800);
+}
+
+function fmtDate(iso) {
+  if(!iso) return '';
+  const d = new Date(iso);
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+function renderSidebar() {
+  const ps=loadProfiles(); const activeId=getActiveId();
+  const list=document.getElementById('sbList'); if(!list) return;
+  const keys=Object.keys(ps).sort((a,b)=>(ps[a].updated||'')<(ps[b].updated||'')?1:-1);
+  if(!keys.length){ list.innerHTML='<div style="padding:12px;font-family:var(--mono);font-size:11px;color:var(--muted);">No profiles yet</div>'; return; }
+  list.innerHTML='';
+  keys.forEach(id=>{
+    const p=ps[id]; const isA=id===activeId;
+    const div=document.createElement('div');
+    div.className='sb-item'+(isA?' active':'');
+    div.setAttribute('data-id',id);
+    div.innerHTML=
+      '<div style="flex:1;min-width:0;">'+
+        '<div class="sb-item-name">'+p.name+'</div>'+
+        '<div class="sb-item-date">'+fmtDate(p.updated)+'</div>'+
+      '</div>'+
+      '<div class="sb-actions">'+
+        '<button class="sb-btn" title="Rename">&#9998;</button>'+
+        '<button class="sb-btn del" title="Delete">&#x2715;</button>'+
+      '</div>';
+    div.addEventListener('click',()=>switchProfile(id));
+    div.querySelectorAll('.sb-btn')[0].addEventListener('click',e=>{e.stopPropagation();startRename(id,e);});
+    div.querySelectorAll('.sb-btn')[1].addEventListener('click',e=>deleteProfile(id,e));
+    list.appendChild(div);
+  });
+}
+
+function newProfile(name) {
+  autoSave();
+  const ps=loadProfiles(); const id='p_'+Date.now();
+  const pname=name||('Profile '+(Object.keys(ps).length+1));
+  ps[id]={id,name:pname,doors:[],created:new Date().toISOString(),updated:new Date().toISOString()};
+  saveProfiles(ps); setActiveId(id);
+  document.getElementById('doorList').innerHTML=''; dc=0;
+  document.getElementById('resultsArea').classList.remove('show');
+  addDoor({type:'FBD-1',w:900,h:2100,qty:10});
+  renderSidebar();
+}
+
+function switchProfile(id) {
+  autoSave();
+  const ps=loadProfiles(); const p=ps[id]; if(!p) return;
+  setActiveId(id);
+  document.getElementById('doorList').innerHTML=''; dc=0;
+  document.getElementById('resultsArea').classList.remove('show');
+  if(p.doors&&p.doors.length){ applyDoors(p.doors); }
+  else{ addDoor({type:'FBD-1',w:900,h:2100,qty:10}); }
+  renderSidebar();
+}
+
+function deleteProfile(id,e) {
+  e.stopPropagation();
+  const ps=loadProfiles(); const name=ps[id]?ps[id].name:'this profile';
+  if(!confirm('Delete "'+name+'"?')) return;
+  delete ps[id]; saveProfiles(ps);
+  const keys=Object.keys(ps);
+  if(getActiveId()===id){
+    if(keys.length>0){ setActiveId(keys[keys.length-1]); switchProfile(keys[keys.length-1]); }
+    else{ localStorage.removeItem(ACTIVE_KEY); newProfile('Profile 1'); }
+  }
+  renderSidebar();
+}
+
+function startRename(id,e) {
+  e.stopPropagation();
+  const item=document.querySelector('[data-id="'+id+'"]'); if(!item) return;
+  const nameEl=item.querySelector('.sb-item-name');
+  const ps=loadProfiles(); const cur=ps[id]?ps[id].name:'';
+  const input=document.createElement('input');
+  input.className='sb-rename-input'; input.value=cur;
+  nameEl.replaceWith(input); input.focus(); input.select();
+  const finish=()=>{
+    const val=input.value.trim()||cur;
+    const p2=loadProfiles(); if(p2[id]){p2[id].name=val;saveProfiles(p2);}
+    renderSidebar();
+  };
+  input.addEventListener('blur',finish);
+  input.addEventListener('keydown',ev=>{if(ev.key==='Enter')input.blur();if(ev.key==='Escape'){input.value=cur;input.blur();}});
+}
+
+function exportJSON() {
+  const data={doors:getDoors(),saved:new Date().toISOString(),version:'v3'};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='FireBoard_BOM_v3_'+new Date().toISOString().split('T')[0]+'.json'; a.click();
+}
+
+function importJSON() {
+  const input=document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange=e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(data.doors){ applyDoors(data.doors); autoSave(); }
+        else{ alert('Invalid file.'); }
+      }catch(err){ alert('Invalid JSON.'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+(function(){
+  try{
+    const ps=loadProfiles(); const keys=Object.keys(ps);
+    if(keys.length){
+      const activeId=getActiveId();
+      const id=activeId&&ps[activeId]?activeId:keys[keys.length-1];
+      setActiveId(id);
+      const p=ps[id];
+      if(p.doors&&p.doors.length){ applyDoors(p.doors); }
+      else{ addDoor({type:'FBD-1',w:900,h:2100,qty:10}); addDoor({type:'FBD-2',w:1100,h:2400,qty:5}); }
+      renderSidebar(); return;
+    }
+  }catch(e){}
+  addDoor({type:'FBD-1',w:900,h:2100,qty:10});
+  addDoor({type:'FBD-2',w:1100,h:2400,qty:5});
+  newProfile('Default');
+})();
+</script>
+
+</div>
+</body>
+</html>
