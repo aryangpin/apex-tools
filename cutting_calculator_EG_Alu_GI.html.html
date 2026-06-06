@@ -512,6 +512,16 @@
                     </div>
                     <table class="table" id="detailAnalysisTable"></table>
                 </div>
+
+                <!-- 开料参考矩阵 -->
+                <div class="material-comparison" style="margin-top: 25px; display:none;" id="refMatrixSection">
+                    <div style="padding: 0 15px; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">材料采购 <small style="font-size: 0.8rem; color: #888; font-weight: normal;">每片可开数量（基于当前订单规格）</small></h3>
+                    </div>
+                    <div style="padding: 0 15px 15px; overflow-x: auto;">
+                        <table class="table" id="refMatrixTable" style="min-width: 400px;"></table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1075,6 +1085,7 @@
                 document.getElementById('comparisonTable').innerHTML = tableHTML;
                 
                 generateMaterialRankingTable();
+                generateRefMatrix();
                 resultsSection.scrollIntoView({ behavior: 'smooth' });
             }
             
@@ -1129,6 +1140,81 @@
                 document.getElementById('detailAnalysisTable').innerHTML = detailHTML;
             }
             
+            function generateRefMatrix() {
+                if (!currentResults) return;
+
+                const widthSet = new Set();
+                const heightSet = new Set();
+                currentResults.optimizedDemands.forEach(opt => {
+                    widthSet.add(opt.spec.width);
+                    heightSet.add(opt.spec.height);
+                });
+                const widths  = Array.from(widthSet).sort((a, b) => a - b);
+                const heights = Array.from(heightSet).sort((a, b) => a - b);
+
+                // 建立查找表：specName -> 总需要订购片数
+                const lookup = {};
+                currentResults.optimizedDemands.forEach(opt => {
+                    const k = opt.specName;
+                    if (!lookup[k]) lookup[k] = 0;
+                    lookup[k] += opt.sheetsNeeded;
+                });
+
+                // 预算列总数和行总数
+                const colTotals = {};
+                heights.forEach(h => { colTotals[h] = 0; });
+                const rowTotals = {};
+                widths.forEach(w => { rowTotals[w] = 0; });
+                widths.forEach(w => {
+                    heights.forEach(h => {
+                        const qty = lookup[`${w}x${h}`] || 0;
+                        colTotals[h] += qty;
+                        rowTotals[w] += qty;
+                    });
+                });
+                const grandTotal = widths.reduce((s, w) => s + rowTotals[w], 0);
+
+                const thStyle = `background:#f8f9fa; text-align:center; min-width:80px;`;
+                const totalStyle = `background:#f0f4ff; font-weight:bold; text-align:center; color:#333;`;
+
+                // 表头
+                let thead = `<thead><tr>`;
+                thead += `<th style="${thStyle}">宽 \\ 高</th>`;
+                heights.forEach(h => { thead += `<th style="${thStyle}">${h}mm</th>`; });
+                thead += `<th style="${thStyle} color:#2196F3;">合计</th>`;
+                thead += `</tr></thead>`;
+
+                // 数据行
+                let tbody = '<tbody>';
+                widths.forEach(w => {
+                    tbody += `<tr>`;
+                    tbody += `<td style="font-weight:bold; text-align:center; background:#fafafa;">${w}mm</td>`;
+                    heights.forEach(h => {
+                        const qty = lookup[`${w}x${h}`] || 0;
+                        if (qty) {
+                            tbody += `<td style="text-align:center; padding:8px 6px;"><span style="color:#2196F3; font-weight:bold; font-size:1.1em;">${qty}</span></td>`;
+                        } else {
+                            tbody += `<td style="text-align:center; color:#ccc;">—</td>`;
+                        }
+                    });
+                    tbody += `<td style="${totalStyle} color:#2196F3;">${rowTotals[w] || '—'}</td>`;
+                    tbody += `</tr>`;
+                });
+
+                // 列总数行
+                tbody += `<tr>`;
+                tbody += `<td style="${totalStyle}">合计</td>`;
+                heights.forEach(h => {
+                    tbody += `<td style="${totalStyle} color:#2196F3;">${colTotals[h] || '—'}</td>`;
+                });
+                tbody += `<td style="${totalStyle} color:#e53935;">${grandTotal}</td>`;
+                tbody += `</tr>`;
+                tbody += '</tbody>';
+
+                document.getElementById('refMatrixTable').innerHTML = thead + tbody;
+                document.getElementById('refMatrixSection').style.display = 'block';
+            }
+
             // 导出功能
             function copyToClipboard() {
                 if (!currentResults) {
@@ -1258,6 +1344,43 @@
                     
                     csv += `${opt.demand.key}mm,${typeText},${opt.demand.pieces}片,${opt.specName}mm,${opt.piecesPerSheet}片/张,${layoutText},${opt.sheetsNeeded}张,${formatNumber(opt.actualWidthNeeded)}×${formatNumber(opt.actualHeightNeeded)}mm,${opt.efficiency}%,${remark}\n`;
                 });
+                csv += '\n';
+
+                // 材料采购矩阵
+                csv += '材料采购\n';
+                const mWidthSet = new Set();
+                const mHeightSet = new Set();
+                currentResults.optimizedDemands.forEach(opt => {
+                    mWidthSet.add(opt.spec.width);
+                    mHeightSet.add(opt.spec.height);
+                });
+                const mWidths  = Array.from(mWidthSet).sort((a, b) => a - b);
+                const mHeights = Array.from(mHeightSet).sort((a, b) => a - b);
+                const mLookup = {};
+                currentResults.optimizedDemands.forEach(opt => {
+                    const k = opt.specName;
+                    if (!mLookup[k]) mLookup[k] = 0;
+                    mLookup[k] += opt.sheetsNeeded;
+                });
+                const mColTotals = {};
+                mHeights.forEach(h => { mColTotals[h] = 0; });
+
+                // 表头行
+                csv += '宽 \\ 高,' + mHeights.map(h => `${h}mm`).join(',') + ',合计\n';
+                // 数据行
+                mWidths.forEach(w => {
+                    let rowTotal = 0;
+                    const cells = mHeights.map(h => {
+                        const qty = mLookup[`${w}x${h}`] || 0;
+                        mColTotals[h] += qty;
+                        rowTotal += qty;
+                        return qty || '';
+                    });
+                    csv += `${w}mm,${cells.join(',')},${rowTotal}\n`;
+                });
+                // 列总数行
+                const grandTotal = mHeights.reduce((s, h) => s + mColTotals[h], 0);
+                csv += `合计,${mHeights.map(h => mColTotals[h] || '').join(',')},${grandTotal}\n`;
                 
                 return csv;
             }
@@ -1273,7 +1396,8 @@
                 calculateOptimal,
                 copyToClipboard,
                 exportToCSV,
-                updatePrices
+                updatePrices,
+                generateRefMatrix
             };
 
             // 初始化
