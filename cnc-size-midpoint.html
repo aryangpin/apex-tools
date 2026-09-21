@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNC Size · Min–Max Midpoint | Apex Jaya</title>
+<style>
+  :root {
+    --bg: #0c0f14;
+    --card: #141922;
+    --line: #232c38;
+    --text: #e6eaf0;
+    --muted: #7d8896;
+    --green: #1fc98b;
+    --green-dim: #12382d;
+    --amber: #f0b429;
+    --amber-dim: #3b2f10;
+    --red: #ef5b5b;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body { padding: 40px 16px 80px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  h1 span { color: var(--green); }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.6; }
+
+  .how { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 14px; line-height: 1.8; color: #b7c0cc; }
+  .how b { color: var(--text); }
+  .how code { font-family: var(--mono); color: var(--green); }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .toolbar .spacer { flex: 1; }
+  button { font: inherit; font-size: 14px; cursor: pointer; border-radius: 8px; padding: 9px 16px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  button:hover { border-color: #3a4757; }
+  button.primary { background: var(--green); color: #06251b; border-color: var(--green); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+  .thr { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .thr input { width: 70px; }
+
+  .tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { padding: 10px 8px; text-align: center; font-size: 14px; }
+  thead th { color: var(--muted); font-weight: 500; font-size: 13px; border-bottom: 1px solid var(--line); }
+  thead tr.grp th { padding-bottom: 2px; border-bottom: none; }
+  thead tr.grp th.w, thead tr.grp th.h { color: var(--text); font-weight: 600; }
+  tbody tr + tr td { border-top: 1px solid var(--line); }
+  td.name { text-align: left; padding-left: 14px; }
+  td.res-start, th.res-start { border-left: 1px solid var(--line); }
+
+  input { font: inherit; font-family: var(--mono); font-size: 15px; background: #0e131a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px 8px; width: 88px; text-align: center; }
+  input.nm { width: 96px; text-align: left; font-family: var(--sans); }
+  input::placeholder { color: #3d4859; }
+  input.bad { border-color: var(--red); }
+
+  .mid { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--green); min-width: 82px; }
+  .tol { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--red); min-width: 64px; }
+  .seg + .seg { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .rng { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .tag { display: inline-block; margin-top: 3px; font-size: 11px; color: var(--amber); background: var(--amber-dim); border-radius: 5px; padding: 1px 7px; }
+  .total { text-align: left; min-width: 190px; padding: 0 10px; }
+  .cnt { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .cnt.multi { color: var(--amber); }
+  .chips { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .chip { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--green); background: var(--green-dim); border: 1px solid #1d6b52; border-radius: 8px; padding: 6px 14px; cursor: copy; }
+  .chip:hover { background: #17503f; border-color: var(--green); }
+  .copyall { font-size: 12px; padding: 2px 10px; color: var(--muted); }
+  .empty { color: #3d4859; }
+  .err { color: var(--red); font-size: 12px; }
+  .del { padding: 4px 10px; color: var(--muted); }
+  .del:hover { color: var(--red); }
+
+  .note { margin-top: 14px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--green); color: #06251b; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CNC Size <span>Midpoint</span></h1>
+  <p class="sub">填每个门型量回来的最小、最大尺寸，自动算出 CNC 图要画的中间值和误差 ±</p>
+
+  <div class="how">
+    <b>中间值</b> = (最小 + 最大) ÷ 2 　→ CNC 图就画这个尺寸<br>
+    <b>误差 ±</b> = (最大 − 最小) ÷ 2 　→ 这张图能通用的范围是 <code>中间值 ± 误差</code>，也就是最小到最大<br>
+    <b>自动分张</b>：如果误差超过你设的「每张最大误差」，就把范围平均切成 2 张、3 张⋯，每张都有自己的中间值
+  </div>
+
+  <div class="toolbar">
+    <button class="primary" id="addBtn">+ 添加门型</button>
+    <button id="copyBtn">复制到 Excel</button>
+    <button id="clearBtn">清空</button>
+    <div class="spacer"></div>
+    <label class="thr">宽：每张最大误差 ±
+      <input id="thrW" type="number" inputmode="decimal" placeholder="不限" step="any">
+      mm
+    </label>
+    <label class="thr">高：每张最大误差 ±
+      <input id="thrH" type="number" inputmode="decimal" placeholder="不限" step="any">
+      mm
+    </label>
+  </div>
+
+  <div class="tablebox">
+    <table>
+      <thead>
+        <tr class="grp">
+          <th></th>
+          <th colspan="2" class="w">宽 Width</th>
+          <th colspan="2" class="h">高 Height</th>
+          <th colspan="2" class="w res-start">宽结果</th>
+          <th colspan="2" class="h res-start">高结果</th>
+          <th class="res-start">要做的尺寸</th>
+          <th></th>
+        </tr>
+        <tr>
+          <th style="text-align:left;padding-left:14px">门型</th>
+          <th>最小</th><th>最大</th>
+          <th>最小</th><th>最大</th>
+          <th class="res-start">中间值</th><th>误差 ±</th>
+          <th class="res-start">中间值</th><th>误差 ±</th>
+          <th class="res-start">宽x高（点一下复制）</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    小提示：在输入框里按 <b>Enter</b> 会跳到下一格，最后一格按 Enter 会自动新增一行。<br>
+    点绿色的尺寸（如 697x2074）就能直接复制。「复制到 Excel」按钮的格式和你现在的 Excel 一样：第一行是 门型 + 宽，第二行是 高，直接粘贴就行。
+  </p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var STORE = "apexjaya_cnc_midpoint_v1";
+  var rowsEl = document.getElementById("rows");
+  var thrWEl = document.getElementById("thrW");
+  var thrHEl = document.getElementById("thrH");
+  var toastEl = document.getElementById("toast");
+  var rows = [];
+
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STORE) || "null");
+      if (s && Array.isArray(s.rows) && s.rows.length) { rows = s.rows; thrWEl.value = s.thrW || s.thr || ""; thrHEl.value = s.thrH || s.thr || ""; return; }
+    } catch (e) {}
+    rows = [blank()];
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify({ rows: rows, thrW: thrWEl.value, thrH: thrHEl.value })); } catch (e) {}
+  }
+  function blank() { return { n: "", wmin: "", wmax: "", hmin: "", hmax: "" }; }
+
+  function fmt(x) { return String(Math.round(x * 100) / 100); }
+  // sizes to make are always rounded UP to a whole number
+  function up(x) { return String(Math.ceil(x - 1e-9)); }
+
+  // returns null (not filled) | {err} | {n, segs:[{lo,hi,mid,tol}]}
+  // thr = max allowed tolerance per CNC drawing; if range is wider, split evenly into n drawings
+  function calc(minV, maxV, thr) {
+    if (minV === "" || maxV === "") return null;
+    var a = parseFloat(minV), b = parseFloat(maxV);
+    if (isNaN(a) || isNaN(b)) return null;
+    if (a > b) return { err: "最小 > 最大" };
+    var half = (b - a) / 2, n = 1;
+    if (!isNaN(thr) && thr > 0 && half > thr) n = Math.ceil(half / thr - 1e-9);
+    if (n > 20) return { err: "限制太小" };
+    var step = (b - a) / n, segs = [];
+    for (var i = 0; i < n; i++) {
+      var lo = a + i * step, hi = (i === n - 1) ? b : a + (i + 1) * step;
+      segs.push({ lo: lo, hi: hi, mid: (lo + hi) / 2, tol: (hi - lo) / 2 });
+    }
+    return { n: n, segs: segs };
+  }
+
+  function td(cls) { var t = document.createElement("td"); if (cls) t.className = cls; return t; }
+
+  function makeInput(row, key, cls, ph) {
+    var i = document.createElement("input");
+    i.type = cls === "nm" ? "text" : "number";
+    if (cls !== "nm") { i.inputMode = "decimal"; i.step = "any"; }
+    if (cls === "nm") i.className = "nm";
+    i.placeholder = ph || "";
+    i.value = row[key];
+    i.setAttribute("data-k", key);
+    i.addEventListener("input", function () { row[key] = i.value; update(); save(); });
+    i.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      var all = Array.prototype.slice.call(rowsEl.querySelectorAll("input"));
+      var idx = all.indexOf(i);
+      if (idx === all.length - 1) { addRow(); }
+      else { all[idx + 1].focus(); all[idx + 1].select(); }
+    });
+    return i;
+  }
+
+  function render() {
+    rowsEl.innerHTML = "";
+    rows.forEach(function (row, idx) {
+      var tr = document.createElement("tr");
+      var c;
+
+      c = td("name"); c.appendChild(makeInput(row, "n", "nm", "D3")); tr.appendChild(c);
+      c = td(); c.appendChild(makeInput(row, "wmin", "", "694")); tr.appendChild(c);
+      c = td(); c.appendChild(makeInput(row, "wmax", "", "717")); tr.appendChild(c);
+      c = td(); c.appendChild(makeInput(row, "hmin", "", "2060")); tr.appendChild(c);
+      c = td(); c.appendChild(makeInput(row, "hmax", "", "2099")); tr.appendChild(c);
+
+      c = td("res-start"); c.innerHTML = '<div data-r="wmid"></div>'; tr.appendChild(c);
+      c = td(); c.innerHTML = '<div data-r="wtol"></div>'; tr.appendChild(c);
+      c = td("res-start"); c.innerHTML = '<div data-r="hmid"></div>'; tr.appendChild(c);
+      c = td(); c.innerHTML = '<div data-r="htol"></div>'; tr.appendChild(c);
+      c = td("res-start"); c.innerHTML = '<div class="total" data-r="total"></div>'; tr.appendChild(c);
+
+      c = td();
+      var d = document.createElement("button");
+      d.className = "del"; d.textContent = "✕"; d.title = "删除这一行"; d.setAttribute("aria-label", "删除这一行");
+      d.addEventListener("click", function () {
+        rows.splice(idx, 1);
+        if (!rows.length) rows.push(blank());
+        render(); save();
+      });
+      c.appendChild(d); tr.appendChild(c);
+
+      rowsEl.appendChild(tr);
+    });
+    update();
+  }
+
+  var DASH = '<span class="empty">–</span>';
+
+  function setHtml(tr, key, html) { tr.querySelector('[data-r="' + key + '"]').innerHTML = html; }
+
+  function showAxis(tr, k, v) {
+    if (!v) { setHtml(tr, k + "mid", DASH); setHtml(tr, k + "tol", DASH); return; }
+    if (v.err) { setHtml(tr, k + "mid", '<span class="err">' + v.err + '</span>'); setHtml(tr, k + "tol", DASH); return; }
+    var mids = v.segs.map(function (g) {
+      return '<div class="seg"><div class="mid">' + up(g.mid) + '</div>' +
+             (v.n > 1 ? '<div class="rng">' + fmt(g.lo) + '–' + fmt(g.hi) + '</div>' : '') + '</div>';
+    }).join("");
+    setHtml(tr, k + "mid", mids);
+    setHtml(tr, k + "tol", '<div class="tol">' + fmt(v.segs[0].tol) + '</div>' +
+                           (v.n > 1 ? '<div class="tag">分 ' + v.n + ' 张</div>' : ''));
+  }
+
+  function update() {
+    var thrW = parseFloat(thrWEl.value), thrH = parseFloat(thrHEl.value);
+    var trs = rowsEl.children;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i], tr = trs[i];
+      var w = calc(r.wmin, r.wmax, thrW), h = calc(r.hmin, r.hmax, thrH);
+
+      tr.querySelector('[data-k="wmin"]').classList.toggle("bad", !!(w && w.err));
+      tr.querySelector('[data-k="wmax"]').classList.toggle("bad", !!(w && w.err));
+      tr.querySelector('[data-k="hmin"]').classList.toggle("bad", !!(h && h.err));
+      tr.querySelector('[data-k="hmax"]').classList.toggle("bad", !!(h && h.err));
+
+      showAxis(tr, "w", w);
+      showAxis(tr, "h", h);
+
+      var totalEl = tr.querySelector('[data-r="total"]');
+      if (w && h && !w.err && !h.err) {
+        var t = w.n * h.n, chips = [], vals = [];
+        w.segs.forEach(function (gw) {
+          h.segs.forEach(function (gh) {
+            var v = up(gw.mid) + "x" + up(gh.mid);
+            vals.push(v);
+            var tip = "宽 " + fmt(gw.lo) + "–" + fmt(gw.hi) + "　高 " + fmt(gh.lo) + "–" + fmt(gh.hi);
+            chips.push('<button class="chip" data-v="' + v + '" title="' + tip + '">' + v + '</button>');
+          });
+        });
+        totalEl.innerHTML =
+          '<div class="cnt' + (t > 1 ? ' multi' : '') + '">共 ' + t + ' 张' +
+          (t > 1 ? '<button class="copyall" data-all="' + vals.join("|") + '">复制全部</button>' : '') +
+          '</div><div class="chips">' + chips.join("") + '</div>';
+      } else {
+        totalEl.innerHTML = DASH;
+      }
+    }
+  }
+
+  function addRow() {
+    rows.push(blank());
+    render(); save();
+    var all = rowsEl.querySelectorAll("tr:last-child input");
+    if (all.length) all[0].focus();
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(function () { toastEl.classList.remove("show"); }, 1600);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (ok, fail) {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy") ? ok() : fail(); } catch (e) { fail(e); }
+      document.body.removeChild(ta);
+    });
+  }
+
+  rowsEl.addEventListener("click", function (e) {
+    var chip = e.target.closest(".chip"), all = e.target.closest(".copyall");
+    if (chip) {
+      var v = chip.getAttribute("data-v");
+      copyText(v).then(function () { toast("已复制 " + v + " ✅"); }, function () { toast("复制失败，请重试"); });
+    } else if (all) {
+      var list = all.getAttribute("data-all").split("|");
+      copyText(list.join("\n")).then(function () { toast("已复制全部 " + list.length + " 个尺寸 ✅"); }, function () { toast("复制失败，请重试"); });
+    }
+  });
+
+  document.getElementById("addBtn").addEventListener("click", addRow);
+
+  document.getElementById("clearBtn").addEventListener("click", function () {
+    if (!confirm("确定清空全部数据？")) return;
+    rows = [blank()]; render(); save();
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var lines = [];
+    var thrW = parseFloat(thrWEl.value), thrH = parseFloat(thrHEl.value);
+    var blank4 = [["", "", "", ""]];
+    function segRows(v) {
+      if (!v || v.err) return blank4;
+      return v.segs.map(function (g) { return [fmt(g.lo), fmt(g.hi), up(g.mid), fmt(g.tol)]; });
+    }
+    rows.forEach(function (r) {
+      var w = calc(r.wmin, r.wmax, thrW), h = calc(r.hmin, r.hmax, thrH);
+      if (!w && !h) return;
+      var all = segRows(w).concat(segRows(h));
+      all.forEach(function (cols, idx) {
+        lines.push([idx === 0 ? r.n : ""].concat(cols).join("\t"));
+      });
+    });
+    if (!lines.length) { toast("还没有可复制的结果"); return; }
+    copyText(lines.join("\n")).then(function () { toast("已复制，去 Excel 粘贴 ✅"); },
+                                    function () { toast("复制失败，请重试"); });
+  });
+
+  [thrWEl, thrHEl].forEach(function (el) {
+    el.addEventListener("input", function () { update(); save(); });
+  });
+
+  load(); render();
+})();
+</script>
+</body>
+</html>
