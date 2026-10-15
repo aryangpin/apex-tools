@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开料计算器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            animation: backgroundShift 10s ease-in-out infinite alternate;
+        }
+        
+        @keyframes backgroundShift {
+            0% { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            100% { background: linear-gradient(135deg, #667eea 20%, #764ba2 80%); }
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2196F3, #21CBF3);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .specs-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .specs-title {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .spec-item {
+            background: white;
+            padding: 12px 18px;
+            border-radius: 25px;
+            text-align: center;
+            font-weight: 500;
+            color: #2196F3;
+            border: 2px solid #e3f2fd;
+            transition: all 0.3s ease;
+        }
+        
+        .spec-item:hover {
+            background: #2196F3;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .input-group label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .input-group input, .input-group select {
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+        
+        .calculate-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto;
+        }
+        
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .results-section {
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 5px solid #2196F3;
+        }
+        
+        .result-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .optimal-choice {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            border-left-color: #4CAF50;
+        }
+        
+        .material-comparison {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .table th, .table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .best-option {
+            background: #e8f5e8 !important;
+            font-weight: bold;
+        }
+        
+        .waste-high {
+            color: #f44336;
+        }
+        
+        .waste-low {
+            color: #4CAF50;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 5px;
+        }
+        
+        .summary-card .label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .order-row {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .remove-btn:hover {
+            background: #f57c00 !important;
+            transform: scale(1.05);
+        }
+
+        .btn {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary { background: #2196F3; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn-secondary { background: #ccc; color: black; }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .material-settings {
+            background: #e8f5e8;
+            border-left-color: #4CAF50;
+        }
+        
+        .material-info {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #0ea5e9;
+            margin-top: 20px;
+        }
+        
+        .material-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .material-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e1e5e9;
+            font-size: 13px;
+        }
+        
+        .price-input {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>开料计算器</h1>
+            <p>智能材料规划 · 成本优化 · 减少浪费</p>
+        </div>
+        
+        <div class="content">
+            <!-- 材料类型和价格设置 -->
+            <div class="specs-section material-settings">
+                <div class="specs-title">
+                    材料类型和价格设置
+                </div>
+                
+                <div class="input-grid" style="margin-bottom: 20px;">
+                    <div class="input-group">
+                        <label>选择材料类型:</label>
+                        <select id="materialType">
+                            <option value="EG">EG (Electro Galvanized)</option>
+                            <option value="GI">GI (Galvanized Iron)</option>
+                            <option value="Aluzinc">Aluzinc</option>
+                            <option value="Zincalume">Zincalume</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>选择厚度:</label>
+                        <select id="materialThickness">
+                            <option value="0.95">0.95mm</option>
+                            <option value="1.0" selected>1.0mm</option>
+                            <option value="1.1">1.1mm</option>
+                            <option value="1.2">1.2mm</option>
+                            <option value="1.5">1.5mm</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 style="color: #333; margin-bottom: 15px;">材料价格设置 (RM/吨):</h4>
+                    <div style="background: white; border-radius: 8px; overflow: hidden;">
+                        <table class="table" style="margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th>材料类型</th>
+                                    <th>价格 (RM/吨)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>EG</strong></td>
+                                    <td><input type="number" step="0.01" id="priceEG" value="3850" class="price-input"></td>
+                                    <td><button class="btn btn-primary update-price-btn" style="padding: 5px 10px; font-size: 12px;">更新</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>GI</strong></td>
+                                    <td><input type="number" step="0.01" id="priceGI" value="3500" class="price-input"></td>
+                                    <td><button class="btn btn-primary update-price-btn" style="padding: 5px 10px; font-size: 12px;">更新</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Aluzinc</strong></td>
+                                    <td><input type="number" step="0.01" id="priceAluzinc" value="3500" class="price-input"></td>
+                                    <td><button class="btn btn-primary update-price-btn" style="padding: 5px 10px; font-size: 12px;">更新</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Zincalume</strong></td>
+                                    <td><input type="number" step="0.01" id="priceZincalume" value="4950" class="price-input"></td>
+                                    <td><button class="btn btn-primary update-price-btn" style="padding: 5px 10px; font-size: 12px;">更新</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="material-info">
+                    <h4 style="color: #0c4a6e; margin-bottom: 10px;">当前选择材料信息:</h4>
+                    <div id="materialDisplay">正在加载材料信息...</div>
+                </div>
+            </div>
+
+            <!-- 标准材料规格 -->
+            <div class="specs-section">
+                <div class="specs-title">
+                    标准材料规格
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>材料宽度 (mm):</strong>
+                    <div class="specs-grid" style="margin-top: 10px;">
+                        <div class="spec-item">945</div>
+                        <div class="spec-item">975</div>
+                        <div class="spec-item">1010</div>
+                        <div class="spec-item">1020</div>
+                        <div class="spec-item">1055</div>
+                        <div class="spec-item">1100</div>
+                        <div class="spec-item">1180</div>
+                        <div class="spec-item">1219</div>
+                    </div>
+                </div>
+                <div>
+                    <strong>材料高度 (mm):</strong>
+                    <div class="specs-grid" style="margin-top: 10px;">
+                        <div class="spec-item">1510</div>
+                        <div class="spec-item">1810</div>
+                        <div class="spec-item">2010</div>
+                        <div class="spec-item">2134</div>
+                        <div class="spec-item">2438</div>
+                        <div class="spec-item">3048</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 订单数据输入 -->
+            <div class="input-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: #333; margin: 0;">订单数据录入</h2>
+                    <div>
+                        <button class="btn btn-primary" id="batchInputBtn">
+                            批量录入
+                        </button>
+                        <button class="btn btn-success" id="addOrderBtn">
+                            添加订单
+                        </button>
+                        <button class="btn btn-danger" id="clearAllBtn">
+                            清空全部
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 批量输入模态框 -->
+                <div id="batchInputModal" class="modal">
+                    <div class="modal-content">
+                        <h3 style="margin-bottom: 20px; color: #333;">批量录入订单数据</h3>
+                        <p style="margin-bottom: 15px; color: #666;">请按以下格式输入，每行一个订单：<br>
+                        <strong>Door Type,Profile尺寸,开料尺寸,门框宽度,门框高度,数量</strong><br>
+                        例如：D3A-window,40x150,243,1350,2110,146<br>（最后可再加一项窗口数，2 = 左右都有窗，不写就是 1 个窗口）</p>
+                        <textarea id="batchInputText" style="width: 100%; height: 200px; border: 2px solid #e1e5e9; border-radius: 8px; padding: 15px; font-family: monospace;" placeholder="D3A-window,40x150,243,1350,2110,146&#10;D5-window,40x150,243,1800,2110,50,2"></textarea>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <button class="btn btn-secondary" id="cancelBatchBtn">
+                                取消
+                            </button>
+                            <button class="btn btn-success" id="importBatchBtn">
+                                导入数据
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="emptyHint" style="text-align:center;color:#888;padding:30px;background:#f8f9fa;border-radius:10px;margin-bottom:20px;">还没有订单。点「批量录入」直接贴资料，或点「添加订单」手动填。</div>
+                <div id="ordersContainer">
+                    <!-- 订单行将在这里动态添加 -->
+                </div>
+                
+                <button class="calculate-btn" id="calculateBtn">
+                    计算
+                </button>
+            </div>
+            
+            <!-- 计算结果 -->
+            <div class="results-section" id="resultsSection">
+                <h2 style="margin-bottom: 20px; color: #333;">计算结果与建议</h2>
+                
+                <div class="summary-cards" id="summaryCards"></div>
+                
+                <div class="result-card optimal-choice" id="optimalChoice"></div>
+                
+                <div class="material-comparison">
+                    <table class="table" id="comparisonTable"></table>
+                </div>
+                
+                <!-- 详细开料分析 -->
+                <div class="material-comparison" style="margin-top: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 15px; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">智能优化分析 - 材料采购排名</h3>
+                        <div>
+                            <button class="btn btn-success" id="copyBtn">
+                                复制开料指示表
+                            </button>
+                            <button class="btn btn-primary" id="exportBtn">
+                                导出CSV文件
+                            </button>
+                        </div>
+                    </div>
+                    <table class="table" id="detailAnalysisTable"></table>
+                </div>
+
+                <!-- 开料参考矩阵 -->
+                <div class="material-comparison" style="margin-top: 25px; display:none;" id="refMatrixSection">
+                    <div style="padding: 0 15px; margin-bottom: 15px;">
+                        <h3 style="color: #333; margin: 0;">材料采购 <small style="font-size: 0.8rem; color: #888; font-weight: normal;">每片可开数量（基于当前订单规格）</small></h3>
+                    </div>
+                    <div style="padding: 0 15px 15px; overflow-x: auto;">
+                        <table class="table" id="refMatrixTable" style="min-width: 400px;"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+            
+            // 全局变量
+            const CONFIG = {
+                materialSpecs: [
+                    { width: 945, height: 1510 }, { width: 945, height: 1810 }, { width: 945, height: 2010 }, { width: 945, height: 2134 }, { width: 945, height: 2438 }, { width: 945, height: 3048 },
+                    { width: 975, height: 1510 }, { width: 975, height: 1810 }, { width: 975, height: 2010 }, { width: 975, height: 2134 }, { width: 975, height: 2438 }, { width: 975, height: 3048 },
+                    { width: 1010, height: 1510 }, { width: 1010, height: 1810 }, { width: 1010, height: 2010 }, { width: 1010, height: 2134 }, { width: 1010, height: 2438 }, { width: 1010, height: 3048 },
+                    { width: 1020, height: 1510 }, { width: 1020, height: 1810 }, { width: 1020, height: 2010 }, { width: 1020, height: 2134 }, { width: 1020, height: 2438 }, { width: 1020, height: 3048 },
+                    { width: 1055, height: 1510 }, { width: 1055, height: 1810 }, { width: 1055, height: 2010 }, { width: 1055, height: 2134 }, { width: 1055, height: 2438 }, { width: 1055, height: 3048 },
+                    { width: 1100, height: 1510 }, { width: 1100, height: 1810 }, { width: 1100, height: 2010 }, { width: 1100, height: 2134 }, { width: 1100, height: 2438 }, { width: 1100, height: 3048 },
+                    { width: 1180, height: 1510 }, { width: 1180, height: 1810 }, { width: 1180, height: 2010 }, { width: 1180, height: 2134 }, { width: 1180, height: 2438 }, { width: 1180, height: 3048 },
+                    { width: 1219, height: 1510 }, { width: 1219, height: 1810 }, { width: 1219, height: 2010 }, { width: 1219, height: 2134 }, { width: 1219, height: 2438 }, { width: 1219, height: 3048 }
+                ],
+                
+                baseMaterialWeights: {
+                    'EG': 23.4435,
+                    'GI': 24.4599,
+                    'Aluzinc': 24.2012,
+                    'Zincalume': 24.2012
+                },
+                
+                materialPrices: {
+                    'EG': 3850,
+                    'GI': 3500,
+                    'Aluzinc': 3500,
+                    'Zincalume': 4950
+                }
+            };
+            
+            let orderCounter = 0;
+            let currentResults = null;
+            let inputWarnings = [];
+
+            // 核心工具函数
+            function formatNumber(value, decimals = 1) {
+                const num = typeof value === 'number' ? value : parseFloat(value);
+                if (isNaN(num)) return '0';
+                return num % 1 === 0 ? num.toString() : num.toFixed(decimals);
+            }
+
+            function safeParseFloat(value) {
+                const parsed = parseFloat(value);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+
+            function calculateWeight(materialType, thickness, width, height) {
+                const baseWeight = CONFIG.baseMaterialWeights[materialType];
+                const baseArea = 1219 * 2438;
+                const currentArea = width * height;
+                const thicknessRatio = thickness / 1.0;
+                return baseWeight * (currentArea / baseArea) * thicknessRatio;
+            }
+            
+            function calculateCost(weightKg, pricePerTon) {
+                return (weightKg / 1000) * pricePerTon;
+            }
+            
+            function getCurrentMaterialInfo() {
+                return {
+                    type: document.getElementById('materialType').value,
+                    thickness: safeParseFloat(document.getElementById('materialThickness').value),
+                    pricePerTon: CONFIG.materialPrices[document.getElementById('materialType').value]
+                };
+            }
+
+            function updateMaterialDisplay() {
+                try {
+                    const materialType = document.getElementById('materialType').value;
+                    const thickness = safeParseFloat(document.getElementById('materialThickness').value);
+                    const pricePerTon = CONFIG.materialPrices[materialType];
+                    
+                    let infoHTML = `<div style="margin-bottom: 15px;"><strong>当前选择:</strong> ${materialType} ${formatNumber(thickness)}mm, 价格: RM${formatNumber(pricePerTon, 0)}/吨</div>`;
+                    
+                    const mainSpecs = [
+                        { width: 945, height: 2438 }, { width: 975, height: 2438 }, { width: 1010, height: 2438 },
+                        { width: 1020, height: 2438 }, { width: 1055, height: 2438 }, { width: 1100, height: 2438 }, 
+                        { width: 1180, height: 2438 }, { width: 1219, height: 2438 }, { width: 1219, height: 3048 }
+                    ];
+                    
+                    infoHTML += '<div class="material-grid">';
+                    mainSpecs.forEach(spec => {
+                        const weight = calculateWeight(materialType, thickness, spec.width, spec.height);
+                        const cost = calculateCost(weight, pricePerTon);
+                        
+                        infoHTML += `
+                            <div class="material-item">
+                                <div style="font-weight: bold; color: #0ea5e9; margin-bottom: 3px;">${spec.width}×${spec.height}mm</div>
+                                <div>重量: ${formatNumber(weight, 2)}kg</div>
+                                <div>成本: RM${formatNumber(cost, 2)}</div>
+                            </div>`;
+                    });
+                    infoHTML += '</div>';
+                    
+                    document.getElementById('materialDisplay').innerHTML = infoHTML;
+                } catch (error) {
+                    console.error('更新材料显示错误:', error);
+                    document.getElementById('materialDisplay').innerHTML = '材料信息加载失败';
+                }
+            }
+
+            function updatePrices() {
+                try {
+                    CONFIG.materialPrices.EG = safeParseFloat(document.getElementById('priceEG').value) || 3850;
+                    CONFIG.materialPrices.GI = safeParseFloat(document.getElementById('priceGI').value) || 3500;
+                    CONFIG.materialPrices.Aluzinc = safeParseFloat(document.getElementById('priceAluzinc').value) || 3500;
+                    CONFIG.materialPrices.Zincalume = safeParseFloat(document.getElementById('priceZincalume').value) || 4950;
+                    updateMaterialDisplay();
+                    alert('材料价格已更新！');
+                } catch (error) {
+                    console.error('更新价格错误:', error);
+                    alert('更新价格失败，请检查输入');
+                }
+            }
+
+            // 订单管理
+            // 固定的料（料名和每套片数不能改）。aw/al = 自动填入宽/长的来源：c=开料尺寸, h=门框高度
+            const WINDOW_SETS = {
+                1: [
+                    { name: '门脚(无窗边)', perSet: 1, aw: 'c', al: 'h' },
+                    { name: '门脚(窗口边)', perSet: 1, al: 'h' },
+                    { name: '门头', perSet: 1, aw: 'c' },
+                    { name: '窗脚(中间竖料)', perSet: 1 },
+                    { name: '窗头', perSet: 2 }
+                ],
+                2: [
+                    { name: '门脚(窗口1边)', perSet: 1, al: 'h' },
+                    { name: '门脚(窗口2边)', perSet: 1, al: 'h' },
+                    { name: '门头', perSet: 1, aw: 'c' },
+                    { name: '窗1脚(中间竖料)', perSet: 1 },
+                    { name: '窗1头', perSet: 2 },
+                    { name: '窗2脚(中间竖料)', perSet: 1 },
+                    { name: '窗2头', perSet: 2 }
+                ]
+            };
+
+            function pieceRowHTML(name, width, length, perSet, fixed) {
+                const base = 'width:100%;padding:8px;border:2px solid #e1e5e9;border-radius:6px;';
+                const lock = fixed ? ' readonly tabindex="-1" style="' + base + 'background:#eee;color:#555;"' : ' style="' + base + '"';
+                const last = fixed
+                    ? '<span style="color:#999;font-size:12px;white-space:nowrap;">固定</span>'
+                    : '<button type="button" class="btn btn-warning" style="padding:6px 12px;margin:0;" onclick="this.closest(\'tr\').remove()">删</button>';
+                return `
+                    <tr class="piece-row" data-fixed="${fixed ? 1 : 0}">
+                        <td><input type="text" class="p-name" placeholder="例如: 额外料" value="${name || ''}"${lock}></td>
+                        <td><input type="number" step="0.1" min="0" class="p-width" placeholder="宽" value="${width || ''}" oninput="this.dataset.manual='1'" style="${base}"></td>
+                        <td><input type="number" step="0.1" min="0" class="p-length" placeholder="长" value="${length || ''}" oninput="this.dataset.manual='1'" style="${base}"></td>
+                        <td><input type="number" step="1" min="1" class="p-per" placeholder="每套几片" value="${perSet || ''}"${lock}></td>
+                        <td>${last}</td>
+                    </tr>`;
+            }
+
+            function fixedRowsHTML(windows) {
+                return WINDOW_SETS[windows].map(p => pieceRowHTML(p.name, '', '', p.perSet, true)).join('');
+            }
+
+            function addPiece(orderNumber) {
+                const tbody = document.getElementById(`pieces_${orderNumber}`);
+                if (tbody) tbody.insertAdjacentHTML('beforeend', pieceRowHTML('', '', '', 1, false));
+            }
+
+            // 根据已输入的 开料宽/门框高 自动填入已知的料尺寸（你手动改过的格子不会被覆盖）
+            function autoFill(orderNumber) {
+                const vals = {
+                    c: document.getElementById(`cuttingSize_${orderNumber}`).value,
+                    h: document.getElementById(`frameHeight_${orderNumber}`).value
+                };
+                const windows = parseInt(document.getElementById(`windows_${orderNumber}`).value) || 1;
+                const rows = document.querySelectorAll(`#pieces_${orderNumber} .piece-row[data-fixed="1"]`);
+                WINDOW_SETS[windows].forEach((spec, i) => {
+                    const row = rows[i];
+                    if (!row) return;
+                    if (spec.aw && row.querySelector('.p-width').dataset.manual !== '1') row.querySelector('.p-width').value = vals[spec.aw];
+                    if (spec.al && row.querySelector('.p-length').dataset.manual !== '1') row.querySelector('.p-length').value = vals[spec.al];
+                });
+            }
+
+            function changeWindows(orderNumber) {
+                const windows = parseInt(document.getElementById(`windows_${orderNumber}`).value) || 1;
+                const tbody = document.getElementById(`pieces_${orderNumber}`);
+                // 保留用户自己加的额外料，换掉固定料
+                const extras = Array.from(tbody.querySelectorAll('.piece-row[data-fixed="0"]')).map(r => r.outerHTML).join('');
+                tbody.innerHTML = fixedRowsHTML(windows) + extras;
+                autoFill(orderNumber);
+            }
+
+            function updateEmptyHint() {
+                const hint = document.getElementById('emptyHint');
+                if (hint) hint.style.display = document.querySelectorAll('.order-row').length === 0 ? 'block' : 'none';
+            }
+
+            function addOrderRow() {
+                addOrderRowWithData('', '', '', '', '', '', 1);
+            }
+
+            function addOrderRowWithData(doorType, profileSize, cuttingSize, frameWidth, frameHeight, quantity, windows) {
+                orderCounter++;
+                const n = orderCounter;
+                const w = windows === 2 ? 2 : 1;
+                const container = document.getElementById('ordersContainer');
+                const newOrderHTML = `
+                    <div class="order-row" data-order="${n}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="color: #2196F3; margin: 0;">订单 #${n}</h3>
+                            <button class="btn btn-warning remove-btn" onclick="CuttingCalculator.removeOrderRow(${n})">删除订单</button>
+                        </div>
+                        <div class="input-grid">
+                            <div class="input-group">
+                                <label>Door Type</label>
+                                <input type="text" id="doorType_${n}" placeholder="例如: D3A-window" value="${doorType || ''}">
+                            </div>
+                            <div class="input-group">
+                                <label>Profile尺寸</label>
+                                <input type="text" id="profileSize_${n}" placeholder="例如: 40x150" value="${profileSize || ''}">
+                            </div>
+                            <div class="input-group">
+                                <label>开料尺寸 (mm)</label>
+                                <input type="number" step="0.1" min="0" id="cuttingSize_${n}" placeholder="例如: 243" value="${cuttingSize || ''}" oninput="CuttingCalculator.autoFill(${n})">
+                            </div>
+                            <div class="input-group">
+                                <label>门框宽度 (mm)</label>
+                                <input type="number" step="0.1" min="0" id="frameWidth_${n}" placeholder="例如: 1350" value="${frameWidth || ''}">
+                            </div>
+                            <div class="input-group">
+                                <label>门框高度 (mm)</label>
+                                <input type="number" step="0.1" min="0" id="frameHeight_${n}" placeholder="例如: 2110" value="${frameHeight || ''}" oninput="CuttingCalculator.autoFill(${n})">
+                            </div>
+                            <div class="input-group">
+                                <label>数量 (套)</label>
+                                <input type="number" step="1" min="1" id="quantity_${n}" placeholder="例如: 146" value="${quantity || ''}">
+                            </div>
+                            <div class="input-group">
+                                <label>窗口数量</label>
+                                <select id="windows_${n}" onchange="CuttingCalculator.changeWindows(${n})">
+                                    <option value="1" ${w === 1 ? 'selected' : ''}>1个窗口</option>
+                                    <option value="2" ${w === 2 ? 'selected' : ''}>2个窗口 (左右都有)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <strong style="color:#333;">每套门框的开料清单 <small style="color:#888;font-weight:normal;">(已知的会自动填入，其余的手动填宽和长；用不到的料留空)</small></strong>
+                            <table class="table" style="margin-top:8px;background:white;border-radius:8px;">
+                                <thead>
+                                    <tr><th style="width:38%">料名</th><th>宽 (mm)</th><th>长 (mm)</th><th>每套几片</th><th></th></tr>
+                                </thead>
+                                <tbody id="pieces_${n}">${fixedRowsHTML(w)}</tbody>
+                            </table>
+                            <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="CuttingCalculator.addPiece(${n})">+ 添加额外的料</button>
+                        </div>
+                    </div>`;
+                container.insertAdjacentHTML('beforeend', newOrderHTML);
+                autoFill(n);
+                updateEmptyHint();
+            }
+
+            function piecesSummary(order) {
+                return order.pieces.map(p => `${p.name} ${formatNumber(p.width)}×${formatNumber(p.length)} ×${p.perSet}片/套`).join('；');
+            }
+
+            function removeOrderRow(orderNumber) {
+                const orderRow = document.querySelector(`[data-order="${orderNumber}"]`);
+                if (orderRow) orderRow.remove();
+                updateEmptyHint();
+            }
+
+            function clearAllOrders(confirmAction) {
+                if (confirmAction === false || confirm('确定要清空所有订单数据吗？')) {
+                    document.getElementById('ordersContainer').innerHTML = '';
+                    orderCounter = 0;
+                    document.getElementById('resultsSection').style.display = 'none';
+                    updateEmptyHint();
+                }
+            }
+
+            // 批量输入
+            function showBatchInput() {
+                document.getElementById('batchInputModal').style.display = 'block';
+            }
+            
+            function closeBatchInput() {
+                document.getElementById('batchInputModal').style.display = 'none';
+                document.getElementById('batchInputText').value = '';
+            }
+            
+            function processBatchInput() {
+                try {
+                    const batchText = document.getElementById('batchInputText').value.trim();
+                    if (!batchText) {
+                        alert('请输入订单数据！');
+                        return;
+                    }
+
+                    const lines = batchText.split('\n');
+                    const validOrders = [];
+                    const badLines = [];
+
+                    lines.forEach(line => {
+                        line = line.trim();
+                        if (!line) return;
+                        const parts = line.split(/[,\t]/).map(x => x.trim());
+                        if (parts.length === 6 || parts.length === 7) {
+                            const order = {
+                                doorType: parts[0],
+                                profileSize: parts[1],
+                                cuttingSize: safeParseFloat(parts[2]),
+                                frameWidth: safeParseFloat(parts[3]),
+                                frameHeight: safeParseFloat(parts[4]),
+                                quantity: parseInt(parts[5]),
+                                windows: parts.length === 7 && parseInt(parts[6]) === 2 ? 2 : 1
+                            };
+                            if (order.doorType && order.profileSize && order.cuttingSize > 0 && order.frameWidth > 0 && order.frameHeight > 0 && order.quantity > 0) {
+                                validOrders.push(order);
+                                return;
+                            }
+                        }
+                        badLines.push(line);
+                    });
+
+                    if (validOrders.length === 0) {
+                        alert('没有找到有效的订单数据！请检查格式。');
+                        return;
+                    }
+
+                    validOrders.forEach(order => {
+                        addOrderRowWithData(order.doorType, order.profileSize, order.cuttingSize, order.frameWidth, order.frameHeight, order.quantity, order.windows);
+                    });
+
+                    closeBatchInput();
+                    alert(`成功导入 ${validOrders.length} 个订单！` + (badLines.length ? `\n\n有 ${badLines.length} 行格式不对，没导入：\n` + badLines.join('\n') : ''));
+                } catch (error) {
+                    console.error('批量输入错误:', error);
+                    alert('批量输入失败，请检查数据格式');
+                }
+            }
+
+            function getAllOrders() {
+                const orders = [];
+                inputWarnings = [];
+                const orderRows = document.querySelectorAll('.order-row');
+
+                orderRows.forEach(row => {
+                    const orderNumber = row.getAttribute('data-order');
+                    const doorType = document.getElementById(`doorType_${orderNumber}`).value;
+                    const profileSize = document.getElementById(`profileSize_${orderNumber}`).value;
+                    const quantity = parseInt(document.getElementById(`quantity_${orderNumber}`).value);
+
+                    const pieces = [];
+                    row.querySelectorAll('.piece-row').forEach(pr => {
+                        const name = pr.querySelector('.p-name').value.trim();
+                        const width = safeParseFloat(pr.querySelector('.p-width').value);
+                        const length = safeParseFloat(pr.querySelector('.p-length').value);
+                        const perSet = parseInt(pr.querySelector('.p-per').value);
+                        if ((width > 0) !== (length > 0)) {
+                            inputWarnings.push(`订单 #${orderNumber} 的「${name}」宽和长只填了一个，请补完整（用不到就两个都留空）`);
+                        }
+                        if (width > 0 && length > 0 && perSet > 0) {
+                            pieces.push({ name: name || `${formatNumber(width)}x${formatNumber(length)}`, width, length, perSet });
+                        }
+                    });
+
+                    if (quantity > 0 && pieces.length > 0) {
+                        orders.push({
+                            orderNumber, doorType: doorType || '', profileSize: profileSize || '',
+                            quantity, pieces
+                        });
+                    }
+                });
+
+                return orders;
+            }
+
+            // 计算优化
+            function calculateOptimal() {
+                try {
+                    const orders = getAllOrders();
+
+                    if (inputWarnings.length > 0) {
+                        alert(inputWarnings.join('\n'));
+                        return;
+                    }
+                    
+                    if (orders.length === 0) {
+                        alert('请至少填写一个完整的订单信息！');
+                        return;
+                    }
+                    
+                    const demands = [];
+
+                    orders.forEach(order => {
+                        order.pieces.forEach(piece => {
+                            demands.push({
+                                orderNumber: order.orderNumber,
+                                name: piece.name,
+                                width: piece.width,
+                                height: piece.length,
+                                pieces: piece.perSet * order.quantity,
+                                key: `${formatNumber(piece.width)}x${formatNumber(piece.length)}`
+                            });
+                        });
+                    });
+
+                    const optimizedDemands = [];
+                    demands.forEach(demand => {
+                        const bestOption = findBestMaterialForDemand(demand);
+                        if (bestOption) {
+                            optimizedDemands.push(bestOption);
+                        }
+                    });
+                    
+                    const materialGroups = {};
+                    let totalSheets = 0;
+                    
+                    optimizedDemands.forEach(opt => {
+                        const specKey = `${opt.spec.width}x${opt.spec.height}`;
+                        
+                        if (!materialGroups[specKey]) {
+                            materialGroups[specKey] = {
+                                spec: opt.spec,
+                                specName: specKey,
+                                demands: [],
+                                totalSheets: 0,
+                                efficiency: 0
+                            };
+                        }
+                        
+                        materialGroups[specKey].demands.push(opt);
+                        materialGroups[specKey].totalSheets += opt.sheetsNeeded;
+                        totalSheets += opt.sheetsNeeded;
+                    });
+                    
+                    Object.values(materialGroups).forEach(group => {
+                        const totalEfficiency = group.demands.reduce((sum, demand) => sum + parseFloat(demand.efficiency), 0);
+                        group.efficiency = formatNumber(totalEfficiency / group.demands.length);
+                    });
+                    
+                    const sortedGroups = Object.values(materialGroups);
+                    
+                    currentResults = {
+                        orders,
+                        optimizedDemands,
+                        materialGroups: sortedGroups,
+                        totalSheets
+                    };
+                    
+                    displayResults();
+                } catch (error) {
+                    console.error('计算优化错误:', error);
+                    alert('计算过程中出现错误，请检查输入数据');
+                }
+            }
+            
+            function findBestMaterialForDemand(demand) {
+                let bestOption = null;
+                let minWastePerPiece = Infinity;
+                
+                // Try both orientations: original and rotated 90°
+                const orientations = [
+                    { w: demand.width, h: demand.height, rotated: false },
+                    { w: demand.height, h: demand.width, rotated: true }
+                ];
+                
+                CONFIG.materialSpecs.forEach(spec => {
+                    orientations.forEach(orient => {
+                        if (spec.width >= orient.w && spec.height >= orient.h) {
+                            const rotatedDemand = Object.assign({}, demand, { width: orient.w, height: orient.h });
+                            const layouts = findOptimalLayouts(rotatedDemand, spec);
+                            
+                            layouts.forEach(layout => {
+                                const sheetsNeeded = Math.ceil(demand.pieces / layout.piecesPerSheet);
+                                const wastePerPiece = (layout.totalWaste * sheetsNeeded) / demand.pieces;
+                                
+                                if (wastePerPiece < minWastePerPiece) {
+                                    minWastePerPiece = wastePerPiece;
+                                    bestOption = {
+                                        demand,
+                                        spec,
+                                        specName: `${spec.width}x${spec.height}`,
+                                        widthCount: layout.widthCount,
+                                        heightCount: layout.heightCount,
+                                        piecesPerSheet: layout.piecesPerSheet,
+                                        sheetsNeeded,
+                                        wastePerSheet: layout.totalWaste,
+                                        actualWidthNeeded: layout.actualWidth,
+                                        actualHeightNeeded: layout.actualHeight,
+                                        layoutDescription: layout.description + (orient.rotated ? ' (旋转90°)' : ''),
+                                        efficiency: formatNumber((layout.piecesPerSheet * demand.width * demand.height) / (spec.width * spec.height) * 100)
+                                    };
+                                }
+                            });
+                        }
+                    });
+                });
+                
+                return bestOption;
+            }
+            
+            function findOptimalLayouts(demand, spec) {
+                const layouts = [];
+                const availableWidth = spec.width - 4;
+                const availableHeight = spec.height - 4;
+                const maxWidthCount = Math.floor(availableWidth / demand.width);
+                const maxHeightCount = Math.floor(availableHeight / demand.height);
+                
+                for (let baseW = 1; baseW <= maxWidthCount; baseW++) {
+                    for (let baseH = 1; baseH <= maxHeightCount; baseH++) {
+                        const baseNeededWidth = baseW * demand.width;
+                        const baseNeededHeight = baseH * demand.height;
+                        
+                        if (baseNeededWidth <= availableWidth && baseNeededHeight <= availableHeight) {
+                            const basePieces = baseW * baseH;
+                            const description = `${baseW}×${baseH}`;
+                            const actualUsedWidth = baseNeededWidth;
+                            const actualUsedHeight = baseNeededHeight;
+                            
+                            const usedArea = basePieces * demand.width * demand.height;
+                            const totalArea = spec.width * spec.height;
+                            const wasteArea = totalArea - usedArea;
+                            
+                            layouts.push({
+                                widthCount: baseW,
+                                heightCount: baseH,
+                                piecesPerSheet: basePieces,
+                                actualWidth: actualUsedWidth + 4,
+                                actualHeight: actualUsedHeight + 4,
+                                totalWaste: wasteArea,
+                                description
+                            });
+                        }
+                    }
+                }
+                
+                layouts.sort((a, b) => (a.totalWaste / a.piecesPerSheet) - (b.totalWaste / b.piecesPerSheet));
+                return layouts;
+            }
+
+            // 结果显示
+            function displayResults() {
+                const resultsSection = document.getElementById('resultsSection');
+                resultsSection.style.display = 'block';
+                
+                const totalOrders = currentResults.orders.length;
+                const totalSets = currentResults.orders.reduce((sum, order) => sum + order.quantity, 0);
+                let totalWeight = 0;
+                let totalCost = 0;
+                const materialInfo = getCurrentMaterialInfo();
+                
+                currentResults.materialGroups.forEach(group => {
+                    const weight = calculateWeight(materialInfo.type, materialInfo.thickness, group.spec.width, group.spec.height);
+                    const groupWeight = weight * group.totalSheets;
+                    const groupCost = calculateCost(groupWeight, materialInfo.pricePerTon);
+                    
+                    totalWeight += groupWeight;
+                    totalCost += groupCost;
+                });
+                
+                // 显示汇总卡片
+                document.getElementById('summaryCards').innerHTML = `
+                    <div class="summary-card">
+                        <div class="value">${totalOrders}</div>
+                        <div class="label">订单数量</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value">${totalSets}</div>
+                        <div class="label">总套数</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value">${currentResults.materialGroups.length}</div>
+                        <div class="label">材料规格种类</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value">${currentResults.totalSheets}</div>
+                        <div class="label">总需材料数 (片)</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value">${formatNumber(totalWeight, 1)}kg</div>
+                        <div class="label">总重量</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value">RM${formatNumber(totalCost, 2)}</div>
+                        <div class="label">预估总成本</div>
+                    </div>`;
+                
+                // 显示优化方案
+                const purchaseDetails = currentResults.materialGroups.map(group => 
+                    `${group.specName}mm: ${group.totalSheets}片`
+                ).join(' ');
+                
+                const orderDetailsHTML = currentResults.orders.map(order => {
+                    const doorInfo = order.doorType && order.profileSize ? `${order.doorType} (${order.profileSize}) - ` : '';
+                    return `
+                        <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 5px;">
+                            <strong>订单 #${order.orderNumber}:</strong> ${doorInfo}${order.quantity}套<br><small>${piecesSummary(order)}</small>
+                        </div>`;
+                }).join('');
+                
+                document.getElementById('optimalChoice').innerHTML = `
+                    <h3>智能优化采购方案</h3>
+                    <div style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); display: grid; gap: 15px; margin-top: 15px;">
+                        <div>
+                            <strong>优化策略:</strong> 为每个开料尺寸选择最省料的材料<br>
+                            <strong>总订单数:</strong> ${totalOrders} 个订单，共 ${totalSets} 套<br>
+                            <strong>材料选择:</strong> ${materialInfo.type} ${formatNumber(materialInfo.thickness)}mm
+                        </div>
+                        <div>
+                            <strong>采购清单:</strong><br>
+                            <small>${purchaseDetails}</small><br>
+                            <strong>总重量:</strong> ${formatNumber(totalWeight, 1)}kg<br>
+                            <strong>预估成本:</strong> RM${formatNumber(totalCost, 2)}
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <h4 style="color: #333; margin-bottom: 10px;">订单明细:</h4>
+                        <div style="background: white; padding: 15px; border-radius: 8px;">
+                            ${orderDetailsHTML}
+                        </div>
+                    </div>`;
+                
+                // 显示对比表格
+                const tableHTML = `
+                    <thead>
+                        <tr>
+                            <th>开料尺寸</th>
+                            <th>料名</th>
+                            <th>数量</th>
+                            <th>实际使用尺寸</th>
+                            <th>最优材料规格</th>
+                            <th>需要材料数</th>
+                            <th>每片开料数</th>
+                            <th>单片重量</th>
+                            <th>单片成本</th>
+                            <th>利用率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${currentResults.optimizedDemands.map(opt => {
+                            const typeText = opt.demand.name;
+                            const sheetWeight = calculateWeight(materialInfo.type, materialInfo.thickness, opt.spec.width, opt.spec.height);
+                            const sheetCost = calculateCost(sheetWeight, materialInfo.pricePerTon);
+                            const actualSizeText = `<span style="color: #ff9800; font-weight: bold;">${formatNumber(opt.actualWidthNeeded)}×${formatNumber(opt.actualHeightNeeded)}mm</span>`;
+                            
+                            return `
+                                <tr>
+                                    <td><strong>${opt.demand.key}mm</strong></td>
+                                    <td>${typeText}</td>
+                                    <td>${opt.demand.pieces}片</td>
+                                    <td>${actualSizeText}</td>
+                                    <td>${opt.specName}mm</td>
+                                    <td>${opt.sheetsNeeded}片</td>
+                                    <td><span style="color: #4CAF50; font-weight: bold; font-size: 1.1em;">${opt.piecesPerSheet}个</span></td>
+                                    <td>${formatNumber(sheetWeight, 2)}kg</td>
+                                    <td>RM${formatNumber(sheetCost, 2)}</td>
+                                    <td>${opt.efficiency}%</td>
+                                </tr>`;
+                        }).join('')}
+                    </tbody>`;
+                
+                document.getElementById('comparisonTable').innerHTML = tableHTML;
+                
+                generateMaterialRankingTable();
+                generateRefMatrix();
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            function generateMaterialRankingTable() {
+                const materialInfo = getCurrentMaterialInfo();
+                const sortedGroups = [...currentResults.materialGroups].sort((a, b) => parseFloat(b.efficiency) - parseFloat(a.efficiency));
+                
+                const detailHTML = `
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>材料规格</th>
+                            <th>需要数量</th>
+                            <th>单片重量</th>
+                            <th>总重量</th>
+                            <th>单片成本</th>
+                            <th>总成本</th>
+                            <th>平均利用率</th>
+                            <th>适用开料</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedGroups.map((group, i) => {
+                            const rankClass = i === 0 ? 'best-option' : '';
+                            const sheetWeight = calculateWeight(materialInfo.type, materialInfo.thickness, group.spec.width, group.spec.height);
+                            const totalWeight = sheetWeight * group.totalSheets;
+                            const sheetCost = calculateCost(sheetWeight, materialInfo.pricePerTon);
+                            const totalCost = sheetCost * group.totalSheets;
+                            
+                            const demandsList = group.demands.map(demand => {
+                                const typeText = demand.demand.name;
+                                return `${demand.demand.key}(${typeText}:${demand.piecesPerSheet}pcs)`;
+                            }).join(' ');
+                            
+                            return `
+                                <tr class="${rankClass}">
+                                    <td style="text-align: center;"><strong>第${i + 1}名</strong></td>
+                                    <td><strong>${group.specName}mm</strong></td>
+                                    <td>${group.totalSheets}片</td>
+                                    <td>${formatNumber(sheetWeight, 2)}kg</td>
+                                    <td><strong>${formatNumber(totalWeight, 1)}kg</strong></td>
+                                    <td>RM${formatNumber(sheetCost, 2)}</td>
+                                    <td><strong>RM${formatNumber(totalCost, 2)}</strong></td>
+                                    <td class="${parseFloat(group.efficiency) > 80 ? 'waste-low' : 'waste-high'}">
+                                        <strong>${group.efficiency}%</strong>
+                                    </td>
+                                    <td><small>${demandsList}</small></td>
+                                </tr>`;
+                        }).join('')}
+                    </tbody>`;
+                
+                document.getElementById('detailAnalysisTable').innerHTML = detailHTML;
+            }
+            
+            function generateRefMatrix() {
+                if (!currentResults) return;
+
+                const widthSet = new Set();
+                const heightSet = new Set();
+                currentResults.optimizedDemands.forEach(opt => {
+                    widthSet.add(opt.spec.width);
+                    heightSet.add(opt.spec.height);
+                });
+                const widths  = Array.from(widthSet).sort((a, b) => a - b);
+                const heights = Array.from(heightSet).sort((a, b) => a - b);
+
+                // 建立查找表：specName -> 总需要订购片数
+                const lookup = {};
+                currentResults.optimizedDemands.forEach(opt => {
+                    const k = opt.specName;
+                    if (!lookup[k]) lookup[k] = 0;
+                    lookup[k] += opt.sheetsNeeded;
+                });
+
+                // 预算列总数和行总数
+                const colTotals = {};
+                heights.forEach(h => { colTotals[h] = 0; });
+                const rowTotals = {};
+                widths.forEach(w => { rowTotals[w] = 0; });
+                widths.forEach(w => {
+                    heights.forEach(h => {
+                        const qty = lookup[`${w}x${h}`] || 0;
+                        colTotals[h] += qty;
+                        rowTotals[w] += qty;
+                    });
+                });
+                const grandTotal = widths.reduce((s, w) => s + rowTotals[w], 0);
+
+                const thStyle = `background:#f8f9fa; text-align:center; min-width:80px;`;
+                const totalStyle = `background:#f0f4ff; font-weight:bold; text-align:center; color:#333;`;
+
+                // 表头
+                let thead = `<thead><tr>`;
+                thead += `<th style="${thStyle}">宽 \\ 高</th>`;
+                heights.forEach(h => { thead += `<th style="${thStyle}">${h}mm</th>`; });
+                thead += `<th style="${thStyle} color:#2196F3;">合计</th>`;
+                thead += `</tr></thead>`;
+
+                // 数据行
+                let tbody = '<tbody>';
+                widths.forEach(w => {
+                    tbody += `<tr>`;
+                    tbody += `<td style="font-weight:bold; text-align:center; background:#fafafa;">${w}mm</td>`;
+                    heights.forEach(h => {
+                        const qty = lookup[`${w}x${h}`] || 0;
+                        if (qty) {
+                            tbody += `<td style="text-align:center; padding:8px 6px;"><span style="color:#2196F3; font-weight:bold; font-size:1.1em;">${qty}</span></td>`;
+                        } else {
+                            tbody += `<td style="text-align:center; color:#ccc;">—</td>`;
+                        }
+                    });
+                    tbody += `<td style="${totalStyle} color:#2196F3;">${rowTotals[w] || '—'}</td>`;
+                    tbody += `</tr>`;
+                });
+
+                // 列总数行
+                tbody += `<tr>`;
+                tbody += `<td style="${totalStyle}">合计</td>`;
+                heights.forEach(h => {
+                    tbody += `<td style="${totalStyle} color:#2196F3;">${colTotals[h] || '—'}</td>`;
+                });
+                tbody += `<td style="${totalStyle} color:#e53935;">${grandTotal}</td>`;
+                tbody += `</tr>`;
+                tbody += '</tbody>';
+
+                document.getElementById('refMatrixTable').innerHTML = thead + tbody;
+                document.getElementById('refMatrixSection').style.display = 'block';
+            }
+
+            // 导出功能
+            function copyToClipboard() {
+                if (!currentResults) {
+                    alert('请先进行计算！');
+                    return;
+                }
+                
+                const reportText = generateCuttingReport();
+                const textarea = document.createElement('textarea');
+                textarea.value = reportText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        alert('开料指示表已复制到剪贴板！');
+                    } else {
+                        alert('复制失败，请手动选择文本复制。');
+                    }
+                } catch (err) {
+                    alert('复制功能不支持，请手动选择文本复制。');
+                }
+                
+                document.body.removeChild(textarea);
+            }
+            
+            function exportToCSV() {
+                if (!currentResults) {
+                    alert('请先进行计算！');
+                    return;
+                }
+                
+                const csvContent = generateCSVContent();
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `智能开料指示表_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            function generateCuttingReport() {
+                const materialInfo = getCurrentMaterialInfo();
+                let totalWeight = 0;
+                let totalCost = 0;
+                
+                currentResults.materialGroups.forEach(group => {
+                    const weight = calculateWeight(materialInfo.type, materialInfo.thickness, group.spec.width, group.spec.height);
+                    totalWeight += weight * group.totalSheets;
+                    totalCost += calculateCost(weight * group.totalSheets, materialInfo.pricePerTon);
+                });
+                
+                let report = 'CUTTING INSTRUCTION SHEET\n';
+                report += '================================\n';
+                report += `Date: ${new Date().toLocaleDateString()}\n`;
+                report += `Material: ${materialInfo.type} ${formatNumber(materialInfo.thickness)}mm\n`;
+                report += `Price: RM${formatNumber(materialInfo.pricePerTon, 0)}/ton\n`;
+                report += `Total Sheets: ${currentResults.totalSheets} pcs\n`;
+                report += `Total Weight: ${formatNumber(totalWeight, 1)}kg\n`;
+                report += `Total Cost: RM${formatNumber(totalCost, 2)}\n\n`;
+                
+                report += 'MATERIAL PURCHASE LIST:\n';
+                currentResults.materialGroups.forEach(group => {
+                    report += `${group.specName}mm: ${group.totalSheets} pcs\n`;
+                });
+                
+                report += '\nORDER DETAILS:\n';
+                currentResults.orders.forEach(order => {
+                    const doorInfo = order.doorType && order.profileSize ? `${order.doorType} (${order.profileSize}) ` : '';
+                    report += `Order #${order.orderNumber}: ${doorInfo}${order.quantity} sets\n`;
+                    order.pieces.forEach(p => { report += `   - ${p.name}: ${formatNumber(p.width)} x ${formatNumber(p.length)} mm, ${p.perSet} pcs/set (total ${p.perSet * order.quantity})\n`; });
+                });
+                
+                return report;
+            }
+            
+            function generateCSVContent() {
+                const materialInfo = getCurrentMaterialInfo();
+                
+                let totalWeight = 0;
+                let totalCost = 0;
+                currentResults.materialGroups.forEach(group => {
+                    const weight = calculateWeight(materialInfo.type, materialInfo.thickness, group.spec.width, group.spec.height);
+                    totalWeight += weight * group.totalSheets;
+                    totalCost += calculateCost(weight * group.totalSheets, materialInfo.pricePerTon);
+                });
+                
+                let csv = '\uFEFF';
+                csv += `制表日期,${new Date().toLocaleDateString()}\n`;
+                csv += `材料规格,${materialInfo.type} ${formatNumber(materialInfo.thickness)}mm\n`;
+                csv += `单价,RM${formatNumber(materialInfo.pricePerTon, 0)}/吨\n`;
+                csv += `总重量,${formatNumber(totalWeight, 1)}kg\n`;
+                csv += `预估成本,RM${formatNumber(totalCost, 2)}\n\n`;
+                
+                csv += '订单明细\n';
+                currentResults.orders.forEach(order => {
+                    const doorInfo = order.doorType && order.profileSize ? `${order.doorType}(${order.profileSize}),` : '';
+                    csv += `订单#${order.orderNumber},${doorInfo}${order.quantity}套\n`;
+                    order.pieces.forEach(p => { csv += `,${p.name},${formatNumber(p.width)}×${formatNumber(p.length)}mm,每套${p.perSet}片\n`; });
+                });
+                csv += '\n';
+                
+                csv += '材料采购清单\n';
+                csv += '排名,材料规格,需要数量,单片重量,总重量,单片成本,总成本,利用率\n';
+                
+                const sortedGroups = [...currentResults.materialGroups].sort((a, b) => parseFloat(b.efficiency) - parseFloat(a.efficiency));
+                
+                sortedGroups.forEach((group, i) => {
+                    const weight = calculateWeight(materialInfo.type, materialInfo.thickness, group.spec.width, group.spec.height);
+                    const totalWeight = weight * group.totalSheets;
+                    const sheetCost = calculateCost(weight, materialInfo.pricePerTon);
+                    const totalCostGroup = calculateCost(totalWeight, materialInfo.pricePerTon);
+                    
+                    csv += `#${i + 1},${group.specName}mm,${group.totalSheets}片,${formatNumber(weight, 2)}kg,${formatNumber(totalWeight, 1)}kg,RM${formatNumber(sheetCost, 2)},RM${formatNumber(totalCostGroup, 2)},${group.efficiency}%\n`;
+                });
+                csv += '\n';
+                
+                csv += '详细开料指示表\n';
+                csv += '开料尺寸,料名,需要数量,选用材料规格,每片开料数量,排布方式,需要材料片数,实际使用尺寸,利用率,备注\n';
+                
+                currentResults.optimizedDemands.forEach(opt => {
+                    const typeText = opt.demand.name;
+                    const layoutText = `${opt.layoutDescription}排布`;
+                    const remark = `订单#${opt.demand.orderNumber}`;
+                    
+                    csv += `${opt.demand.key}mm,${typeText},${opt.demand.pieces}片,${opt.specName}mm,${opt.piecesPerSheet}片/张,${layoutText},${opt.sheetsNeeded}张,${formatNumber(opt.actualWidthNeeded)}×${formatNumber(opt.actualHeightNeeded)}mm,${opt.efficiency}%,${remark}\n`;
+                });
+                csv += '\n';
+
+                // 材料采购矩阵
+                csv += '材料采购\n';
+                const mWidthSet = new Set();
+                const mHeightSet = new Set();
+                currentResults.optimizedDemands.forEach(opt => {
+                    mWidthSet.add(opt.spec.width);
+                    mHeightSet.add(opt.spec.height);
+                });
+                const mWidths  = Array.from(mWidthSet).sort((a, b) => a - b);
+                const mHeights = Array.from(mHeightSet).sort((a, b) => a - b);
+                const mLookup = {};
+                currentResults.optimizedDemands.forEach(opt => {
+                    const k = opt.specName;
+                    if (!mLookup[k]) mLookup[k] = 0;
+                    mLookup[k] += opt.sheetsNeeded;
+                });
+                const mColTotals = {};
+                mHeights.forEach(h => { mColTotals[h] = 0; });
+
+                // 表头行
+                csv += '宽 \\ 高,' + mHeights.map(h => `${h}mm`).join(',') + ',合计\n';
+                // 数据行
+                mWidths.forEach(w => {
+                    let rowTotal = 0;
+                    const cells = mHeights.map(h => {
+                        const qty = mLookup[`${w}x${h}`] || 0;
+                        mColTotals[h] += qty;
+                        rowTotal += qty;
+                        return qty || '';
+                    });
+                    csv += `${w}mm,${cells.join(',')},${rowTotal}\n`;
+                });
+                // 列总数行
+                const grandTotal = mHeights.reduce((s, h) => s + mColTotals[h], 0);
+                csv += `合计,${mHeights.map(h => mColTotals[h] || '').join(',')},${grandTotal}\n`;
+                
+                return csv;
+            }
+
+            // 全局对象暴露给HTML中的onclick事件
+            window.CuttingCalculator = {
+                removeOrderRow,
+                clearAllOrders,
+                showBatchInput,
+                closeBatchInput,
+                processBatchInput,
+                addOrderRow,
+                addPiece,
+                autoFill,
+                changeWindows,
+                calculateOptimal,
+                copyToClipboard,
+                exportToCSV,
+                updatePrices,
+                generateRefMatrix
+            };
+
+            // 初始化
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('页面加载完成，开始初始化...');
+                
+                updateEmptyHint();
+                updateMaterialDisplay();
+                
+                document.getElementById('materialType').addEventListener('change', updateMaterialDisplay);
+                document.getElementById('materialThickness').addEventListener('change', updateMaterialDisplay);
+                
+                document.querySelectorAll('.update-price-btn').forEach(btn => {
+                    btn.addEventListener('click', updatePrices);
+                });
+                
+                document.getElementById('batchInputBtn').addEventListener('click', showBatchInput);
+                document.getElementById('addOrderBtn').addEventListener('click', addOrderRow);
+                document.getElementById('clearAllBtn').addEventListener('click', () => clearAllOrders(true));
+                
+                document.getElementById('cancelBatchBtn').addEventListener('click', closeBatchInput);
+                document.getElementById('importBatchBtn').addEventListener('click', processBatchInput);
+                
+                document.getElementById('calculateBtn').addEventListener('click', calculateOptimal);
+                
+                document.getElementById('copyBtn').addEventListener('click', copyToClipboard);
+                document.getElementById('exportBtn').addEventListener('click', exportToCSV);
+                
+                window.addEventListener('click', function(event) {
+                    const modal = document.getElementById('batchInputModal');
+                    if (event.target === modal) {
+                        closeBatchInput();
+                    }
+                });
+                
+                console.log('初始化完成！');
+            });
+        })();
+    </script>
+</body>
+</html>
