@@ -1,0 +1,1405 @@
+<title>Lock Hole Calculator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Layout: 单列。门的尺寸 → 结果和图（照 CAD 图排位：铰链边 | 门面 | 锁边，TOP 在下面，间距松）→ 机器参数表 → 认识这把锁（照片）→ 锁孔和锁槽（输入）→ 铰链（示意图 + 输入）。深色工业风，沿用现有工具页的字体和颜色。 */
+:root {
+  --bg: #0d0f12;
+  --surface: #141720;
+  --surface2: #1c2030;
+  --border: #2a2f42;
+  --text: #e8eaf0;
+  --muted: #8a92b0;
+  --accent: #e8c84a;
+  --accent-text: #e8c84a;
+  --accent-ink: #0d0f12;
+  --accent-soft: rgba(232, 200, 74, 0.09);
+  --blue: #4a9eff;
+  --dim: #5fd38d;
+  --warn: #ff9a6b;
+  --ok: #6fe3a0;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f3f7; --surface: #ffffff; --surface2: #ebedf4; --border: #d2d6e3;
+    --text: #161a24; --muted: #596180;
+    --accent: #e8c84a; --accent-text: #7a5c00; --accent-ink: #0d0f12; --accent-soft: rgba(232, 200, 74, 0.2);
+    --blue: #1f6fd1; --dim: #1a8a4a; --warn: #b4470f; --ok: #1a7f4b;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f2f3f7; --surface: #ffffff; --surface2: #ebedf4; --border: #d2d6e3;
+  --text: #161a24; --muted: #596180;
+  --accent: #e8c84a; --accent-text: #7a5c00; --accent-ink: #0d0f12; --accent-soft: rgba(232, 200, 74, 0.2);
+  --blue: #1f6fd1; --dim: #1a8a4a; --warn: #b4470f; --ok: #1a7f4b;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 16px; }
+.wrap > * { min-width: 0; }
+
+.head .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em; color: var(--muted); text-transform: uppercase; }
+.head h1 { font-size: 26px; font-weight: 700; margin: 6px 0; text-wrap: balance; letter-spacing: -0.01em; }
+.head h1 span { color: var(--accent-text); }
+.head p { color: var(--muted); max-width: 62ch; margin: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.card-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; margin: 22px 0 10px; }
+.sub:first-child { margin-top: 0; }
+.hint { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+
+.seg-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.seg {
+  flex: 1 1 110px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 11px 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.seg small { display: block; font-family: var(--sans); font-weight: 400; font-size: 11px; opacity: 0.8; margin-top: 2px; }
+.seg:hover { border-color: var(--accent); color: var(--text); }
+.seg[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg[data-group="hsize"][aria-pressed="true"], .seg[data-group="hcount"][aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 4px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label { font-size: 12px; color: var(--muted); }
+.field > label em { font-style: normal; font-family: var(--mono); font-size: 10px; background: var(--accent); color: var(--accent-ink); padding: 1px 5px; border-radius: 3px; margin-left: 6px; letter-spacing: 0.06em; }
+.in { display: flex; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; }
+.in:focus-within { border-color: var(--blue); }
+.in input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-family: var(--mono); font-size: 18px; font-weight: 700; padding: 10px 12px; }
+.in .u { font-family: var(--mono); font-size: 11px; color: var(--muted); padding-right: 12px; }
+.in.auto { border-color: var(--accent); }
+.in.auto input { color: var(--accent-text); }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.tile .l { font-size: 11px; color: var(--muted); line-height: 1.4; min-height: 32px; }
+.tile .v { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .v small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 3px; }
+.tile.hot { border-color: var(--accent); background: var(--accent-soft); }
+.tile.hot .v { color: var(--accent-text); }
+
+.warn { margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--warn); border-radius: 7px; color: var(--warn); font-size: 13px; }
+.warn ul { margin: 0; padding-left: 18px; }
+
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; }
+thead th { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); font-weight: 400; text-transform: uppercase; }
+tbody th { font-family: var(--sans); font-weight: 500; }
+tbody th small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+td.num { font-weight: 700; }
+td.key { color: var(--accent-text); font-weight: 700; font-size: 15px; }
+tr.ref td, tr.ref th { background: var(--accent-soft); }
+
+.btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--sans); font-size: 12px; padding: 7px 12px; border-radius: 6px; cursor: pointer; letter-spacing: 0; text-transform: none; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.ghost { padding: 3px 9px; font-size: 11px; color: var(--muted); }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+#copyMsg { font-size: 12px; color: var(--ok); }
+#fallback { width: 100%; margin-top: 10px; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 7px; font-family: var(--mono); font-size: 12px; padding: 10px; min-height: 140px; }
+
+.diagram { overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 860px; height: auto; }
+.g-door { fill: var(--surface2); stroke: var(--text); stroke-width: 1; opacity: 1; }
+.g-hole { fill: var(--accent); }
+.g-hinge { fill: var(--blue); }
+.g-panel { fill: var(--accent); opacity: 0.35; }
+.g-body { fill: var(--accent); }
+.g-dim { stroke: var(--dim); stroke-width: 1.2; fill: none; }
+.g-ext { stroke: var(--dim); stroke-width: 0.8; fill: none; opacity: 0.8; }
+.g-arrow { fill: var(--dim); }
+.g-name { fill: var(--text); font-family: var(--sans); font-size: 16px; font-weight: 700; text-anchor: middle; }
+.g-val { fill: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; text-anchor: middle; }
+.g-note { fill: var(--muted); font-family: var(--sans); font-size: 13px; }
+.g-top { fill: var(--text); font-family: var(--mono); font-size: 34px; font-weight: 700; text-anchor: middle; }
+
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.autoblock { border: 1px dashed var(--accent); border-radius: 10px; padding: 14px; background: var(--accent-soft); }
+.autoblock .hint { margin-top: 12px; }
+.in.locked { opacity: 0.85; border-style: dashed; }
+.in.locked input { color: var(--muted); }
+.photo.dark { background: var(--surface2); }
+.photo-grid.holes { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); }
+.photo-grid { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.photo { background: #ffffff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 0; }
+.photo svg { display: block; width: 100%; height: auto; }
+.photo-cap { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.legend h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.legend p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.legend .size { font-family: var(--mono); color: var(--accent-text); font-weight: 700; }
+
+.boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-width: 0; }
+.box h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mi-row.cen { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--accent); }
+.slots .eq { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.slots .op { font-size: 20px; line-height: 1; }
+.slots .slot { margin-top: 0; }
+.slots .slot + .slot { margin-top: 14px; }
+.figs { display: grid; gap: 12px; }
+.hbtns { display: flex; gap: 6px; flex-shrink: 0; }
+.hole-hit { cursor: move; }
+#holeSvg { touch-action: none; user-select: none; }
+.box h4 small { font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 6px; }
+.mi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+.mi { min-width: 0; }
+.mi label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.mi input, .mi select { width: 100%; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; padding: 8px 6px; }
+.mi select { font-family: var(--sans); font-size: 14px; font-weight: 500; padding: 8px 4px; }
+.mi input:focus, .mi select:focus { border-color: var(--blue); }
+.mi .ov { font-family: var(--mono); font-weight: 700; font-size: 18px; color: var(--accent-text); padding: 6px 0; font-variant-numeric: tabular-nums; }
+#holeList { display: grid; gap: 12px; margin-top: 12px; }
+.box.add { border-color: var(--accent); }
+.box.out { background: var(--accent-soft); border-color: var(--accent); }
+
+.slot { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px; }
+.slot > h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; }
+.slot > h3 small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 8px; }
+.eq { display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr) 30px minmax(0, 1fr); gap: 8px; align-items: center; }
+.op { text-align: center; font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--accent-text); }
+
+@media (max-width: 760px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .photo-grid.holes { grid-template-columns: minmax(0, 1fr); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photo-grid { grid-template-columns: minmax(0, 1fr); }
+  .eq { grid-template-columns: minmax(0, 1fr); }
+  .head h1 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.field[hidden] { display: none; }
+.chk { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.chk input { width: 20px; height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+.joblist { display: grid; gap: 8px; margin-top: 12px; }
+.job { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.job > div { min-width: 0; }
+.job b { font-size: 14px; word-break: break-word; }
+.job small { display: block; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+.job .hbtns .btn { padding: 7px 12px; font-size: 12px; }
+
+.print-head { display: none; }
+
+/* ===== 打印：白底、一目了然，给操作机器的人看 ===== */
+@page { size: A4; margin: 10mm; }
+@media print {
+  :root:root:root {
+    --bg: #ffffff; --surface: #ffffff; --surface2: #f1f3f8; --border: #b9bfd0;
+    --text: #10131c; --muted: #4a5270;
+    --accent: #e8c84a; --accent-text: #6b4f00; --accent-ink: #0d0f12; --accent-soft: rgba(232, 200, 74, 0.28);
+    --blue: #1f6fd1; --dim: #15803d; --warn: #b4470f; --ok: #15803d;
+    color-scheme: light;
+  }
+  html, body { background: #fff !important; }
+  body { padding: 0 !important; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .wrap { max-width: none; gap: 5mm; }
+  .head, .btn, .hbtns, .actions, .hint, .seg-row, .photo-cap, .card-label button, #addHole, #copyMsg, #fallback { display: none !important; }
+  .print-head { display: block; border-bottom: 2px solid #10131c; padding-bottom: 3mm; }
+  .ph-title { font-size: 20px; font-weight: 700; }
+  .ph-title small { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+  .ph-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2mm 4mm; margin-top: 3mm; }
+  .ph-grid span { display: block; font-size: 10px; color: var(--muted); }
+  .ph-grid b { font-size: 14px; font-family: var(--mono); }
+  section.card { border: 1px solid var(--border); padding: 5mm; break-inside: avoid; page-break-inside: avoid; }
+  section[aria-label="Door size"], section[aria-label="Saved jobs"], section[aria-labelledby="tp"] { display: none !important; }
+  section[aria-labelledby="tk"] { break-before: page; page-break-before: always; }
+  section[aria-labelledby="tk"] { order: 1; }
+  section[aria-labelledby="ts"] { order: 2; break-before: page; page-break-before: always; }
+  section[aria-labelledby="th"] { order: 3; break-before: page; page-break-before: always; }
+  .models .in button { display: none; }
+  .models .in input { font-family: var(--sans); }
+  section[aria-label="Results"] { break-inside: auto; page-break-inside: auto; }
+  .diagram { overflow: visible; }
+  .diagram svg { min-width: 0; width: 100%; max-height: 140mm; }
+  .tiles { grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+  .tile { padding: 5px 8px; }
+  .tile .l { font-size: 9px; min-height: 0; line-height: 1.25; }
+  .tile .v { font-size: 15px; }
+  .tile .v small { font-size: 9px; }
+  table[aria-label="Hinge slot machine parameters"] th:nth-child(3), table[aria-label="Hinge slot machine parameters"] th:nth-child(4),
+  table[aria-label="Hinge slot machine parameters"] td:nth-child(3), table[aria-label="Hinge slot machine parameters"] td:nth-child(4) { display: none; }
+  table[aria-label="Hinge slot machine parameters"] th, table[aria-label="Hinge slot machine parameters"] td { padding: 5px 8px; }
+  .photo-grid, .photo-grid.holes { grid-template-columns: 70mm minmax(0, 1fr); gap: 6mm; }
+  .photo svg { max-height: 105mm; width: auto; max-width: 100%; margin: 0 auto; }
+  .eq { gap: 2px; }
+  .mi input, .mi select { border-color: #b9bfd0; }
+  .mi select { appearance: none; -webkit-appearance: none; }
+  .holes .box, .slot, .box { break-inside: avoid; }
+  .slots .box { padding: 6px 8px; }
+  .slots .box h4 { margin-bottom: 4px; }
+  .slots .slot { padding: 8px; }
+  .slots .slot > h3 { margin-bottom: 6px; }
+  .slots .mi input { padding: 4px 6px; font-size: 13px; }
+  .slots .mi .ov { font-size: 15px; padding: 2px 0; }
+  .slots .mi-row.cen { margin-top: 4px; padding-top: 4px; }
+  .slots .op { font-size: 14px; }
+  .slots .slot + .slot { margin-top: 6px; }
+}
+</style>
+
+<div class="wrap">
+
+  <div class="print-head" id="printHead"></div>
+
+  <header class="head">
+    <div class="eyebrow">Apex Jaya · CNC Machining</div>
+    <h1>Lock Hole <span>Calculator</span></h1>
+    <p>Enter the door size and the handle height the customer wants. The tool works out every centre point to key into the machine, and the drawings change with the numbers. All positions are measured from the door TOP, never from the floor.</p>
+    <div class="actions"><button class="btn primary" type="button" id="printBtn">Print / Save as PDF</button><span class="hint" style="margin:0">For the machine operator: the printout is a clean white sheet, and every drawing carries this door's numbers.</span></div>
+  </header>
+
+  <section class="card" aria-label="Saved jobs">
+    <div class="card-label"><span>Save &amp; find a job again</span></div>
+    <div class="grid2">
+      <div class="field">
+        <label for="jobName">Job name</label>
+        <div class="in"><input id="jobName" type="text" placeholder="e.g. Tower A level 3, D1" autocomplete="off" maxlength="80" oninput="update()"><button class="btn primary" type="button" id="jobSave">Save</button></div>
+      </div>
+      <div class="field">
+        <label>Backup file</label>
+        <div class="actions" style="margin-top:0">
+          <button class="btn" type="button" id="jobDownload">Download this sheet</button>
+          <button class="btn" type="button" id="jobDownloadAll">Download all saved</button>
+          <button class="btn" type="button" id="jobImportBtn">Import file</button>
+          <input id="jobImport" type="file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </div>
+    <p class="hint" id="jobMsg">Fill in the sheet below, type a job name and press Save. It is kept on this device, and shows in the list so you can load it again. Use “Download this sheet” for a backup file you can send or keep; “Import file” brings it back on any computer.</p>
+    <div class="joblist" id="jobList"></div>
+  </section>
+
+  <section class="card" aria-label="Door size">
+    <div class="grid2 models">
+      <div class="field">
+        <label for="lockModel">Lock model</label>
+        <div class="in"><input id="lockModel" type="text" list="lockModels" placeholder="e.g. Union 2234" autocomplete="off" onchange="loadPreset('lock')" oninput="update()"><button class="btn" type="button" onclick="savePreset('lock')">Save</button></div>
+        <datalist id="lockModels"></datalist>
+      </div>
+      <div class="field" id="fld_hingeModel">
+        <label for="hingeModel">Hinge model</label>
+        <div class="in"><input id="hingeModel" type="text" list="hingeModels" placeholder="e.g. SS 5×3×3" autocomplete="off" onchange="loadPreset('hinge')" oninput="update()"><button class="btn" type="button" onclick="savePreset('hinge')">Save</button></div>
+        <datalist id="hingeModels"></datalist>
+      </div>
+    </div>
+    <p class="hint" id="presetMsg">Type the model name and press Save. Next time the same model is typed, its sizes fill in by themselves. (Saved on this device only.)</p>
+    <div class="seg-row">
+      <button class="seg" data-group="mode" data-val="frame">Frame + Door<small>Frame height known, door height is worked out</small></button>
+      <button class="seg" data-group="mode" data-val="door">Door only<small>Door height known, no frame</small></button>
+    </div>
+    <div class="seg-row">
+      <button class="seg" data-group="type" data-val="1hr">1HR<small>1-hour fire door</small></button>
+      <button class="seg" data-group="type" data-val="2hr">2HR<small>2-hour fire door</small></button>
+      <button class="seg" data-group="type" data-val="nor">Normal<small>Standard door</small></button>
+    </div>
+
+    <label class="chk" for="hasHinge"><input type="checkbox" id="hasHinge" checked onchange="update()"> This door has hinges</label>
+
+    <div class="sub">Enter these</div>
+    <div class="grid2">
+      <div class="field" id="fld_frameH">
+        <label for="frameH">Frame height (without embedment)</label>
+        <div class="in"><input id="frameH" type="number" step="any" inputmode="decimal" value="2100" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field" id="fld_measH" hidden>
+        <label for="measH">Measured height inside the installed frame</label>
+        <div class="in"><input id="measH" type="number" step="any" inputmode="decimal" value="2050" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field">
+        <label for="doorW">Door width</label>
+        <div class="in"><input id="doorW" type="number" step="any" inputmode="decimal" value="790" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field">
+        <label for="doorT">Door thickness</label>
+        <div class="in"><input id="doorT" type="number" step="any" inputmode="decimal" value="45" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field">
+        <label for="lockH">Handle height (floor to handle centre)</label>
+        <div class="in"><input id="lockH" type="number" step="any" inputmode="decimal" value="1000" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field" id="fld_profY">
+        <label for="profY">Profile Y<em id="profTag" hidden>FIXED</em></label>
+        <div class="in" id="profBox"><input id="profY" type="number" step="any" inputmode="decimal" value="65" oninput="update()"><span class="u">mm</span></div>
+      </div>
+      <div class="field" id="fld_stopGap">
+        <label for="stopGap">Stop Gap<em id="stopTag" hidden>FIXED</em></label>
+        <div class="in" id="stopBox"><input id="stopGap" type="number" step="any" inputmode="decimal" value="25" oninput="update()"><span class="u">mm</span></div>
+      </div>
+    </div>
+    <p class="hint" id="lockHint"></p>
+
+    <div class="sub" id="autoSub">Calculated automatically (nothing to enter)</div>
+    <div class="autoblock">
+      <div class="grid2">
+        <div class="field" id="fld_frameBal"><label for="frameBal">Frame Balance = Profile Y − Stop Gap</label><div class="in auto"><input id="frameBal" type="number" readonly><span class="u">mm</span></div></div>
+        <div class="field"><label for="doorH" id="doorHLabel">Door height</label><div class="in auto" id="doorHBox"><input id="doorH" type="number" readonly><span class="u">mm</span></div></div>
+        <div class="field" id="fld_topGap"><label for="topGap">Top gap</label><div class="in auto"><input id="topGap" type="number" readonly><span class="u">mm</span></div></div>
+        <div class="field" id="fld_btmGap"><label for="btmGap">Bottom gap</label><div class="in auto"><input id="btmGap" type="number" readonly><span class="u">mm</span></div></div>
+      </div>
+      <p class="hint" id="doorFormula"></p>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Results">
+    <div class="tiles">
+      <div class="tile"><div class="l">Floor to handle<br>(minus bottom gap)</div><div class="v"><span id="r-floor">—</span><small>mm</small></div></div>
+      <div class="tile hot"><div class="l">TOP to handle centre<br>CNC Position</div><div class="v"><span id="r-handle">—</span><small>mm</small></div></div>
+      <div class="tile hot"><div class="l">TOP to lock-body centre<br>Handle + Gap</div><div class="v"><span id="r-lock">—</span><small>mm</small></div></div>
+      <div class="tile"><div class="l">Number of hinges</div><div class="v"><span id="r-hn">—</span><small>pcs</small></div></div>
+    </div>
+    <div id="warn" class="warn" hidden></div>
+
+    <div class="sub">Same layout as the CAD drawing and the machine screen: hinge edge on the left, door face in the middle, lock edge on the right (TOP at the bottom)</div>
+    <div class="diagram"><svg id="svg" viewBox="0 0 1200 1120" role="img" aria-label="Measuring diagram laid out like the CAD drawing: hinge edge left, door face middle, lock edge right, TOP at the bottom"></svg></div>
+
+    <div class="sub" id="hingeResSub">Hinge slots (start = the corner nearest TOP)</div>
+    <div class="tbl-wrap" id="hingeResTbl">
+      <table aria-label="Hinge slot machine parameters">
+        <thead><tr><th>Hinge</th><th>Start (from TOP)</th><th>End</th><th>Size L × W × D</th><th>Gap to previous</th></tr></thead>
+        <tbody id="rowsHinge"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" id="copyBtn">Copy parameters</button>
+      <span id="copyMsg" role="status"></span>
+    </div>
+    <textarea id="fallback" readonly hidden aria-label="Parameter text"></textarea>
+  </section>
+
+  <section class="card" aria-labelledby="tk">
+    <div class="card-label" id="tk">
+      <span>Lock holes &amp; lock slots</span>
+      <button class="btn" type="button" id="resetBtn">Reset all to defaults</button>
+    </div>
+
+    <div class="sub">Lock holes (cut in the door face)</div>
+    <div class="photo-grid holes">
+      <div>
+        <figure class="photo dark"><svg id="holeSvg" viewBox="0 0 420 640" role="img" aria-label="Hole layout on the door face, showing each hole size and the distances between holes"></svg></figure>
+        <p class="photo-cap">Example drawing, it follows the numbers on the right. You can drag a hole in any direction with your finger or mouse: up/down changes the gap, left/right changes “From door edge”. Up = toward the door TOP.</p>
+      </div>
+      <div>
+        <div class="boxes" id="handleBox"></div>
+        <div id="holeList"></div>
+        <div class="actions"><button class="btn" type="button" id="addHole">+ Add a hole</button></div>
+        <p class="hint">Every lock has different holes: round, long, short, wide, thin. Add them yourself. “Gap to handle centre” is the distance from the handle centre to the near end of the hole. To move a hole to the other side of the handle, press “Flip side” or just drag it in the drawing.</p>
+        <div class="sub">Handle centre → lock-body centre</div>
+        <div class="boxes" id="gapBox"></div>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="card" aria-labelledby="tp">
+    <div class="card-label" id="tp">Know your lock</div>
+    <div class="photo-grid">
+      <div>
+        <figure class="photo">
+          <svg viewBox="0 0 674 861" role="img" aria-label="Photo of a sashlock with dimension lines for faceplate length and width, case height and depth, handle centre and case centre">
+            <defs><marker id="pm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#d9480f"/></marker></defs>
+            <image href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCAPLAvgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6oooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAooooAKKKKACiikNAC0EUCigAopGIA6gVC13EnVwfpQBPRVQXpkbEa8erUq3uDtb7w9KALVFIpyM0tABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAhooNFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFKKSlFABRRRQAGkpTSUAISB1qN7mJPvOKh1MBrfn1FZ6DC8UAaLagmflBNRPfO33QFqqOKWk2NIJJXfksT+NNQAmlI4pUGDSuOxKnBGKilc+e496nTqKqTN/pLn3ouFjbj+4PpTqbFzGv0p1USFFFFABRRRQAUUUUAFFFFAB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omVAM4GR0oBHZRus0ayKco4DKT3B6U4cDHaorN1extmUEAwpwfpU2OKBMTFMPB5p5OBmmtz+FAARxSU7ORSGgYnXrRjvR1FIelAjufh4P9Bu/wDrt/Sutrj/AIdN/od8ufuzD+VdhmrQhDRRRTAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigApRSUooAKbJyh+hp1Nf7h4ycGhgeM/EEZ+Ht4uP+XhK8Al0+5u/ltoHcjrgdK+hfGYf+xZdHmtbgTSSiRgsefkHcV5Rf6nHEoigieCEcBdhG761hJm0djjZPDN7jMgRD6FqrSaBcx88N9K62NZbkMYonkxydq5qvN50RO6GQY9VNRcqxx0tm0LjerLWvoe1LpCORV2a7jeIxIkc1y52xqRn8TWlp/hKZ2ikjlG7+IEcZpphY9E8JuDEuM5pt4yD4h+F9xYYnmP47DUOnG40HT3upbd5lhXeViGWIHoKzPCfig+OPiPok9npeoW9vZNI8klxFtAypHHFVYR9D2yksvavD/iWmdVvvXzWr3K3YcGvHfiDaebqV6cc+Y1U9iY6HxvqQxfXH/XRv51UxV3VABf3P/XVh+tVD9au5DPSvgWf+Kx0/wD3n/lX1AvevmH4FpnxnpwxyWb+VfTqsO3eoQMcCRTycimmj6UxDec9aDxQeDR3+lACNwKbTic0g4oGBHFI0aMMMit9RmlxnmjGKAEBwQO1P60hU9hQDgY70CEY4NHX2pOTk0Z5xQMKCM0pA7UE4GO9AhAtEgwKVKHOVxQB2Hw4GLbUCepmH8q7KuO+HX/Htf8AtMP5V2NWhBRRRTAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigApRSUooAKMCiigDL1bw5Z6y4edp0cLt3RPtOK43U/gnot9yl/qEXp84bH5ivRqKlxTGm0eY6D8NrbwRcS7Lx75bkdJUA2YrV1Xw1pWs6bPY3NqgjnXazRja4+hHSt7XQPPg+hqsFwoqeVIpNnA6J8GPC2g3Ek9tbyySOMb5X3ED2rfTwTpUQwkOK6NEx1pxUUWQ7mFD4atUwFJAq7BpcFoAsWAOpwMVfZMDNRHrTsK7JIpSrgZ4rg/FVkJ725Yrnc5NdtHnefrXPa1CGuZv940MEefXHw38J3uWuNCsyzcsyrgk1k3PwO8EXLZ/s2WP/rnKRXegY4pT2JpCOI8PfCPQPC+qwajpb3kcsLEhWcEc/hXa49qf0FNNAgzTkGaaelCEg0AObkZpn3jkVISCKYvSgY0jmne1IRzTh0oAaBinAA9aXHy0bcDNMBDx3qNjzT+c4qKQgH6UhDiwFJ70xZATT84FAB3FK33iKO1LQMaOKDSmmt92gDs/hucw6j/12X+VdlXGfDbmHUP+uq/yrtMc1aJEooNFMAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAooooAKD0ooPSgDG1obp4R7Gq4G0AmrWrDN1F7KarvyBUdSlsAbNIx5oUe1KRxQMbuJppXPelpaAGqMGsDVR/pEnuTW8eHFYWq83En1NIRzpPzH61JnKgYpjD5j9aUHn3oAC+AM0NTW68jilzkUCBWxwaU8Y96jwd1OJoGPxkUi96VTleKaeKBC0uOabnvTgeaAuKDikYUj/Wmh88UDuGaiduTn0pt3eQWUZkuJVjXtu7n2qtHfC5xstrkj+8YyAKBEy5BqVGz1qOP5xwc/0qRRyBQBKvIoIxQpx0pep5oAbTG9KlOBTG9hQFzsPhtxDqHvKv8q7WuJ+GxzHqP/XVf5V21WhCGig0UwCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlKKACiiigAoPSig9KAMjVTi6jH+x/WqzMDVnVv8Aj6j/AOuZqqoGM1D3LWw4nDUFs03GTSqOeaEA2lBwacaZjmgQj/ez71g6nxPJ9TXQEZrntV/18n1NIRgkfMaCT6CntyD9aacYoAjftQgobr1zQhxmgAPXNAwetB5pvNAx+QtVNV1fT9Gtjc6jdw2sI4LyMAKsMOK+Xfjh4ruta8XXGnCdjZWB8pEB+Ut3Y0AfQ+m+OfDerTJb2WsWksznCoH5J9q38cDNfDFtcvbTLKjsrKeCpwa+rPg94tm8U+GQt5JvurNhE7nq644JoCx3RGQT6VBcTx2tvJPKwVI1LMT6VKzEBq4z4maymk6Cnmt8k06I4HVlByQPwoYkdL4d0z+19ut6jHu3c20MnSJexI/vGtCfxLo1ncm3m1C2S4Bx5ZcV494++J0euaFZ2+jPc2jIwZsHA2gYxkV5XJqtyZS7yszE5LMeTUcxaj3Pre8VGVZY1QFhnKngioSMgEcV4b8M/FWo3XiSxtJL+d4WbaUZsjGK90lQox9KqLuDSETin5qJevFR3+oWul2j3V5KkMKDLO5wBTJLORim7s5HFcJb/GTwrcXv2drmSNS20SMuFP4121vJHcRLNE4kjcZVh0IoE1Y7P4bf6vUR/wBNF/lXbVw3w0bP9pr6On8q7mrQhDRQaKYBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFKKSlFABRRRQAUHpRQelAGLrDYvYx/sf1qBRkVLrJ/06I+sf8AWo0GFzWbLWw4L3pQOeabNPHbx75GCr61VtdSiu5jHEGPfJFFwLTimjrTbm6jt13SMAO3vVe0v0u5WRVIwMj3psC53xXN6t/r5PrXSqvzA1zer/8AHxL9TSEYJOGI7UoXtSH7xoBxQA3GCaaTzT8ZzTWFAAKbjH1pw54pQvNAEZJ+lfGvjqGW38YavHPneLp85r7NZefX6189fHrwBdxas3iWxheW3uBm4CLny3H8R9jQB46IywQL1Jr3n9nYyC61VOkYhQ4/2s14RbQTXE0cUMbs+cAKpJ5r6q+D/g6Xwp4c8y8j2Xl6RI6nqi9gfehoGzuW5HFeTfHZ3S106MH5TIzfpXrDcED1rzX44WTz6JY3EcZZo7jYQBk/MMfzpPYInkl40iW8bBQoZB27VQEMXlmZlXjqPSug1zw3rGn6RaX93avBC3yDf1z7jtmuRecK20k5PWszQ7nwDdW0HibTWRFDidcECvo66IaU45G3Ir5j+HxQ+IdPJiJ/fLznpX00/wAvzAdRVRFIhB7g4xXkvxz1SdvsWlIxWIqZpFH8R7Zr10gMM4rx74z2jrq1rdMP3bQ7SfcHpVPYlM8amh2Rjv1r3L4E+KX1LTJ9Indme2+dCTn5c4wK8WukBiyB68V6F+z5Ax1/UJBwsdvg/iwqVuD2Pqj4a8Nqh/20/lXcCuG+Gh+bUx/tp/Ku6xWyIENFBopgFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUopKUUAFFFFABQaKD0oAxNaH+mw/7h/nTU4HPSpNYGbyH/cNQzMEgdvRTUdS1sYl40up33lx8qOB7e9aFnpiWTGUyMWAwfSotCiGJZep6A1evnKWkpHXbUW6hfUwZjLqV0QnPPyjsB61p6dpn2JzIZNzEY4qhY3iWRZjEXZuOOwrZs7gXUXmBSozjBoikNkwGDXNav/x8y/7xrp8Vy+sf8fM3+8askwWGc+tNxmnE/MabmgBTkCmtT1BxTCMZpANB5p+QO9MB+alYc0AK/SoWiSVWWRFdT1VhkGpj0pueM0wKMGh6Vay+fFplnHJ1DrEARV7fTWbKigdAfShgx33uayvFGj/25oN5ZLxIy74j6OvIrSVfm3Zp+7BpAclpYtPiV4MfR75ntrqBlScKBvRl+tee618Ab2PUP9Cv1ltWPDOMOPriu91/w3qmkas/iPwuR9pf/j5tCcLP7j0NSWfxPs52MGo6bqFpdL96PyCwz7EVLQ0zB8MfB9NCure5n1B3eFg7Ls44r00yCZcpgoelUrHUJ9YXfJZSWtsfuiY4d/fHYVeEee9CQNjVGK57xt4UXxTpDW6FUnjO6NiO/p+NdIUoXuKoSPmq6+F/jAymFdHlcluGXG3869f+G3gEeC9J8u42NqF0Q1wwOQg7KK7bcRn0pCAOaLDOq+G339T/AN9P5V3NcF8NC32nVgem6Mj8q73NaIgQ0UGigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAooooAKDRRQBjaucXcX+4f51FOoe2kUDkqal1gf6XF/uGmqOKh7lrYzNBkH72I9eCKu6gm6zlx1IrKu45NMu/Ni+6xyP8KvWV99vDxPHjC84NSuwGXaWLXobEqoV7YzmtmwtjaweWW3HOSax2Mum3RKnHPTswrVstQS8LKF2soyRSiORbz8wFcxq4zdTf7xrpxy2a5nVxi5l/3jVslnPM3zMPelBBFRyA7m+tOUZpAPPA4prZxQM0pPyEU2DI1ABoJ5AFO2jbQFBH0pAHXimNkcUu7byKXgjmgBqLn6UpAzQvWnhcfnQBGRtxihgQakkHSmsMc0CA8nHpUaj5gakOSB6mg/KBQMMHqKelV5ZxFGzscKBkn0p9pDeXcInS3ZY2GUZ2xuHrigCfvTe9NRnBKuMMODSjJPNCEwI4prdKkYUxxxTGjqfhsB52qHuWj/lXc1w/w3GJdT+qfyruMVSJYUUUUwCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlKKACiiigAoPSikNAGTrH/HxEf8AZNRKeBUusH/SIfoajTG2oe5XQSSFJ02SKGFQ2lhHZs7Rk/Nxg9qmLAEEk5pu7ryaVgGXNpHdR7XGCOjDqKhsdMWxd3EhfcMc1Z3nrSbyTTsBKgOa5nWf+Pqb/eNdSnIX6Vy2tY+1TY/vGhgc44yxoUgHFIT+8b2owBzSEKDg4pw5PNR87gaeelNjFZewpMUKeaM4zk0gGlfbFIeOlKW4oByKAEUYIqTNMHWnhhmgBzDNMPpTic004NAhuRmhvuk0jAZzVFtb077R9mN/aibOPL81d2fpmgLlXxBmWO0sgSPtdykRI9Op/lXPeOvibq3hXxNDHBGo0iF1t2hUfPK2O3Hauj8Qows4ruNdzWkyzgDrgHn+dZ/i7wE3jXVNOlS5EOlSt9okljA8xGA7H3qJXNI26nXzP9qhtb0RmMzxqxVuoyM1CRhuTU9yY0iggjZ2WJAgLnkgDHP5VAR3q0Q9RWORimk/KBSj7uaaRmmGx1fw5/1+pj3j/lXc1wvw4ObnVB7x/wAq7qrRIhooNFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFKKSlFABRRRmgApCaWgjigDI1YZuof901Bkip9VP8ApUf+5Uar8oqHuV0GMC3am7G9KmAxS7c0AQ4IXpSbW7VOB2puME0DJIgSFz1ArltZH+ly/U11MROa5fWf+PqU/wC0aGJnOYw7k+tIy56UrZLN9aD0pANFOOTTQ3zU/ORmmMQDBoI5o4PWlzSEN20hNOc4GaZnNACjmj6UA0EjtQAoYDrSkBh1pkg7jt1oVs0COC+M3jKbwn4VItJPLvLtvJiYdVH8R/Kvl1NRuRdC4M8hl3bt5Y5z65r3L9phJDb6I/Plh5AfrivBCc8ninYdj6q+Dvi1/FPhgw3jiS7sz5chPJdT0Jru7GyWxj8u3mkWInITPA+npXhf7NrSfbNWGPk8hMn3ya97GAKBtCEnnPOaRmxxTqawB5oERTzpbxNJI4VV6moEu2eNZGt54genmDGaZqOJJ7CFlHlyXADfgCR+orcvEW6tJVKnAXIPvSBmx8NCTdamT38v+Vd9XAfDPIutSBOcCP8AlXf1aJENFBopgFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUopKUUAFJS0lAC0HpSZpT0oAx9WH+kp/uVGudoxUurcXMf8AuVCjfKKhldB4BFOFGQRTevSkA/INI/ApF5pJD2pjJIsiuY1kZuZfrXTRsNwFc1rH/H1L/vGhiZzbDDEe9BwaVx8zH3pCMdaQETcHikUkU496YD2pgSY9aMDFIPSkwTSACR0oBpQoFLxg4oAb1pCM0o680MOmKAEBx1py8daQsMcikxQBx/xV8IP4x8JzWtuoN3AfOgz3I6j8a+UH0+6S7NpJBIk4baUK8g/SvuHGB9azZ9B0yW7F2+nWrXAOfNMY3fnTHc5H4L+DZPC3hn7RdpsvNQIkZT1RB0H9a9CxTI84waeDzikgDNDAAZoxSkZFMRQ1CB7mJfLbbJGwdD7irR1OeW1CyQeSzD5huyM0OOKj8sZBOTSA6v4a4F5qIH92M139cB8NgBfajj+4ld9mrRIUUUUwCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlKKACkpaQigAooxSnpQBjaz/x8Rf7lQA8Cp9a/4+Yv901VBwAKhldCUPTlbmocE07pSETg1EzZbmnIaY/WmMkiI31zmsn/AEubn+I10MQ5zmub1jm5lx/eNIDCfqfrTZPu0uDkg9M0j88CmBD3o4zQx2npTSeelIQ8dafmotxzT93egA5NAGaaXPanocgk0AIeKTdSt3qM55IoGO3ULnOaapyeacSQOtAh/wB7vSEYoUZFNb5c5oAcvWnCmKAeQaeDTGhaM4oooBjWwRUb9akamMcGgEdN8OP+QjqI6fu0r0CvP/hwc6nqP/XNK9A71SJYhooNFMAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAooooAKKKD0oAxNdbbcQn/ZNVFfeoIqzr/M8I/2TVGHvUPcroWkbil61EKevWkKxItNPWngU1wAKYxY+Tj0rm9W/4+Zf9410sIrmtY4upfqaAZgyNyaYeopWGWOKQZNIBGHpQq09RninKm3pTAjMYpNtSHOaQ9KQiLbUi9MetAHNLtoAjdSDQAOtK3WkA9sUDGsNvNKcY5pzYNR5/OgRIvHHelK7uT1pinNSoDjIoAYFpwpWpKYxaQ5FKBxRQDGEk0xzj6ipGqJsjmkJHT/Dc51TUf8Armn869B71598OD/xNdQH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nC2KsbsimgY8yYprPmoWJFIpyaLgWYz71x2tN/pk/wDvGuvj61x+uf8AH5P/ALxpMDALDcfWgPkVGx+cmkBIOexpCJc00HJxQzdqRAO9Ax2MCkHWnAZ6Uh4I9aBAwNISQvWl5wc009KAFBz0pdxx1qMZFPHNACDOcUo4OaQDBzSOaBj8Bj0prKBkUm75aaWJwaBByO9GTTGOXxUi8UABXikHNKcnikoAQfeND8ClwKRuBQM6L4fY/t+U9/s/9a9Hrzb4fEHxDL/17/1r0mrRIUUUUwCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlKKACiiigAJpKDRQBka/963+prPTFaGv9IfqazUqHuUtiyjYqdWzVZKkVsUhkjMDTc4ppbPSkB9aYFqE5Fcfrf8Ax+T/AO8a62JsAVyOtt/pc/8AvGhiZzpPzH605RkD2qNvvH605DxSAVjzxS5IAoxS4+WgBQePrSbucUAGmj71ArEj5Cim4yKRySMUgY+nSgA6HHpS7s0wtk03PNAEuTTWJ5NIGOeax/FevxeG9EudRm/5Zr8i/wB5j0FAzC+IHxKsvBkQhVVub9x8sAb7vu3tXj958bPF09z5kdzDbx/88kT5f15rlda1S41i/uL66kZ5p3LMTWU3GaVwse8+AvjP/a0yWetoiO5wJk4A+tesb8qChDAjIPrXxhbXMlpOssZIKnPHevpj4T+JW1vQUhlcu8Q+Unrj0/CmOx3QoLUinccelDEdO9BIbqRzlaa77aaSSM0DOl+H3/IxSH/p3P8AOvSq8z+Hmf8AhIpOOPIP869Mq0SFFFFMAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAoNFFACYopaMUAZGvjKQ/U1lBq2NdH7uL/AHqyMc1HUpbEqtT92DVcuAaC5JzSYyx5mDQWzUKvTi1A7FuNgAAK5HWj/pk/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KACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlKKADFIKWkoAWigUZoAw/FJ/dW3++f5VjxZzWz4n5htz6Of5VkxAYqHuUloYfjfw6fEWj7Ih/pNu3mQ+57j8RXMaD4N0qWA3d4qsI+dp42HuD9K9HQ881l6t4WtNTdpUlltXf7/lHCufUilYadjwH4l/D/SNc1l7zT4fKlcgMsPIc9M1658JfBC+BvCUNiQ3nTOZ5M9QT2rR0XwHp+ky/aJma4mUkqT90fhXTqnyA0krFcwqLuB5rldVGLiX611cYNcrrAIuZvqaGhXMleRmgg+hNEQAQZrlrmfUbmWQ/wBoTwos8kZWAgbQDgfpRewrXOqOOnp1pFFctpMFzb+IID/bN7dW8kUmYbh85OBggY7V1Rx2ppisFZXiDw1pfiSKKLVLVbqOJt6ox4zWoct3AppA6buaAMfTfBnhvR50uLHRrSCVOVZVORW3LK0z7mpnyr1cU3z4h1daVwFIH5Ui55zTGu4Qc7hSG/gAouFibOO1CAntVT+1IzwFJ/CpY7i6l/1NnM/0Umncdi0yZGCKYYmC4DMB7GnJZazPxHpd1k+qEVZj8J+JrgZWz8v/AH3AoFYpLEEHB60u4KOTWtD8PfEM/wDrZoIfq2atx/Cy9fmfVVH+6poA5syxr1YU3zk3YGCa7SD4V2KjM97cOf8AZ4rQt/hrocBBZZ5D/tPRZhc5vwfoT6rqi3Ey5trchiP7z9hXpwHbioLOwttPhENrCsMY7KKsirSsSFFFFMBDRQaKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUUlFAC0lKKKAAUUUYoAx/EgzbRez1kooCD6VreJD/o0Q9XrMjGUzio6lrYQLTmyFwKcRgU0nFAEPJOCasRcpUSgbiamTCrQAq8GuZ1WLfdS+5NdMOaxryHfcycfxUMEck1xFESrSKMe9cXd+D4ZtSuLyLxHqMS3EhkMMQBVST2r6Gs/C+jxIsi6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RRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFKKSlFABRRRQAUlLRQBj+J/wDkHD/rotc9F0x2rovFH/IN/wCBiudiPyioZaKWvad/ammTWwALkZXPrWNongaxmtVu7nayrnK919c11OQfqOlV7uw+2RyCGeS2kk4ZkPDfUVIzLb4hHwzM1jFafareMYRVbBX2rQttV1DWbVLzUYkheT5kiX+BOwPvVHTfBNnZy/aLmQ3cucguOAfpWtcIFGB2p6g7FeQbsUkK4kx71IoyRmhQFnP+9S6j6Hd2/wDqI/8AdFSVHAf3Ef8AuipK1RkFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFACGig0UAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUopKUUAFFFBoAKKBRQBj+Kv+QZ/wADFczE3ArovGDiPStxOB5i81y8EykDmoe5cdi0OtPD4WoRID0pwkHekMnEhIApJMFTmmIQRTZ2wpxQBEZBuxjoabG26Vj70owTTYhiQ/WgL6HfW4/cp/uipKjt/wDUp/uipK0MwooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAQ0UGigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAClFJSigAooooAKKKKAKupadBqts1tcqTG3JwcGsGTwNArf6PeTRj0PNdOaWlYdzkJvCl/Cv7meOXHrwarNo2pouWtmP0Oa7cgUYosguzgts8f34ZVx6qahabJ2scfWvQioIwRkVDJp9pJ9+2iP1UVPKPmOHTBwcjk1Yig3vn1NdHP4c06c5MG0/7JxVq0022tAFjj6d25p8oXLEHEKD0Ap9A46UVRIUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAIaKDRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQB//Z" x="0" y="0" width="674" height="861"/>
+            <g stroke="#d9480f" stroke-width="2" fill="none">
+              <line x1="205" y1="70" x2="205" y2="788" marker-start="url(#pm)" marker-end="url(#pm)"/>
+              <line x1="198" y1="70" x2="246" y2="70" stroke-dasharray="4 3"/>
+              <line x1="198" y1="788" x2="246" y2="788" stroke-dasharray="4 3"/>
+
+              <line x1="245" y1="46" x2="298" y2="46" marker-start="url(#pm)" marker-end="url(#pm)"/>
+              <line x1="245" y1="40" x2="245" y2="68" stroke-dasharray="4 3"/>
+              <line x1="298" y1="40" x2="298" y2="68" stroke-dasharray="4 3"/>
+
+              <line x1="300" y1="150" x2="446" y2="150" marker-start="url(#pm)" marker-end="url(#pm)"/>
+              <line x1="300" y1="144" x2="300" y2="182" stroke-dasharray="4 3"/>
+              <line x1="446" y1="144" x2="446" y2="250" stroke-dasharray="4 3"/>
+
+              <line x1="590" y1="182" x2="590" y2="650" marker-start="url(#pm)" marker-end="url(#pm)"/>
+              <line x1="400" y1="182" x2="598" y2="182" stroke-dasharray="4 3"/>
+              <line x1="418" y1="650" x2="598" y2="650" stroke-dasharray="4 3"/>
+
+              <line x1="300" y1="372" x2="566" y2="372" stroke-dasharray="8 5"/>
+              <line x1="300" y1="422" x2="566" y2="422" stroke-dasharray="8 5"/>
+              <line x1="340" y1="372" x2="340" y2="422" marker-start="url(#pm)" marker-end="url(#pm)"/>
+            </g>
+            <g fill="#d9480f" font-family="Noto Sans SC, sans-serif" font-size="17" font-weight="700" stroke="#ffffff" stroke-width="5" paint-order="stroke" stroke-linejoin="round">
+              <text transform="translate(192 430) rotate(-90)" text-anchor="middle">Faceplate length 241</text>
+              <text x="271" y="32" text-anchor="middle">Faceplate width 24</text>
+              <text x="373" y="138" text-anchor="middle">Case depth 100</text>
+              <text transform="translate(612 416) rotate(-90)" text-anchor="middle">Case height 188</text>
+              <text x="452" y="364">Handle centre</text>
+              <text x="452" y="446">Case centre</text>
+              <text x="348" y="402">Gap</text>
+            </g>
+          </svg>
+        </figure>
+        <p class="photo-cap">Sample photo. The lines only show what to measure and are not to scale for your lock. The final version will use your own photo.</p>
+      </div>
+      <ul class="legend">
+        <li><h3>Faceplate</h3><p>The thin steel plate set into the door edge. Length × width × thickness <span class="size">241 × 24 × 3</span>. It needs a “panel slot” in the door edge.</p></li>
+        <li><h3>Lock case</h3><p>The metal box hidden inside the door. Height × width × depth <span class="size">188 × 21 × 100</span>. It needs a “case hole” in the door edge.</p></li>
+        <li><h3>Handle centre</h3><p>Where the handle spindle goes through, which is the centre of the round hole in the door face.</p></li>
+        <li><h3>Case centre</h3><p>The exact middle of the case height. The panel slot and the case hole are both centred here. Its distance from the handle centre is the Gap, which is different for every lock, so enter it yourself.</p></li>
+      </ul>
+    </div>
+  </section>
+
+
+  <section class="card" aria-labelledby="ts">
+    <div class="card-label" id="ts"><span>Lock slots (cut in the door edge)</span></div>
+    <div class="photo-grid holes slots">
+      <div class="figs">
+        <figure class="photo dark"><svg id="slotSvg" viewBox="0 0 420 640" role="img" aria-label="Door edge view of the lock slots: the panel slot and case hole nested together with length and width"></svg></figure>
+        <figure class="photo dark"><svg id="slotSecSvg" viewBox="0 0 420 560" role="img" aria-label="Lock side view: thin faceplate and box-shaped case with faceplate length, thickness, case height and depth"></svg></figure>
+        <p class="photo-cap">Example drawings, they follow the numbers on the right. The top one looks straight at the door edge (shape of the slots), the bottom one is the side of the lock (thin faceplate, box-shaped case). The numbers are what you key into the machine, allowance already added.</p>
+      </div>
+      <div>
+        <div id="slotBlocks"></div>
+        <p class="hint">Machine input = actual lock size + allowance. Three separate parts: actual size, allowance, machine input. The slots are always centred on the lock-body centre, so both slots share the same “From TOP” and “From door face” numbers. Once the allowances are tuned, ask Claude to lock these numbers.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="hingeCard" aria-labelledby="th">
+    <div class="card-label" id="th">Hinges</div>
+    <div class="photo-grid">
+      <div>
+        <figure class="photo dark"><svg id="hingeSvg" viewBox="0 0 420 640" role="img" aria-label="Hinge slot drawing: door edge view, slot flush with one door face, showing distance from TOP to start, slot length, width and depth"></svg></figure>
+        <p class="photo-cap">Example drawing, it follows the numbers on the right. The yellow dot is the start point the machine needs: the slot corner nearest TOP, measured from TOP. The slot is cut in from the door edge, flush with one door face, not in the middle of the edge.</p>
+      </div>
+      <div>
+        <div class="seg-row" id="hsizeRow">
+          <button class="seg" data-group="hsize" data-val="4">4 inch<small>slot length 102</small></button>
+          <button class="seg" data-group="hsize" data-val="5">5 inch<small>slot length 128</small></button>
+          <button class="seg" data-group="hsize" data-val="c">Custom<small>enter yourself</small></button>
+        </div>
+        <div class="seg-row">
+          <button class="seg" data-group="hcount" data-val="3">3 hinges<small>usual for 7 ft door</small></button>
+          <button class="seg" data-group="hcount" data-val="4">4 hinges<small>always for 8 ft door</small></button>
+        </div>
+        <p class="hint" id="hcountHint"></p>
+        <p class="hint" id="hsizeHint"></p>
+        <div class="sub">Hinge slot size</div>
+        <div class="grid" id="hingeFields"></div>
+        <p class="hint">3 hinges: the 2nd is exactly in the middle between the 1st and 3rd. 4 hinges: the 2nd is a fixed 70 gap from the 1st, and the 3rd is exactly in the middle between the 2nd and 4th. The 1st is 150 from the frame top and the last is 150 from the frame bottom, fixed, cannot be changed.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ===== All defaults live here. Once tuned, ask Claude to lock this block so new staff never need to adjust it. ===== */
+const DEFAULTS = {
+  tol: { '1hr': [3, 7], '2hr': [4.5, 7.5], 'nor': [3, 7] },   // [top gap, bottom gap]; every door with a lock is single leaf
+  frame: { '1hr': { profY: 65, stopGap: 25, lock: true }, '2hr': { profY: 65, stopGap: 25, lock: true }, 'nor': { profY: 50, stopGap: 13, lock: false } },   // fixed for 1HR/2HR, editable for Normal
+  thick: { '1hr': 45, '2hr': 49, 'nor': 38 },                  // default door thickness (filled when the type is chosen, can be edited)
+  gapBody: 42,                                   // handle centre -> case centre (different for every lock)
+  round: { dia: 20, edge: 70 },                  // handle round hole: diameter, distance from door edge
+  holes: [                                       // other holes: shape circle|slot; gap = handle centre to near end of hole; dir top = toward TOP, bottom = toward floor
+    { shape: 'slot', len: 45, wid: 12, gap: 80, dir: 'top',    edge: 70 },
+    { shape: 'slot', len: 40, wid: 20, gap: 60, dir: 'bottom', edge: 70 }
+  ],
+  panel:  { L: 241, W: 24, D: 3,   aL: 2, aW: 0.5, aD: 0.3 },   // panel slot
+  body:   { L: 188, W: 21, D: 100, aL: 6, aW: 0.5, aD: 3 },     // case hole
+  hinge: {
+    '4': { len: 102, wid: 31.8, dep: 2 },
+    '5': { len: 128, wid: 37.3, dep: 2.5 }
+  },
+  hingeGap2: 70,                                 // with 4 hinges: gap between 1st and 2nd (fixed)
+  hingeTop: 150,                                 // hinge distance from frame top
+  hingeBottom: 150,                              // hinge distance from frame bottom
+  hingeAutoH: 2300                               // at this door height or more, suggest 4 hinges
+};
+
+/*CALC-START*/
+function calc(p) {
+  const o = {};
+  const top = p.top, btm = p.btm;
+  const doorH = p.doorH;
+  o.doorH = doorH;
+  o.floor = p.lockH - btm;
+  o.handle = doorH - o.floor;
+  const h = o.handle;
+  o.lock = h + p.gapBody;
+  o.holes = [];
+  p.holes.forEach((x, i) => {
+    const circle = x.shape === 'circle';
+    const len = x.len, wid = circle ? x.len : x.wid;
+    if (!isFinite(len) || !isFinite(wid) || !isFinite(x.gap)) return;
+    const c = x.dir === 'top' ? h - (x.gap + len / 2) : h + x.gap + len / 2;
+    o.holes.push({ i: i, circle: circle, len: len, wid: wid, gap: x.gap, dir: x.dir, c: c, edge: isFinite(x.edge) ? x.edge : p.handleEdge });
+  });
+  o.panel = { L: p.panel.L + p.panel.aL, W: p.panel.W + p.panel.aW, D: p.panel.D + p.panel.aD };
+  o.body = { L: p.body.L + p.body.aL, W: p.body.W + p.body.aW, D: p.body.D + p.body.aD };
+  o.panelFrom = o.lock - o.panel.L / 2; o.panelTo = o.lock + o.panel.L / 2;
+  o.bodyFrom = o.lock - o.body.L / 2;   o.bodyTo = o.lock + o.body.L / 2;
+  const hs = p.hingeSpec;
+  o.s1 = p.hTop - top;
+  o.sN = doorH - (p.hBottom - btm) - hs.len;
+  o.hinges = [];
+  if (!p.hasHinge) {
+    // this door has no hinges: nothing to work out
+  } else if (p.hcount === 4) {
+    // 4 个：第 1 个在最上，第 4 个在最下；第 2 个离第 1 个固定空隙；第 3 个在第 2 个和第 4 个正中间（两边空隙一样大）
+    const f2 = o.s1 + hs.len + p.hGap2;
+    const f3 = ((f2 + hs.len) + o.sN) / 2 - hs.len / 2;
+    [o.s1, f2, f3, o.sN].forEach(v => o.hinges.push({ from: v, to: v + hs.len }));
+  } else {
+    // 3 个：第 2 个在第 1 个和第 3 个正中间
+    for (let i = 0; i < p.hcount; i++) {
+      const s = o.s1 + i * (o.sN - o.s1) / (p.hcount - 1);
+      o.hinges.push({ from: s, to: s + hs.len });
+    }
+  }
+  o.warn = [];
+  const bad = [doorH, o.floor, o.handle, o.lock].concat(p.hasHinge ? [o.s1, o.sN] : []).some(v => !isFinite(v));
+  o.ok = !bad;
+  if (o.ok) {
+    if (doorH <= 0) o.warn.push('Door height is 0 or negative. Please check the frame height.');
+    if (o.handle <= 0 || o.handle >= doorH) o.warn.push('The handle is outside the door. Please check the handle height.');
+    o.holes.forEach(x => {
+      if (x.c - x.len / 2 < 0 || x.c + x.len / 2 > doorH) o.warn.push('Hole ' + (x.i + 1) + ' is outside the door.');
+    });
+    if (o.panelFrom < 0 || o.panelTo > doorH) o.warn.push('The panel slot is outside the door.');
+    for (let i = 1; i < o.hinges.length; i++) {
+      if (o.hinges[i].from < o.hinges[i - 1].to) { o.warn.push('Hinge slots overlap. Please check the hinge size and number.'); break; }
+    }
+    if (isFinite(p.doorT)) {
+      if (p.hasHinge && hs.wid > p.doorT) o.warn.push('Hinge slot width ' + hs.wid + ' is bigger than the door thickness ' + p.doorT + '.');
+      if (o.panel.W > p.doorT || o.body.W > p.doorT) o.warn.push('A lock slot is wider than the door thickness. Please check the lock size and allowance.');
+    }
+  }
+  return o;
+}
+/*CALC-END*/
+
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? NaN : v; };
+const r2 = x => Math.round(x * 100) / 100;
+const f = x => (typeof x === 'number' && isFinite(x)) ? String(r2(x)) : '—';
+
+const state = { mode: 'frame', type: '1hr', hsize: '4', hcount: 3, hTouched: false, holes: [] };
+
+const mi = (id, label, val) =>
+  '<div class="mi"><label for="' + id + '">' + label + '</label><input id="' + id + '" type="number" step="any" inputmode="decimal" value="' + val + '" oninput="update()"></div>';
+const ov = (id, label) => '<div class="mi"><label>' + label + '</label><div class="ov" id="' + id + '">—</div></div>';
+
+function cloneHoles() {
+  return DEFAULTS.holes.map(h => ({ shape: h.shape, len: String(h.len), wid: String(h.wid), gap: String(h.gap), dir: h.dir, edge: String(h.edge) }));
+}
+
+function renderHoles() {
+  const hi = (i, key, label, val, ph) =>
+    '<div class="mi"><label for="h' + i + '_' + key + '">' + label + '</label><input id="h' + i + '_' + key + '" type="number" step="any" inputmode="decimal" value="' + val + '" placeholder="' + (ph || '') + '" oninput="holeEdit(' + i + ',\'' + key + '\',this.value)"></div>';
+  $('holeList').innerHTML = state.holes.map((x, i) => {
+    const circle = x.shape === 'circle';
+    return '<div class="box"><h4><span>Hole ' + (i + 1) + '<small>' + (x.dir === 'top' ? 'above handle (toward TOP)' : 'below handle (toward floor)') + '</small></span>' +
+      '<span class="hbtns"><button class="btn ghost" type="button" onclick="flipHole(' + i + ')">⇅ Flip side</button><button class="btn ghost" type="button" onclick="delHole(' + i + ')">Delete</button></span></h4><div class="mi-row">' +
+      '<div class="mi"><label for="h' + i + '_shape">Shape</label><select id="h' + i + '_shape" onchange="holeEdit(' + i + ',\'shape\',this.value)">' +
+        '<option value="circle"' + (circle ? ' selected' : '') + '>Round</option><option value="slot"' + (circle ? '' : ' selected') + '>Slot</option></select></div>' +
+      hi(i, 'len', circle ? 'Diameter' : 'Length', x.len, '–') + (circle ? '' : hi(i, 'wid', 'Width', x.wid, '–')) +
+      hi(i, 'gap', 'Gap to handle centre', x.gap, '–') +
+      hi(i, 'edge', 'From door edge', x.edge, '70') +
+      '</div></div>';
+  }).join('');
+}
+
+function holeEdit(i, key, val) {
+  state.holes[i][key] = val;
+  if (key === 'shape') {
+    const h = state.holes[i];
+    if (val === 'circle') { if (!h.len) h.len = '20'; }
+    else { if (!h.len) h.len = '40'; if (!h.wid) h.wid = '20'; }
+    if (!h.gap) h.gap = '60';
+    renderHoles();
+  }
+  update();
+}
+function addHole() {
+  state.holes.push({ shape: 'slot', len: '40', wid: '20', gap: '140', dir: 'top', edge: String(DEFAULTS.round.edge) });
+  renderHoles();
+  update();
+}
+function flipHole(i) {
+  state.holes[i].dir = state.holes[i].dir === 'top' ? 'bottom' : 'top';
+  renderHoles();
+  update();
+}
+function delHole(i) {
+  state.holes.splice(i, 1);
+  renderHoles();
+  update();
+}
+
+function renderSettings() {
+  const D = DEFAULTS;
+  $('handleBox').innerHTML =
+    '<div class="box"><h4><span>Handle round hole<small>reference, always there</small></span></h4><div class="mi-row">' + mi('lo_dia', 'Diameter', D.round.dia) + mi('lo_edge', 'From door edge', D.round.edge) + '</div></div>';
+  state.holes = cloneHoles();
+  renderHoles();
+  $('gapBox').innerHTML =
+    '<div class="box add"><h4><span>Gap<small>different for every lock</small></span></h4><div class="mi-row">' + mi('lo_body', 'Gap', D.gapBody) + '</div></div>';
+
+  const slot = (k, name, hint) => {
+    const d = D[k], dl = k === 'panel' ? 'Thickness' : 'Depth';
+    return '<div class="slot"><h3>' + name + '<small>' + hint + '</small></h3><div class="eq">' +
+      '<div class="box"><h4>Actual lock size</h4><div class="mi-row">' + mi('lk_' + k + '_L', 'Length', d.L) + mi('lk_' + k + '_W', 'Width', d.W) + mi('lk_' + k + '_D', dl, d.D) + '</div></div>' +
+      '<div class="op">+</div>' +
+      '<div class="box add"><h4>Add allowance</h4><div class="mi-row">' + mi('lk_' + k + '_aL', '+ Length', d.aL) + mi('lk_' + k + '_aW', '+ Width', d.aW) + mi('lk_' + k + '_aD', '+ ' + dl, d.aD) + '</div></div>' +
+      '<div class="op">=</div>' +
+      '<div class="box out"><h4>Machine input</h4><div class="mi-row">' + ov('m_' + k + '_L', 'Length') + ov('m_' + k + '_W', 'Width') + ov('m_' + k + '_D', dl) + '</div><div class="mi-row cen">' + ov('m_' + k + '_top', 'From TOP (centre)') + ov('m_' + k + '_face', 'From door face (centre)') + '</div></div>' +
+      '</div></div>';
+  };
+  $('slotBlocks').innerHTML = slot('panel', 'Panel slot', 'holds the faceplate, which is thin, so we measure thickness') + slot('body', 'Case hole', 'holds the lock case, cut deep into the door, so we measure depth');
+
+  const h4 = D.hinge['4'];
+  const fld = (id, label, val, locked) =>
+    '<div class="field"><label for="' + id + '">' + label + (locked ? '<em>FIXED</em>' : '') + '</label><div class="in' + (locked ? ' locked' : '') + '"><input id="' + id + '" type="number" step="any" inputmode="decimal" value="' + val + '"' + (locked ? ' readonly' : '') + ' oninput="update()"><span class="u">mm</span></div></div>';
+  $('hingeFields').innerHTML =
+    fld('hg_len', 'Slot length', h4.len) + fld('hg_wid', 'Slot width', h4.wid) + fld('hg_dep', 'Slot depth', h4.dep) +
+    fld('hg_top', 'From frame top', D.hingeTop, true) + fld('hg_bot', 'From frame bottom', D.hingeBottom, true) + fld('hg_gap2', 'With 4 hinges: 2nd to 1st (gap)', D.hingeGap2, true);
+}
+
+function setHinge(k) {
+  const h = DEFAULTS.hinge[k];
+  $('hg_len').value = h.len; $('hg_wid').value = h.wid; $('hg_dep').value = h.dep;
+}
+
+/* ---- saved models (this device only; the portal version would save these in its database) ---- */
+function pStore() { try { return JSON.parse(localStorage.getItem('apexLockPresets') || '{}'); } catch (e) { return {}; } }
+function pPut(o) { try { localStorage.setItem('apexLockPresets', JSON.stringify(o)); return true; } catch (e) { return false; } }
+function pKey(kind, name) { return kind + '|' + name.trim().toLowerCase(); }
+function refreshModelLists() {
+  const st = pStore();
+  ['lock', 'hinge'].forEach(k => {
+    $(k + 'Models').innerHTML = Object.keys(st).filter(x => x.indexOf(k + '|') === 0).map(x => '<option value="' + st[x].name.replace(/"/g, '&quot;') + '"></option>').join('');
+  });
+}
+function savePreset(kind) {
+  const name = $(kind + 'Model').value.trim(), msg = $('presetMsg');
+  if (!name) { msg.textContent = 'Type the ' + kind + ' model name first.'; return; }
+  const v = id => $(id).value;
+  let data;
+  if (kind === 'lock') {
+    data = { gap: v('lo_body'), dia: v('lo_dia'), edge: v('lo_edge'), holes: JSON.parse(JSON.stringify(state.holes)), slots: {} };
+    ['panel', 'body'].forEach(k => { data.slots[k] = {}; ['L', 'W', 'D', 'aL', 'aW', 'aD'].forEach(q => data.slots[k][q] = v('lk_' + k + '_' + q)); });
+  } else data = { len: v('hg_len'), wid: v('hg_wid'), dep: v('hg_dep') };
+  const st = pStore(); st[pKey(kind, name)] = { name: name, data: data };
+  msg.textContent = pPut(st) ? 'Saved ' + kind + ' model “' + name + '”. Type it again any time to fill in the same sizes.' : 'Could not save on this browser.';
+  refreshModelLists();
+}
+function loadPreset(kind) {
+  const name = $(kind + 'Model').value.trim(), msg = $('presetMsg');
+  const rec = pStore()[pKey(kind, name)];
+  if (!rec) return;
+  const d = rec.data, set = (id, val) => { const el = $(id); if (el) el.value = val; };
+  if (kind === 'lock') {
+    set('lo_body', d.gap); set('lo_dia', d.dia); set('lo_edge', d.edge);
+    state.holes = JSON.parse(JSON.stringify(d.holes)); renderHoles();
+    ['panel', 'body'].forEach(k => ['L', 'W', 'D', 'aL', 'aW', 'aD'].forEach(q => set('lk_' + k + '_' + q, d.slots[k][q])));
+    msg.textContent = 'Loaded saved lock model “' + rec.name + '”.';
+  } else {
+    if (DEFAULTS.frame[state.type].lock) { msg.textContent = 'Fire door: hinge size is fixed at 5 inch, saved size not used.'; return; }
+    set('hg_len', d.len); set('hg_wid', d.wid); set('hg_dep', d.dep);
+    msg.textContent = 'Loaded saved hinge model “' + rec.name + '”.';
+  }
+  update();
+}
+
+function readParams() {
+  const g = DEFAULTS.tol[state.type];
+  const lk = k => ({ L: num('lk_' + k + '_L'), W: num('lk_' + k + '_W'), D: num('lk_' + k + '_D'), aL: num('lk_' + k + '_aL'), aW: num('lk_' + k + '_aW'), aD: num('lk_' + k + '_aD') });
+  return {
+    top: g[0], btm: g[1],
+    frameH: num('frameH'), doorW: num('doorW'), doorH: num('doorH'), doorT: num('doorT'), lockH: num('lockH'),
+    gapBody: num('lo_body'), handleEdge: num('lo_edge'), dia: num('lo_dia'),
+    holes: state.holes.map(x => ({ shape: x.shape, len: parseFloat(x.len), wid: parseFloat(x.wid), gap: parseFloat(x.gap), dir: x.dir, edge: parseFloat(x.edge) })),
+    panel: lk('panel'), body: lk('body'),
+    hingeSpec: { len: num('hg_len'), wid: num('hg_wid'), dep: num('hg_dep') },
+    hGap2: num('hg_gap2'), hTop: num('hg_top'), hBottom: num('hg_bot'), hcount: state.hcount, hasHinge: $('hasHinge').checked
+  };
+}
+
+function syncSeg() {
+  document.querySelectorAll('.seg').forEach(b => {
+    b.setAttribute('aria-pressed', String(state[b.dataset.group]) === b.dataset.val ? 'true' : 'false');
+  });
+}
+
+function applyType() {
+  const fr = DEFAULTS.frame[state.type];
+  $('profY').value = fr.profY; $('stopGap').value = fr.stopGap;
+  $('doorT').value = DEFAULTS.thick[state.type];
+  ['profY', 'stopGap'].forEach(id => {
+    $(id).readOnly = fr.lock;
+    $(id + 'Box' === 'profYBox' ? 'profBox' : 'stopBox').classList.toggle('locked', fr.lock);
+  });
+  $('profTag').hidden = !fr.lock; $('stopTag').hidden = !fr.lock;
+  const hl = fr.lock;
+  if (hl) setHinge('5');
+  $('hsizeRow').hidden = hl;
+  ['hg_len', 'hg_wid', 'hg_dep'].forEach(id => { const el = $(id); if (!el) return; el.readOnly = hl; el.closest('.in').classList.toggle('locked', hl); });
+  $('hsizeHint').textContent = hl ? 'Hinge size is fixed at 5 inch (slot 128 × 37.3 × 2.5) for fire doors and cannot be changed.' : '';
+  setLockHint();
+}
+
+function setLockHint() {
+  const fr = DEFAULTS.frame[state.type];
+  $('lockHint').textContent = state.mode === 'door' ? '' : (fr.lock ? 'Profile Y and Stop Gap are fixed for fire doors and cannot be changed.' : 'For a standard door Profile Y and Stop Gap can vary. The defaults can be edited.');
+}
+
+/* Frame + Door: door height is worked out from the frame height. Door only (frame already installed): measure inside the frame, then take off the top gap. The bottom gap is still used for the handle height, just not shown. */
+function applyMode() {
+  const door = state.mode === 'door';
+  ['fld_frameH', 'fld_profY', 'fld_stopGap', 'fld_frameBal', 'fld_topGap', 'fld_btmGap'].forEach(id => { $(id).hidden = door; });
+  $('fld_measH').hidden = !door;
+  $('doorHLabel').textContent = door ? 'Door height (measured − top gap)' : 'Door height';
+  setLockHint();
+}
+
+function update() {
+  const g0 = DEFAULTS.tol[state.type];
+  if (state.mode === 'door') {
+    const ms = num('measH'), dh = ms - g0[0];
+    $('doorH').value = isFinite(dh) ? r2(dh) : '';
+    $('doorFormula').textContent = isFinite(dh) ? 'Door height = measured inside the installed frame ' + f(ms) + ' − top gap ' + g0[0] + ' = ' + f(dh) + ' mm' : '';
+  } else {
+    const fh = num('frameH'), py = num('profY'), sg = num('stopGap');
+    const bal = (isFinite(py) && isFinite(sg)) ? py - sg : NaN;
+    $('frameBal').value = isFinite(bal) ? r2(bal) : '';
+    const dh = fh - bal - g0[0] - g0[1];
+    $('doorH').value = isFinite(dh) ? r2(dh) : '';
+    $('doorFormula').textContent = isFinite(dh) ? 'Door height = frame height ' + f(fh) + ' − Frame Balance ' + f(bal) + ' − top gap ' + g0[0] + ' − bottom gap ' + g0[1] + ' = ' + f(dh) + ' mm' : '';
+  }
+  const p = readParams();
+  ['fld_hingeModel', 'hingeCard', 'hingeResSub', 'hingeResTbl'].forEach(id => { $(id).hidden = !p.hasHinge; });
+  $('topGap').value = p.top;
+  $('btmGap').value = p.btm;
+
+  const hv = p.hingeSpec, pr = DEFAULTS.hinge;
+  const same = k => hv.len === pr[k].len && hv.wid === pr[k].wid && hv.dep === pr[k].dep;
+  state.hsize = same('4') ? '4' : same('5') ? '5' : 'c';
+
+  if (!state.hTouched && isFinite(p.doorH)) {
+    state.hcount = p.doorH >= DEFAULTS.hingeAutoH ? 4 : 3;
+    p.hcount = state.hcount;
+  }
+  syncSeg();
+  $('hcountHint').textContent = state.hTouched
+    ? 'Number of hinges was chosen manually.'
+    : 'Number of hinges is suggested from the door height: 4 when the door is ' + DEFAULTS.hingeAutoH + ' mm or taller, otherwise 3. Tap a button to change it.';
+
+  const o = calc(p);
+
+  ['panel', 'body'].forEach(k => {
+    $('m_' + k + '_L').textContent = f(o[k].L);
+    $('m_' + k + '_W').textContent = f(o[k].W);
+    $('m_' + k + '_D').textContent = f(o[k].D);
+  });
+
+  ['panel', 'body'].forEach(k => {
+    $('m_' + k + '_top').textContent = f(o.lock);
+    $('m_' + k + '_face').textContent = isFinite(p.doorT) ? f(p.doorT / 2) : '—';
+  });
+  $('r-floor').textContent = f(o.floor);
+  $('r-handle').textContent = f(o.handle);
+  $('r-lock').textContent = f(o.lock);
+  $('r-hn').textContent = p.hasHinge ? String(p.hcount) : '0';
+
+  const w = $('warn');
+  if (o.warn.length) { w.hidden = false; w.innerHTML = '<ul>' + o.warn.map(t => '<li>' + t + '</li>').join('') + '</ul>'; }
+  else { w.hidden = true; w.innerHTML = ''; }
+
+  const edge = f(p.handleEdge);
+  const rows = [
+    { n: 'Handle round hole', sub: 'Ø' + f(p.dia), c: o.handle, e: edge, size: 'Ø' + f(p.dia), from: o.handle - p.dia / 2, to: o.handle + p.dia / 2 }
+  ];
+  o.holes.forEach(x => rows.push({
+    n: 'Hole ' + (x.i + 1), sub: (x.circle ? 'round' : 'slot') + ' · ' + (x.dir === 'top' ? 'toward TOP' : 'toward floor'),
+    c: x.c, e: f(x.edge), size: x.circle ? 'Ø' + f(x.len) : f(x.len) + ' × ' + f(x.wid), from: x.c - x.len / 2, to: x.c + x.len / 2
+  }));
+  rows.push({ n: 'Panel slot', sub: 'centred on case centre', c: o.lock, e: '—', size: f(o.panel.L) + ' × ' + f(o.panel.W) + ' × ' + f(o.panel.D), from: o.panelFrom, to: o.panelTo, ref: true });
+  rows.push({ n: 'Case hole', sub: 'centred on case centre', c: o.lock, e: '—', size: f(o.body.L) + ' × ' + f(o.body.W) + ' × ' + f(o.body.D), from: o.bodyFrom, to: o.bodyTo, ref: true });
+  const hsize = f(hv.len) + ' × ' + f(hv.wid) + ' × ' + f(hv.dep);
+  $('rowsHinge').innerHTML = o.hinges.map((h, i) => {
+    const gap = i === 0 ? '—' : f(h.from - o.hinges[i - 1].to);
+    return '<tr><th scope="row">Hinge ' + (i + 1) + '</th><td class="key">' + f(h.from) + '</td><td class="num">' + f(h.to) + '</td><td class="num">' + hsize + '</td><td>' + gap + '</td></tr>';
+  }).join('');
+
+  draw(o, p);
+  drawHoles(o, p);
+  drawSlots(o, p);
+  drawHinge(p, o);
+  window.__rows = { o: o, p: p, rows: rows };
+  const tn = { '1hr': '1HR fire door', '2hr': '2HR fire door', 'nor': 'Standard door' }[state.type];
+  $('printHead').innerHTML = '<div class="ph-title">Lock Hole Parameter Sheet <small>Apex Jaya · CNC</small></div><div class="ph-grid">' +
+    [['Lock model', $('lockModel').value.trim() || '—'], ['Hinge model', p.hasHinge ? ($('hingeModel').value.trim() || '—') : 'No hinges'], ['Job', $('jobName').value.trim() || '—'], ['Door type', tn + (state.mode === 'door' ? ' · door only' : '')], state.mode === 'door' ? ['Measured inside frame', f(num('measH')) + ' mm'] : ['Frame height', f(p.frameH) + ' mm'], ['Door width', f(p.doorW) + ' mm'], ['Door thickness', f(p.doorT) + ' mm'], ['Door height', f(p.doorH) + ' mm'], ['Handle height (from floor)', f(p.lockH) + ' mm'], ['Date', new Date().toLocaleDateString('en-GB')]]
+      .map(x => '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>').join('') + '</div>';
+}
+
+/* 照 CAD 图排位：左边铰链边 | 中间门面 | 右边锁边。TOP 在下面，所有距离从底下的 TOP 往上量。 */
+function draw(o, p) {
+  const svg = $('svg');
+  if (!o.ok || o.doorH <= 0 || !isFinite(p.doorW) || p.doorW <= 0) { svg.innerHTML = ''; return; }
+  const H = o.doorH, PH = 850, sc = PH / H;
+  const Yt = 170, Yb = Yt + PH;
+  const Y = v => Yb - v * sc;
+  const T = (isFinite(p.doorT) && p.doorT > 0) ? p.doorT : 38;
+  const hs = p.hingeSpec;
+  const s = [];
+  s.push('<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="g-arrow" d="M0,1 L10,5 L0,9 z"/></marker></defs>');
+  const ext = (x1, y1, x2, y2) => s.push('<line class="g-ext" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"/>');
+  const dimv = (x, y1, y2, label) => {
+    s.push('<line class="g-dim" x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" marker-start="url(#ar)" marker-end="url(#ar)"/>');
+    if (label) s.push('<text class="g-val" transform="translate(' + (x - 8) + ' ' + ((y1 + y2) / 2) + ') rotate(-90)">' + label + '</text>');
+  };
+  const dimh = (y, x1, x2, label) => {
+    s.push('<line class="g-dim" x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" marker-start="url(#ar)" marker-end="url(#ar)"/>');
+    s.push('<text class="g-val" x="' + ((x1 + x2) / 2) + '" y="' + (y - 8) + '">' + label + '</text>');
+  };
+
+  // TOP 基线和门底标记
+  ext(40, Yb, 1170, Yb);
+  s.push('<text class="g-note" x="40" y="' + (Yt + 4) + '">Door bottom (floor)</text>');
+
+  // ---------- 左：铰链边（门边正对着看，宽度按真实门厚）----------
+  const sx = 200, sw = Math.max(12, T * sc);
+  s.push('<text class="g-name" x="' + (sx + sw / 2) + '" y="40">Hinge edge</text>');
+  s.push('<rect class="g-door" x="' + sx + '" y="' + Yt + '" width="' + sw + '" height="' + PH + '"/>');
+  const wn = Math.min(sw, Math.max(6, hs.wid * sc));
+  o.hinges.forEach(h => {
+    s.push('<rect class="g-hinge" x="' + (sx + sw - wn) + '" y="' + Y(h.to) + '" width="' + wn + '" height="' + Math.max(4, (h.to - h.from) * sc) + '"/>');
+  });
+  // 门高
+  ext(80, Yt, sx - 4, Yt);
+  dimv(80, Yt, Yb, 'Door height ' + f(H));
+  // 门厚
+  ext(sx, Yt - 4, sx, Yt - 44); ext(sx + sw, Yt - 4, sx + sw, Yt - 44);
+  s.push('<text class="g-val" x="' + (sx + sw / 2) + '" y="' + (Yt - 52) + '">' + f(T) + '</text>');
+  // 铰链：每个铰链从 TOP 量到靠 TOP 的那条边
+  const xs = [260, 310, 360, 410];
+  o.hinges.forEach((h, i) => {
+    const y = Y(h.from), x = xs[Math.min(i, 3)];
+    ext(sx + sw + 4, y, x, y);
+    const lenPx = Yb - y;
+    dimv(x, y, Yb, (lenPx > 190 ? 'Hinge ' + (i + 1) + ' ' : '') + f(h.from));
+  });
+  // 离底边的 143：门底到最靠门底的那条边
+  if (o.hinges.length) {
+    const last = o.hinges[o.hinges.length - 1];
+    const x = xs[0];
+    ext(sx + sw + 4, Yt, x, Yt);
+    ext(sx + sw + 4, Y(last.to), x, Y(last.to));
+    dimv(x, Yt, Y(last.to), f(p.hBottom - p.btm));
+  }
+  // 槽长：量第一个铰链
+  if (o.hinges.length) {
+    const h0 = o.hinges[Math.floor(o.hinges.length / 2)];
+    ext(sx - 4, Y(h0.from), sx - 44, Y(h0.from));
+    ext(sx - 4, Y(h0.to), sx - 44, Y(h0.to));
+    dimv(sx - 40, Y(h0.to), Y(h0.from), f(hs.len));
+  }
+  if (o.hinges.length) {
+    s.push('<text class="g-note" x="' + (sx + sw / 2) + '" y="' + (Yb + 34) + '" style="text-anchor:middle">Slot width ' + f(hs.wid) + ', flush with one face</text>');
+    s.push('<text class="g-note" x="' + (sx + sw / 2) + '" y="' + (Yb + 52) + '" style="text-anchor:middle">Other side ' + f(T - hs.wid) + ', slot depth ' + f(hs.dep) + '</text>');
+  } else {
+    s.push('<text class="g-note" x="' + (sx + sw / 2) + '" y="' + (Yb + 34) + '" style="text-anchor:middle">No hinges</text>');
+  }
+
+  // ---------- 中：门面 ----------
+  const fx = 520, fw = p.doorW * sc;
+  s.push('<text class="g-name" x="' + (fx + fw / 2) + '" y="40">Door face</text>');
+  s.push('<rect class="g-door" x="' + fx + '" y="' + Yt + '" width="' + fw + '" height="' + PH + '"/>');
+  const items = [{ name: 'Handle', c: o.handle, len: p.dia, wid: p.dia, circle: true, edge: p.handleEdge }]
+    .concat(o.holes.map(x => ({ name: 'H' + (x.i + 1), c: x.c, len: x.len, wid: x.wid, circle: x.circle, edge: x.edge })));
+  items.forEach(it => { it.x = fx + fw - it.edge * sc; it.hw = it.circle ? Math.max(4, it.len / 2 * sc) : Math.max(7, it.wid * sc) / 2; });
+  items.forEach(it => {
+    if (it.circle) s.push('<circle class="g-hole" cx="' + it.x + '" cy="' + Y(it.c) + '" r="' + it.hw + '"/>');
+    else s.push('<rect class="g-hole" rx="3" x="' + (it.x - it.hw) + '" y="' + (Y(it.c) - Math.max(6, it.len * sc) / 2) + '" width="' + (it.hw * 2) + '" height="' + Math.max(6, it.len * sc) + '"/>');
+  });
+  // 每个孔的中心：从孔往左拉，再往下量到 TOP；离孔近的是小数字
+  const sorted = items.slice().sort((a, b) => a.c - b.c);
+  const baseX = Math.min.apply(null, items.map(i => i.x)) - 46;
+  const sp = Math.min(66, Math.max(34, (baseX - fx - 30) / Math.max(1, sorted.length - 1)));
+  sorted.forEach((it, k) => {
+    const lx = baseX - k * sp, y = Y(it.c);
+    ext(it.x - it.hw - 4, y, lx, y);
+    dimv(lx, y, Yb, ((Yb - y) > 190 ? it.name + ' ' : '') + f(it.c));
+  });
+  // 门宽、离门边（门底那一侧，在图的上面）
+  const hx = items[0].x, ya = Yt - 66, yb = Yt - 30;
+  ext(fx, Yt - 4, fx, ya - 6); ext(fx + fw, Yt - 4, fx + fw, ya - 6);
+  dimh(ya, fx, fx + fw, f(p.doorW));
+  ext(hx, Y(o.handle) - items[0].hw - 4, hx, yb - 6);
+  dimh(yb, fx, hx, f(p.doorW - p.handleEdge));
+  dimh(yb, hx, fx + fw, f(p.handleEdge));
+  // 左：门高
+  ext(fx - 4, Yt, fx - 74, Yt);
+  dimv(fx - 70, Yt, Yb, 'Door height ' + f(H));
+  // 右：门底到把手 / TOP 到把手
+  const xr = fx + fw + 60;
+  ext(fx + fw + 4, Yt, xr, Yt);
+  ext(fx + fw + 4, Y(o.handle), xr, Y(o.handle));
+  dimv(xr, Yt, Y(o.handle), 'Floor to handle ' + f(o.floor));
+  dimv(xr, Y(o.handle), Yb, 'TOP to handle ' + f(o.handle));
+
+  // ---------- 右：锁边 ----------
+  const lx = 990, lw = Math.max(12, T * sc);
+  s.push('<text class="g-name" x="' + (lx + lw / 2) + '" y="40">Lock edge</text>');
+  s.push('<rect class="g-door" x="' + lx + '" y="' + Yt + '" width="' + lw + '" height="' + PH + '"/>');
+  const pw = Math.min(lw - 2, Math.max(6, o.panel.W * sc)), bw = Math.min(pw - 2, Math.max(4, o.body.W * sc));
+  s.push('<rect class="g-panel" x="' + (lx + (lw - pw) / 2) + '" y="' + Y(o.panelTo) + '" width="' + pw + '" height="' + (o.panel.L * sc) + '"/>');
+  s.push('<rect class="g-body" x="' + (lx + (lw - bw) / 2) + '" y="' + Y(o.bodyTo) + '" width="' + bw + '" height="' + (o.body.L * sc) + '"/>');
+  const xl = lx + lw + 56, xg = lx + lw + 100;
+  ext(lx + lw + 4, Y(o.lock), xg + 6, Y(o.lock));
+  ext(lx + lw + 4, Y(o.handle), xg + 6, Y(o.handle));
+  dimv(xl, Y(o.lock), Yb, f(o.lock) + ' (handle + Gap)');
+  dimv(xg, Y(o.lock), Y(o.handle), '');
+  s.push('<text class="g-note" x="' + (xg + 10) + '" y="' + ((Y(o.lock) + Y(o.handle)) / 2 + 4) + '">Gap ' + f(p.gapBody) + '</text>');
+  { const yh = Y(o.panelTo) - 22;
+    s.push('<line class="g-ext" x1="' + (lx + lw / 2) + '" y1="' + (yh - 8) + '" x2="' + (lx + lw / 2) + '" y2="' + (Y(o.panelTo)) + '" stroke-dasharray="4 3"/>');
+    s.push('<line class="g-dim" x1="' + lx + '" y1="' + yh + '" x2="' + (lx + lw / 2) + '" y2="' + yh + '" marker-start="url(#ar)" marker-end="url(#ar)"/>');
+    s.push('<text class="g-val" x="' + (lx + lw / 2) + '" y="' + (yh - 12) + '">' + f(T / 2) + '</text>'); }
+  s.push('<text class="g-note" x="' + (lx + lw / 2) + '" y="' + (Yb + 34) + '" style="text-anchor:middle">Light = panel slot</text>');
+  s.push('<text class="g-note" x="' + (lx + lw / 2) + '" y="' + (Yb + 52) + '" style="text-anchor:middle">Dark = case hole</text>');
+
+  // TOP 在下面，箭头指向下
+  const tx = fx + fw / 2;
+  s.push('<text class="g-top" x="' + (tx - 16) + '" y="' + (Yb + 70) + '">TOP</text>');
+  s.push('<line class="g-dim" x1="' + (tx + 50) + '" y1="' + (Yb + 30) + '" x2="' + (tx + 50) + '" y2="' + (Yb + 84) + '" marker-end="url(#ar)"/>');
+
+  svg.innerHTML = s.join('');
+}
+
+/* 锁孔示意图：照 CAD 例子图，所有孔排成一条中线，右边量每个孔的长度和孔之间的距离。上面 = 靠门 TOP 那边 */
+let holeDrag = null;
+function drawHoles(o, p) {
+  const svg = $('holeSvg');
+  if (!o.ok) { svg.innerHTML = ''; return; }
+  const items = [{ c: o.handle, len: p.dia, wid: p.dia, circle: true, handle: true }]
+    .concat(o.holes.map(x => ({ c: x.c, len: x.len, wid: x.wid, circle: x.circle, idx: x.i })))
+    .filter(it => isFinite(it.c) && isFinite(it.len) && it.len > 0);
+  if (!items.length) { svg.innerHTML = ''; return; }
+  items.forEach(it => { it.from = it.c - it.len / 2; it.to = it.c + it.len / 2; });
+  items.forEach(it => { const e = it.handle ? p.handleEdge : (o.holes.filter(h => h.i === it.idx)[0] || {}).edge; it.edge = isFinite(e) ? e : p.handleEdge; });
+  items.sort((a, b) => a.c - b.c);
+  const lo = Math.min.apply(null, items.map(i => i.from)), hi = Math.max.apply(null, items.map(i => i.to));
+  let span = Math.max(1, hi - lo), sc = Math.min(500 / span, 3.4);
+  let y0 = 70 + (500 - span * sc) / 2, loM = lo;
+  if (holeDrag) { sc = holeDrag.sc; y0 = holeDrag.y0; loM = holeDrag.lo; }
+  const doorX = 300, kx = 1.5, xmin = 60;
+  window.__hm = { sc: sc, y0: y0, lo: loM, doorX: doorX, kx: kx };
+  const Y = v => y0 + (v - loM) * sc;
+  const xd = 350;
+  items.forEach(it => { it.x = Math.max(xmin, doorX - (isFinite(it.edge) ? it.edge : 70) * kx); });
+  const xs = items.map(i => i.x).filter((v, i, a) => a.indexOf(v) === i);
+  const s = [];
+  s.push('<defs><marker id="ha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="g-arrow" d="M0,1 L10,5 L0,9 z"/></marker></defs>');
+  s.push('<text class="g-note" x="130" y="26" style="text-anchor:middle">↑ toward door TOP</text>');
+  s.push('<text class="g-note" x="210" y="626" style="text-anchor:middle">↓ toward door bottom</text>');
+  xs.forEach(x => s.push('<line class="g-ext" x1="' + x + '" y1="44" x2="' + x + '" y2="606" stroke-dasharray="6 4"/>'));
+  s.push('<line x1="' + doorX + '" y1="44" x2="' + doorX + '" y2="606" stroke="var(--accent)" stroke-width="2.5"/>');
+  s.push('<text class="g-note" x="' + doorX + '" y="26" style="text-anchor:middle">door edge</text>');
+  const dimv = (x, ya, yb, label) => {
+    s.push('<line class="g-dim" x1="' + x + '" y1="' + ya + '" x2="' + x + '" y2="' + yb + '" marker-start="url(#ha)" marker-end="url(#ha)"/>');
+    s.push('<text class="g-val" transform="translate(' + (x + 20) + ' ' + ((ya + yb) / 2) + ') rotate(-90)">' + label + '</text>');
+  };
+  const hits = [];
+  items.forEach((it, i) => {
+    const y1 = Y(it.from), y2 = Y(it.to), w = it.circle ? it.len * sc : it.wid * sc, ax = it.x;
+    if (it.circle) s.push('<circle cx="' + ax + '" cy="' + Y(it.c) + '" r="' + (it.len * sc / 2) + '" fill="none" stroke="var(--text)" stroke-width="1.6"/>');
+    else s.push('<rect x="' + (ax - w / 2) + '" y="' + y1 + '" width="' + w + '" height="' + (y2 - y1) + '" rx="' + (w / 2) + '" fill="none" stroke="var(--text)" stroke-width="1.6"/>');
+    hits.push('<rect class="hole-hit" data-hole="' + (it.handle ? 'h' : it.idx) + '" x="' + (ax - 46) + '" y="' + (Math.min(y1, y2) - 6) + '" width="92" height="' + (Math.abs(y2 - y1) + 12) + '" fill="transparent"/>');
+    // 左边：R 或 Ø
+    const lab = it.circle ? 'Ø' + f(it.len) : 'R' + f(it.wid / 2);
+    const yc = Y(it.c);
+    s.push('<line class="g-ext" x1="14" y1="' + yc + '" x2="' + (ax - w / 2) + '" y2="' + yc + '"/>');
+    s.push('<text class="g-val" x="14" y="' + (yc - 6) + '" style="text-anchor:start;fill:var(--accent-text)">' + lab + '</text>');
+    s.push('<line class="g-dim" x1="' + ax + '" y1="' + yc + '" x2="' + doorX + '" y2="' + yc + '" marker-start="url(#ha)" marker-end="url(#ha)"/>');
+    s.push('<text class="g-val" x="' + ((ax + doorX) / 2 + (it.circle ? 0 : 0)) + '" y="' + (yc - 7) + '" style="fill:var(--accent-text)">' + f(it.edge) + '</text>');
+    // 宽度：最上面的孔标在上方，最下面的标在下方
+    if (!it.circle && (i === 0 || i === items.length - 1)) {
+      const yy = i === 0 ? y1 - 18 : y2 + 18;
+      s.push('<line class="g-dim" x1="' + (ax - w / 2) + '" y1="' + yy + '" x2="' + (ax + w / 2) + '" y2="' + yy + '" marker-start="url(#ha)" marker-end="url(#ha)"/>');
+      s.push('<text class="g-val" x="' + ax + '" y="' + (i === 0 ? yy - 8 : yy + 20) + '" style="fill:var(--accent-text)">' + f(it.wid) + '</text>');
+    }
+    // 右边：长孔量长度；把手圆孔只量到它的中心（和 CAD 一样，80、60 都是量到把手中心）
+    const pts = it.handle ? [it.c] : [it.from, it.to];
+    pts.forEach(v => s.push('<line class="g-ext" x1="' + (doorX + 4) + '" y1="' + Y(v) + '" x2="' + (xd + 8) + '" y2="' + Y(v) + '"/>'));
+    if (!it.handle) dimv(xd, y1, y2, f(it.len));
+    const nx = items[i + 1];
+    if (nx) {
+      const endA = it.handle ? it.c : it.to, startB = nx.handle ? nx.c : nx.from;
+      dimv(xd, Y(endA), Y(startB), f(startB - endA));
+    }
+  });
+  svg.innerHTML = s.join('') + hits.join('');
+}
+
+/* 拖孔：直接在图上把孔拉上或拉下，自动算出「离把手中心」和在把手哪一边 */
+(function () {
+  const svg = $('holeSvg');
+  const mm = e => {
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { c: holeDrag.lo + (q.y - holeDrag.y0) / holeDrag.sc, e: (holeDrag.doorX - q.x) / holeDrag.kx };
+  };
+  svg.addEventListener('pointerdown', e => {
+    const t = e.target.closest('[data-hole]');
+    const m = window.__hm;
+    if (!t || !m) return;
+    holeDrag = { i: t.dataset.hole === 'h' ? 'h' : Number(t.dataset.hole), sc: m.sc, y0: m.y0, lo: m.lo, doorX: m.doorX, kx: m.kx };
+    try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!holeDrag) return;
+    const d = window.__rows && window.__rows.o;
+    if (!d) return;
+    const m = mm(e), ed = Math.max(0, Math.round(m.e * 2) / 2);
+    if (holeDrag.i === 'h') { $('lo_edge').value = ed; update(); return; }
+    const h = state.holes[holeDrag.i];
+    if (!h) return;
+    h.edge = String(ed);
+    const ei = $('h' + holeDrag.i + '_edge'); if (ei) ei.value = ed;
+    const len = parseFloat(h.len);
+    if (isFinite(len)) {
+      const c = m.c, dist = Math.abs(c - d.handle);
+      const gap = Math.max(0, Math.round((dist - len / 2) * 2) / 2);
+      h.gap = String(gap);
+      h.dir = c < d.handle ? 'top' : 'bottom';
+      const inp = $('h' + holeDrag.i + '_gap'); if (inp) inp.value = gap;
+    }
+    update();
+  });
+  const end = () => { if (!holeDrag) return; holeDrag = null; renderHoles(); update(); };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+})();
+
+/* 锁槽示意图：上面一张正对着门边看（长和宽），下面一张从门上面往下看（深和宽）。按真实比例，跟着输入变 */
+function drawSlots(o, p) {
+  const e1 = $('slotSvg'), e2 = $('slotSecSvg');
+  const T = isFinite(p.doorT) && p.doorT > 0 ? p.doorT : 45;
+  const P = o.panel, B = o.body;
+  if (!o.ok || ![P.L, P.W, P.D, B.L, B.W, B.D].every(v => isFinite(v) && v > 0)) { e1.innerHTML = ''; e2.innerHTML = ''; return; }
+  const defs = '<defs><marker id="sa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="g-arrow" d="M0,1 L10,5 L0,9 z"/></marker></defs>';
+  const dv = (a, x, y1, y2, label, dx) => a.push('<line class="g-dim" x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" marker-start="url(#sa)" marker-end="url(#sa)"/><text class="g-val" transform="translate(' + (x + (dx || 20)) + ' ' + ((y1 + y2) / 2) + ') rotate(-90)">' + label + '</text>');
+  const dh = (a, y, x1, x2, label, dy) => a.push('<line class="g-dim" x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" marker-start="url(#sa)" marker-end="url(#sa)"/><text class="g-val" x="' + ((x1 + x2) / 2) + '" y="' + (y + (dy === undefined ? -8 : dy)) + '" style="fill:var(--accent-text)">' + label + '</text>');
+  const ex = (a, x1, y1, x2, y2) => a.push('<line class="g-ext" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"/>');
+
+  // ---- 1) 正对着门边看
+  {
+    const a = [defs];
+    const sc = Math.min(1.9, 360 / P.L);
+    const cx = 150, cy = 330;
+    const sw = T * sc, top = 60, bot = 600;
+    a.push('<text class="g-note" x="320" y="30" style="text-anchor:middle">↑ toward door TOP</text>');
+    a.push('<text class="g-note" x="210" y="634" style="text-anchor:middle">↓ toward door bottom</text>');
+    a.push('<rect x="' + (cx - sw / 2) + '" y="' + top + '" width="' + sw + '" height="' + (bot - top) + '" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2 0"/>');
+    a.push('<line class="g-ext" x1="40" y1="' + cy + '" x2="' + (cx + 8) + '" y2="' + cy + '" stroke-dasharray="6 4"/>');
+    a.push('<text class="g-val" x="10" y="' + (cy - 8) + '" style="text-anchor:start;font-size:12px;fill:var(--accent-text)">Case centre</text>');
+    a.push('<text class="g-val" x="10" y="' + (cy + 8) + '" style="text-anchor:start;font-size:12px;fill:var(--accent-text)">' + f(o.lock) + '</text>');
+    a.push('<line class="g-ext" x1="' + cx + '" y1="' + top + '" x2="' + cx + '" y2="' + bot + '" stroke-dasharray="6 4"/>');
+    dh(a, bot - 26, cx - sw / 2, cx, f(T / 2), 18);
+    a.push('<text class="g-note" x="' + (cx + 8) + '" y="' + (bot - 22) + '">(face to centre)</text>');
+    const pw = P.W * sc, ph = P.L * sc, bw = B.W * sc, bh = B.L * sc;
+    a.push('<rect x="' + (cx - pw / 2) + '" y="' + (cy - ph / 2) + '" width="' + pw + '" height="' + ph + '" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>');
+    a.push('<rect x="' + (cx - bw / 2) + '" y="' + (cy - bh / 2) + '" width="' + bw + '" height="' + bh + '" fill="var(--bg)" stroke="var(--text)" stroke-width="1.6"/>');
+    a.push('<text class="g-note" x="40" y="' + (cy - ph / 2 + 18) + '" style="text-anchor:start;fill:var(--accent-text)">Panel slot</text>');
+    a.push('<text class="g-note" x="40" y="' + (cy - bh / 2 + 18) + '" style="text-anchor:start;fill:var(--text)">Case hole</text>');
+    // 右边：长度
+    const xr = cx + sw / 2 + 40, xr2 = xr + 44;
+    ex(a, cx + pw / 2 + 4, cy - ph / 2, xr + 8, cy - ph / 2); ex(a, cx + pw / 2 + 4, cy + ph / 2, xr + 8, cy + ph / 2);
+    dv(a, xr, cy - ph / 2, cy + ph / 2, f(P.L));
+    ex(a, cx + bw / 2 + 4, cy - bh / 2, xr2 + 8, cy - bh / 2); ex(a, cx + bw / 2 + 4, cy + bh / 2, xr2 + 8, cy + bh / 2);
+    dv(a, xr2, cy - bh / 2, cy + bh / 2, f(B.L));
+    // 上面：面板槽宽 / 门厚；下面：锁身洞宽
+    const yt = cy - ph / 2;
+    ex(a, cx - pw / 2, yt - 2, cx - pw / 2, yt - 26); ex(a, cx + pw / 2, yt - 2, cx + pw / 2, yt - 26);
+    dh(a, yt - 22, cx - pw / 2, cx + pw / 2, f(P.W));
+    ex(a, cx - sw / 2, top, cx - sw / 2, top - 22); ex(a, cx + sw / 2, top, cx + sw / 2, top - 22);
+    dh(a, top - 18, cx - sw / 2, cx + sw / 2, f(T) + ' (door thickness)');
+    const yb = cy + ph / 2;
+    ex(a, cx - bw / 2, cy + bh / 2 + 2, cx - bw / 2, yb + 26); ex(a, cx + bw / 2, cy + bh / 2 + 2, cx + bw / 2, yb + 26);
+    dh(a, yb + 22, cx - bw / 2, cx + bw / 2, f(B.W), 20);
+    e1.innerHTML = a.join('');
+  }
+
+  // ---- 2) 锁的侧面：面板薄薄一片，锁身是接在面板后面的盒子（照 CAD 图）
+  {
+    const a = [defs];
+    const k = Math.min(1.9, 400 / P.L, 230 / B.D);
+    const cy = 300, px = 110;
+    const pt = Math.max(P.D * k, 4), bd = B.D * k, ph = P.L * k, bh = B.L * k;
+    a.push('<text class="g-note" x="210" y="20" style="text-anchor:middle">Lock side view</text>');
+    a.push('<rect x="' + px + '" y="' + (cy - ph / 2) + '" width="' + pt + '" height="' + ph + '" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>');
+    a.push('<rect x="' + (px + pt) + '" y="' + (cy - bh / 2) + '" width="' + bd + '" height="' + bh + '" fill="none" stroke="var(--text)" stroke-width="1.6"/>');
+    a.push('<text class="g-note" x="' + (px + pt + bd / 2) + '" y="' + cy + '" style="text-anchor:middle">Case</text>');
+    a.push('<text class="g-note" x="' + (px + pt + 8) + '" y="' + (cy - ph / 2 + 16) + '" style="text-anchor:start;fill:var(--accent-text)">Faceplate (thin)</text>');
+    // 上面：面板厚度 + 锁身深度
+    const yt = cy - ph / 2 - 30;
+    ex(a, px, cy - ph / 2 - 4, px, yt - 8); ex(a, px + pt, cy - ph / 2 - 4, px + pt, yt - 8); ex(a, px + pt + bd, cy - bh / 2 - 4, px + pt + bd, yt - 8);
+    dh(a, yt + 6, px, px + pt, '', 0);
+    a.push('<text class="g-val" x="' + (px - 4) + '" y="' + (yt - 6) + '" style="text-anchor:end;fill:var(--accent-text)">Thick ' + f(P.D) + '</text>');
+    dh(a, yt, px + pt, px + pt + bd, 'Depth ' + f(B.D));
+    // 左边：面板长度；右边：锁身高度
+    const xl = px - 44, xr = px + pt + bd + 44;
+    ex(a, px - 4, cy - ph / 2, xl - 8, cy - ph / 2); ex(a, px - 4, cy + ph / 2, xl - 8, cy + ph / 2);
+    dv(a, xl, cy - ph / 2, cy + ph / 2, f(P.L), -10);
+    ex(a, px + pt + bd + 4, cy - bh / 2, xr + 8, cy - bh / 2); ex(a, px + pt + bd + 4, cy + bh / 2, xr + 8, cy + bh / 2);
+    dv(a, xr, cy - bh / 2, cy + bh / 2, f(B.L), 22);
+    e2.innerHTML = a.join('');
+  }
+}
+
+/* 铰链示意图：只画一张。门边正对着看，铰链槽从门边开进去，贴着一边门面。TOP 在下面。 */
+function drawHinge(p, o) {
+  const svg = $('hingeSvg');
+  const hs = p.hingeSpec;
+  const T = isFinite(p.doorT) && p.doorT > 0 ? p.doorT : 45;
+  const len = hs.len, wid = hs.wid, dep = hs.dep;
+  const s1 = o && o.ok && o.hinges.length ? o.hinges[0].from : NaN;
+  if (![len, wid, dep, s1].every(isFinite) || len <= 0 || wid <= 0) { svg.innerHTML = ''; return; }
+  const a = [];
+  const k = Math.min(1.9, 400 / (s1 + len + 20));
+  const kx = 2.8, cx = 190, sw = T * kx, yb = 520;
+  const ys = yb - s1 * k, ye = yb - (s1 + len) * k, top = ye - 70;
+  const xr = cx + sw / 2, xm = xr - Math.min(wid, T) * kx, xl = cx - sw / 2;
+  a.push('<defs><marker id="hm2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="g-arrow" d="M0,1 L10,5 L0,9 z"/></marker></defs>');
+  const ex = (x1, y1, x2, y2) => a.push('<line class="g-ext" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"/>');
+  const dv = (x, y1, y2, label, dx) => a.push('<line class="g-dim" x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" marker-start="url(#hm2)" marker-end="url(#hm2)"/><text class="g-val" transform="translate(' + (x + dx) + ' ' + ((y1 + y2) / 2) + ') rotate(-90)">' + label + '</text>');
+  const dh = (y, x1, x2, label) => a.push('<line class="g-dim" x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" marker-start="url(#hm2)" marker-end="url(#hm2)"/><text class="g-val" x="' + ((x1 + x2) / 2) + '" y="' + (y - 8) + '" style="fill:var(--accent-text)">' + label + '</text>');
+  a.push('<text class="g-note" x="210" y="22" style="text-anchor:middle">Door edge (looking straight at it)</text>');
+  a.push('<text class="g-note" x="' + (xr + 14) + '" y="' + (top + 44) + '">↑ toward door bottom</text>');
+  // 门边
+  a.push('<rect x="' + xl + '" y="' + top + '" width="' + sw + '" height="' + (yb - top) + '" fill="none" stroke="var(--muted)" stroke-width="1.2"/>');
+  // 铰链槽：贴着右边一边门面
+  a.push('<rect x="' + xm + '" y="' + ye + '" width="' + (xr - xm) + '" height="' + (ys - ye) + '" fill="var(--accent-soft)" stroke="var(--blue)" stroke-width="2"/>');
+  [0.2, 0.5, 0.8].forEach(t => a.push('<circle cx="' + ((xm + xr) / 2) + '" cy="' + (ye + (ys - ye) * t) + '" r="3" fill="var(--blue)"/>'));
+  // TOP 基线
+  a.push('<line x1="' + (xl - 70) + '" y1="' + yb + '" x2="' + (xr + 150) + '" y2="' + yb + '" stroke="var(--text)" stroke-width="2"/>');
+  a.push('<text class="g-top" x="' + cx + '" y="' + (yb + 38) + '" style="font-size:22px">TOP ↓</text>');
+  // 起点：靠 TOP 的那个角，量到这里
+  a.push('<circle cx="' + xm + '" cy="' + ys + '" r="6" fill="var(--accent)"/>');
+  ex(xm - 8, ys, xl - 56, ys);
+  dv(xl - 50, ys, yb, 'From TOP to start ' + f(s1), -10);
+  a.push('<text class="g-val" x="' + (xl - 56) + '" y="' + (ys - 8) + '" style="text-anchor:start;fill:var(--accent-text)">Start</text>');
+  // 槽长
+  ex(xr + 4, ye, xr + 52, ye); ex(xr + 4, ys, xr + 52, ys);
+  dv(xr + 46, ye, ys, 'Slot length ' + f(len), 22);
+  // 上面：槽宽 和 留边
+  ex(xm, ye - 2, xm, ye - 62); ex(xr, ye - 2, xr, ye - 62); ex(xl, top, xl, ye - 30);
+  dh(ye - 58, xm, xr, 'Slot width ' + f(wid));
+  if (T - wid > 0.5) {
+    a.push('<line class="g-dim" x1="' + xl + '" y1="' + (ye - 26) + '" x2="' + xm + '" y2="' + (ye - 26) + '" marker-start="url(#hm2)" marker-end="url(#hm2)"/>');
+    a.push('<text class="g-val" x="' + (xl - 6) + '" y="' + (ye - 22) + '" style="text-anchor:end;fill:var(--accent-text)">Left ' + f(T - wid) + '</text>');
+  }
+  a.push('<text class="g-val" x="210" y="' + (yb + 70) + '" style="fill:var(--accent-text)">Slot depth ' + f(dep) + ' (how deep into the door)</text>');
+  svg.innerHTML = a.join('');
+}
+
+function tsv() {
+  const d = window.__rows;
+  if (!d || !d.o.ok) return '';
+  const o = d.o, out = [];
+  out.push(['Item', 'From TOP (centre)', 'From door edge (centre)', 'Size L×W×D', 'Start', 'End'].join('\t'));
+  d.rows.forEach(r => out.push([r.n, f(r.c), r.e, r.size, f(r.from), f(r.to)].join('\t')));
+  const hs = d.p.hingeSpec, sz = f(hs.len) + '×' + f(hs.wid) + '×' + f(hs.dep);
+  o.hinges.forEach((h, i) => out.push(['Hinge ' + (i + 1), f(h.from), '—', sz, f(h.from), f(h.to)].join('\t')));
+  return out.join('\n');
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('.seg');
+  if (!b) return;
+  const g = b.dataset.group, v = b.dataset.val;
+  if (g === 'hcount') { state.hcount = Number(v); state.hTouched = true; }
+  else if (g === 'hsize') {
+    if (v === 'c') { $('hg_len').focus(); return; }
+    if (DEFAULTS.frame[state.type].lock) return;
+    setHinge(v);
+  } else { state[g] = v; if (g === 'type') applyType(); if (g === 'mode') applyMode(); }
+  update();
+});
+
+$('printBtn').addEventListener('click', () => { try { window.print(); } catch (e) {} });
+$('resetBtn').addEventListener('click', () => { renderSettings(); applyType(); update(); });
+$('addHole').addEventListener('click', addHole);
+
+$('copyBtn').addEventListener('click', () => {
+  const text = tsv();
+  const msg = $('copyMsg'), fb = $('fallback');
+  if (!text) { msg.textContent = 'Please fill in all the inputs first.'; return; }
+  const manual = () => { fb.hidden = false; fb.value = text; fb.focus(); fb.select(); msg.textContent = 'Could not copy automatically. The text is selected, please copy it by hand.'; };
+  try {
+    navigator.clipboard.writeText(text).then(() => { fb.hidden = true; msg.textContent = 'Copied. You can paste it straight into Excel.'; }, manual);
+  } catch (err) { manual(); }
+});
+
+/* ===== Saved jobs: kept in this browser, plus download / import as a file ===== */
+const JOB_FIELDS = ['frameH', 'measH', 'doorW', 'doorH', 'doorT', 'lockH', 'profY', 'stopGap', 'lockModel', 'hingeModel', 'lo_dia', 'lo_edge', 'lo_body', 'hg_len', 'hg_wid', 'hg_dep'];
+['panel', 'body'].forEach(k => ['L', 'W', 'D', 'aL', 'aW', 'aD'].forEach(q => JOB_FIELDS.push('lk_' + k + '_' + q)));
+
+const escHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const jKey = n => n.trim().toLowerCase();
+const jMsg = t => { $('jobMsg').textContent = t; };
+function jStore() { try { const o = JSON.parse(localStorage.getItem('apexLockJobs') || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; } }
+function jPut(o) { try { localStorage.setItem('apexLockJobs', JSON.stringify(o)); return true; } catch (e) { return false; } }
+
+function snapshot() {
+  const d = { v: 1, mode: state.mode, type: state.type, hcount: state.hcount, hTouched: state.hTouched, hasHinge: $('hasHinge').checked, holes: JSON.parse(JSON.stringify(state.holes)), f: {} };
+  JOB_FIELDS.forEach(id => { const el = $(id); if (el) d.f[id] = el.value; });
+  return d;
+}
+
+function cleanHoles(arr) {
+  if (!Array.isArray(arr)) return cloneHoles();
+  const ns = v => { const n = parseFloat(v); return isFinite(n) ? String(n) : ''; };
+  return arr.slice(0, 20).map(h => {
+    h = h || {};
+    return { shape: h.shape === 'circle' ? 'circle' : 'slot', len: ns(h.len), wid: ns(h.wid), gap: ns(h.gap), dir: h.dir === 'bottom' ? 'bottom' : 'top', edge: ns(h.edge) };
+  });
+}
+
+function restore(d) {
+  d = (d && typeof d === 'object') ? d : {};
+  state.mode = d.mode === 'door' ? 'door' : 'frame';
+  state.type = DEFAULTS.tol[d.type] ? d.type : '1hr';
+  applyType();
+  applyMode();
+  const fv = (d.f && typeof d.f === 'object') ? d.f : {};
+  JOB_FIELDS.forEach(id => { const el = $(id); if (el && fv[id] !== undefined && fv[id] !== null) el.value = String(fv[id]); });
+  if (state.mode === 'door' && (fv.measH === undefined || fv.measH === null) && isFinite(parseFloat(fv.doorH))) $('measH').value = String(r2(parseFloat(fv.doorH) + DEFAULTS.tol[state.type][0]));
+  state.holes = cleanHoles(d.holes);
+  renderHoles();
+  state.hcount = d.hcount === 4 ? 4 : 3;
+  state.hTouched = !!d.hTouched;
+  $('hasHinge').checked = d.hasHinge !== false;
+  update();
+}
+
+function renderJobs() {
+  const st = jStore();
+  const keys = Object.keys(st).sort((a, b) => (Number(st[b].savedAt) || 0) - (Number(st[a].savedAt) || 0));
+  const tn = { '1hr': '1HR', '2hr': '2HR', 'nor': 'Normal' };
+  $('jobList').innerHTML = keys.length ? keys.map(k => {
+    const r = st[k] || {}, d = (r.data && typeof r.data === 'object') ? r.data : {}, ff = (d.f && typeof d.f === 'object') ? d.f : {};
+    const t = Number(r.savedAt) ? new Date(Number(r.savedAt)) : null;
+    const when = t ? t.toLocaleDateString('en-GB') + ' ' + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+    const info = [tn[d.type] || '', d.mode === 'door' ? 'door only' : 'frame + door', 'door ' + (ff.doorW || '?') + ' wide', 'handle ' + (ff.lockH || '?'), when].filter(Boolean).join(' · ');
+    return '<div class="job"><div><b>' + escHtml(r.name || k) + '</b><small>' + escHtml(info) + '</small></div><span class="hbtns"><button class="btn" type="button" data-job="load" data-k="' + escHtml(k) + '">Load</button><button class="btn ghost" type="button" data-job="del" data-k="' + escHtml(k) + '">Delete</button></span></div>';
+  }).join('') : '<p class="hint" style="margin:0">Nothing saved yet.</p>';
+}
+
+function saveFile(fileName, obj) {
+  try {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    return true;
+  } catch (e) { return false; }
+}
+const fileSafe = t => t.replace(/[^\w一-龥\- ]+/g, '').trim().replace(/\s+/g, '-') || 'untitled';
+
+$('jobSave').addEventListener('click', () => {
+  const name = $('jobName').value.trim();
+  if (!name) { jMsg('Type a job name first, then press Save.'); $('jobName').focus(); return; }
+  const st = jStore(), k = jKey(name), had = !!st[k];
+  st[k] = { name: name, savedAt: Date.now(), data: snapshot() };
+  if (jPut(st)) { renderJobs(); jMsg((had ? 'Updated the saved job “' : 'Saved “') + name + '”. Find it in the list below any time.'); }
+  else jMsg('This browser would not keep the save (private window or blocked storage). Use “Download this sheet” instead.');
+});
+
+$('jobList').addEventListener('click', e => {
+  const b = e.target.closest('[data-job]');
+  if (!b) return;
+  const st = jStore(), rec = st[b.dataset.k];
+  if (!rec) return;
+  if (b.dataset.job === 'load') {
+    $('jobName').value = rec.name || '';
+    restore(rec.data);
+    jMsg('Loaded “' + (rec.name || '') + '”.');
+  } else if (b.dataset.armed) {
+    delete st[b.dataset.k]; jPut(st); renderJobs(); jMsg('Deleted “' + (rec.name || '') + '”.');
+  } else {
+    const label = b.textContent;
+    b.dataset.armed = '1'; b.textContent = 'Tap again to delete';
+    setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = label; } }, 3000);
+  }
+});
+
+$('jobDownload').addEventListener('click', () => {
+  const name = $('jobName').value.trim() || 'untitled';
+  const ok = saveFile('lockhole-' + fileSafe(name) + '.json', { app: 'ApexLockHole', version: 1, jobs: [{ name: name, savedAt: Date.now(), data: snapshot() }] });
+  jMsg(ok ? 'Downloaded “' + name + '”. Keep the file safe, or send it to a colleague to Import.' : 'Could not start the download in this browser.');
+});
+
+$('jobDownloadAll').addEventListener('click', () => {
+  const st = jStore(), jobs = Object.keys(st).map(k => st[k]).filter(r => r && r.name && r.data);
+  if (!jobs.length) { jMsg('Nothing saved yet, so there is nothing to download.'); return; }
+  const ok = saveFile('lockhole-all-jobs.json', { app: 'ApexLockHole', version: 1, jobs: jobs });
+  jMsg(ok ? 'Downloaded ' + jobs.length + ' saved job' + (jobs.length > 1 ? 's' : '') + ' as one backup file.' : 'Could not start the download in this browser.');
+});
+
+$('jobImportBtn').addEventListener('click', () => $('jobImport').click());
+$('jobImport').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const o = JSON.parse(rd.result);
+      if (!o || o.app !== 'ApexLockHole' || !Array.isArray(o.jobs)) throw new Error('not ours');
+      const st = jStore();
+      let n = 0, last = null;
+      o.jobs.forEach(j => {
+        if (!j || typeof j.name !== 'string' || !j.name.trim() || !j.data || typeof j.data !== 'object') return;
+        const name = j.name.trim().slice(0, 80);
+        st[jKey(name)] = { name: name, savedAt: Number(j.savedAt) || Date.now(), data: j.data };
+        last = st[jKey(name)]; n++;
+      });
+      if (!n) throw new Error('empty');
+      const kept = jPut(st);
+      renderJobs();
+      if (n === 1) { $('jobName').value = last.name; restore(last.data); }
+      jMsg('Imported ' + n + ' job' + (n > 1 ? 's' : '') + (n === 1 ? ' and loaded it on screen' : '') + (kept ? '.' : '. This browser would not keep it, so it is only on screen.'));
+    } catch (err) { jMsg('That file is not a Lock Hole Calculator job file.'); }
+    e.target.value = '';
+  };
+  rd.readAsText(file);
+});
+
+renderSettings();
+applyType();
+applyMode();
+refreshModelLists();
+renderJobs();
+update();
+</script>
