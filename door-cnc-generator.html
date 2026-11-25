@@ -54,7 +54,7 @@
 <body>
 <header>
   <h1>门面图案 CNC 生成器</h1>
-  <p>先选图案类型 → 填尺寸 → 预览 → 下载 .CNC（正面 + 背面）和 PDF。底部位置固定，多出来的高度加在上面。</p>
+  <p>先选设计 → 填尺寸 → 预览 → 下载 .CNC（正面 + 背面）和 PDF。底部位置固定，多出来的高度加在上面。</p>
 </header>
 <main>
   <div class="card panel">
@@ -63,9 +63,11 @@
       <select id="designSel"></select>
       <button class="sec sm" id="designDel">删除</button>
     </div>
+    <div style="display:none"><!-- 图案类型：阳阳说不用，藏起来（选设计会自动设定） -->
     <h2>图案类型</h2>
     <div class="row"><label>这个门是哪种图案<small>选了上面的设计会自动变；做全新款式才需要自己改</small></label>
       <select id="design"><option value="diag">斜线（斜线 + 竖槽）</option><option value="lines">横竖槽（横线 / 竖线）</option><option value="rects">方框 / 嵌板</option><option value="blocks">错开方块</option><option value="dash">断线（有缺口的槽）</option><option value="pockets">方格挖槽（3 道工序，3 个文件）</option><option value="free">自由线条（按比例放大，Bina SKK 那种）</option><option value="sun">半个太阳（放射线）</option><option value="tree">圣诞树</option></select></div>
+    </div>
     <div class="dsec d-diag d-pockets">
     <h2>门的结构</h2>
     <div class="row"><label>一块还是上下两块</label>
@@ -188,6 +190,7 @@
     <div class="row"><label>工序2：每趟间隔<small>0 = 自动（约刀直径的一半）</small></label><input id="pStep" type="number" value="0"></div>
     <div class="row"><label>工序3：竖直线的刀直径</label><select id="lineCut"><option>3</option><option selected>6</option><option>9.5</option><option>12.5</option></select></div>
     <div class="row"><label>工序3：竖直线切深</label><input id="lineDepth" type="number" step="0.5" value="3"></div>
+    <div class="row"><label>工序3：分几次切<small id="linePerPass"></small></label><input id="linePasses" type="number" step="1" min="1" value="1"></div>
     <div class="row"><label>工序3：刀号 T<div class="hint">6mm刀=T4（照你的6U4）；工序1、2用上面的刀号</div></label><input id="lineTool" type="number" value="4"></div>
     <div class="row"><label>三道工序合成 1 个文件<div class="hint">打勾 = 正面 1 个、背面 1 个；中间自动换刀</div></label><input id="mergeOps" type="checkbox" checked style="width:auto"></div>
     <div class="row"><label>算出来的</label><b id="pocketInfo" style="font-size:13px">-</b></div>
@@ -228,7 +231,9 @@
     <div class="row" id="vWidthRow" style="display:none"><label>槽宽 (mm)<small>V 刀：文件名里第一个数字，例 6V3 的 6</small></label><input id="vWidth" type="number" step="0.5" value="6"></div>
     <div class="row"><label>槽宽<small>平刀=刀直径；V 刀=上面填的</small></label><b id="grooveW" style="font-size:15px">-</b></div>
     <div class="row" id="vAngleRow" style="display:none"><label>刀尖角度（算出来的）<small>由槽宽和深度决定</small></label><b id="vAngleShow" style="font-size:15px">-</b></div>
-    <div class="row"><label>切深<small>文件名里最后那个数字（例 6V3 的 3）</small></label><input id="depth" type="number" step="0.5" value="4"></div>
+    <div class="row"><label>总切深 (mm)<small>文件名里最后那个数字（例 6V3 的 3）</small></label><input id="depth" type="number" step="0.5" value="4"></div>
+    <div class="row"><label>分几次切<small>1 = 一次切到底</small></label><input id="passes" type="number" step="1" min="1" value="1"></div>
+    <div class="row"><label>每次下刀（自动算）</label><b id="perPass" style="font-size:15px">-</b></div>
 
     <details><summary>机器设定（照 6U4.CNC，一般不用改）</summary>
       <div class="row"><label>刀号 T</label><input id="tool" type="number" value="4"></div>
@@ -238,6 +243,7 @@
       <div class="row"><label>安全抬刀高度 Z</label><input id="safeZ" type="number" value="20"></div>
     </details>
 
+    <div style="display:none"><!-- 保存/导出/导入：阳阳说不用，藏起来 -->
     <h2>保存这个设计（下次直接选）</h2>
     <div class="designs" style="margin-top:6px">
       <input id="designName" type="text" placeholder="给这个设计起个名字，例如 浴室门A">
@@ -249,6 +255,7 @@
       <input type="file" id="designFile" accept=".json" style="display:none">
     </div>
     <div class="note" style="margin-top:6px">保存的内容：图案类型、该图案的全部数字、刀、切深（不含门的宽高）。带 ★ 的是内置例子（按你给的设计图，没写出来的数字是我先假设的，请对着真实设计改）。想给同事用，就"导出"一个文件发给他，他"导入"。</div>
+    </div>
 
     <div class="warn" id="warn"></div>
 
@@ -707,16 +714,20 @@ function generateCNC(p) {
     return w.join(' ') + (tail ? ' ' + tail : '');
   };
   let cutLen = 0;
+  // 分几次切到总深度：每次走同一条路线，一次比一次深（1 次 = 跟原来 6U4 一模一样）
+  const nPass = Math.max(1, Math.round(p.passes || 1));
   for (const pt of gpaths) {
-    const a = move(pt[0][0], pt[0][1]);
-    L(first ? 'G0 ' + a : a); first = false;
-    L('Z0.');
-    L('G1 Z' + fmt(-p.depth) + ' F' + fF(p.plunge));
-    for (let i = 1; i < pt.length; i++) {
-      L(move(pt[i][0], pt[i][1], i === 1 ? 'F' + fF(p.feed) : ''));
-      cutLen += Math.hypot(pt[i][0] - pt[i - 1][0], pt[i][1] - pt[i - 1][1]);
+    for (let k = 1; k <= nPass; k++) {
+      const a = move(pt[0][0], pt[0][1]);
+      if (k === 1 || a) L(first ? 'G0 ' + a : a); first = false;   // 封闭的线第 2 次起已在起点，不用再移动
+      L('Z0.');
+      L('G1 Z' + fmt(-p.depth * k / nPass) + ' F' + fF(p.plunge));
+      for (let i = 1; i < pt.length; i++) {
+        L(move(pt[i][0], pt[i][1], i === 1 ? 'F' + fF(p.feed) : ''));
+        cutLen += Math.hypot(pt[i][0] - pt[i - 1][0], pt[i][1] - pt[i - 1][1]);
+      }
+      L('G0 Z' + fmt(p.safeZ));
     }
-    L('G0 Z' + fmt(p.safeZ));
   }
   L('X0. Y0.');
   L('M5');
@@ -724,7 +735,7 @@ function generateCNC(p) {
   return {
     design, grooveW: gw, mirror: !!p.mirror, backOrigin: bo, rotDoor, originX, originY, markX: bo[1] === 'R' ? W : 0, markY: bo[0] === 'T' ? totalH : 0, paths, segs, info, warnings, dims, gcode: out.join('\r\n') + '\r\n',
     extra: { eq: p._eq, veq: p._veq, panel: p._panel, blocks: p._blocks, dash: p._dash, free: p._free, pockets: p._pockets },
-    stats: { cuts: paths.length, diag: nDiag, vert: nVert, cutLen, minutes: cutLen / p.feed + paths.length * (p.depth / p.plunge + 0.02) }
+    stats: { cuts: paths.length, diag: nDiag, vert: nVert, cutLen, passes: nPass, minutes: cutLen / p.feed + paths.length * nPass * (p.depth / p.plunge + 0.02) }
   };
 }
 
@@ -931,6 +942,7 @@ function buildPDF(p, faces, base, dateStr) {
     row('Cutter', pp.cutter + ' mm ' + (pp.cutterType === 'V' ? 'V-bit (pointed)' : 'flat (U)'));
     row('Groove width (top)', (Math.round(g.grooveW * 100) / 100) + ' mm');
     row('Groove depth', pp.depth + ' mm');
+    { const np = Math.max(1, Math.round(pp.passes || 1)); row('Passes (depth per pass)', np + ' x ' + (Math.round(pp.depth / np * 1000) / 1000) + ' mm'); }
     if (pp.cutterType === 'V') row('V-bit angle (calc.)', (Math.round(2 * Math.atan(g.grooveW / 2 / pp.depth) * 180 / Math.PI * 10) / 10) + ' deg');
     ty -= 6;
     row('Tool no.', 'T' + p.tool);
@@ -1104,9 +1116,9 @@ function buildPDF(p, faces, base, dateStr) {
 
 
 const $ = (id) => document.getElementById(id);
-const CORE_IDS = ['cutter','depth','tool','spindle','plunge','feed','safeZ'];
+const CORE_IDS = ['cutter','depth','passes','tool','spindle','plunge','feed','safeZ'];
 const DIAG_IDS = ['gap','topH','leftMargin','spacing','c0dist'];
-const OPT_IDS = ['fW','fH','fScale','vPitch','vEqLeft','vEqRight','sCx','sBase','sOuterPitch','sA0','sA1','tCx','tBase','tN','tW','tH','tOv','tShrink','tSag','tTrunkW','tTrunkH','tStar','tBauble','pStrip','pW','pH','pGx','pGy','pCols','pMinMX','pMinMY','pClearInset','pStep','lineCut','lineDepth','lineTool','dPitch','dM0','dM1','dSeg','dGap','dStagger','dE0','dE1','vWidth','vBotM','vTopM','hPitch','hEqBottom','hEqTop','hX0','hX1','frameInset','pN','pMargin','pPW','pGap','pBottom','pTop','bW','bH','bBottom','bGap','bN','bMinTop'];
+const OPT_IDS = ['fW','fH','fScale','vPitch','vEqLeft','vEqRight','sCx','sBase','sOuterPitch','sA0','sA1','tCx','tBase','tN','tW','tH','tOv','tShrink','tSag','tTrunkW','tTrunkH','tStar','tBauble','pStrip','pW','pH','pGx','pGy','pCols','pMinMX','pMinMY','pClearInset','pStep','lineCut','lineDepth','linePasses','lineTool','dPitch','dM0','dM1','dSeg','dGap','dStagger','dE0','dE1','vWidth','vBotM','vTopM','hPitch','hEqBottom','hEqTop','hX0','hX1','frameInset','pN','pMargin','pPW','pGap','pBottom','pTop','bW','bH','bBottom','bGap','bN','bMinTop'];
 const TEXT_IDS = ['sRings','sPitch','vLeft','vRight','hBottom','hTop','bXs','customRects','dDir','eqMode','fMode','fAlign','freeSegs'];
 const NUM_IDS = CORE_IDS.concat(DIAG_IDS, OPT_IDS);
 const DNAMES = { diag: '斜线', lines: '横竖槽', rects: '方框/嵌板', blocks: '错开方块', dash: '断线', free: '自由线条', sun: '太阳', tree: '圣诞树', pockets: '方格挖槽' };
@@ -1179,7 +1191,7 @@ function opsOf(p){
   return [
     Object.assign({}, p, { part: 'ring' }),
     Object.assign({}, p, { part: 'clear' }),
-    Object.assign({}, p, { part: 'line', cutterType: 'U', cutter: p.lineCut, depth: p.lineDepth, tool: p.lineTool })
+    Object.assign({}, p, { part: 'line', cutterType: 'U', cutter: p.lineCut, depth: p.lineDepth, passes: p.linePasses, tool: p.lineTool })
   ];
 }
 const BO_ZH = { BL: '翻面后朝上的左下角', BR: '翻面后朝上的右下角', TL: '翻面后朝上的左上角', TR: '翻面后朝上的右上角' };
@@ -1245,6 +1257,10 @@ function validate(p, g, ops){
   $('maxDepthHint').textContent = '最深可切 ' + maxD + ' mm';
   $('grooveW').textContent = (Math.round(g.grooveW * 100) / 100) + ' mm';
   $('vAngleShow').textContent = Math.round(2 * Math.atan(g.grooveW / 2 / p.depth) * 180 / Math.PI * 10) / 10 + '°';
+  const pp1 = Math.max(1, Math.round(p.passes || 1)), per = Math.round(p.depth / pp1 * 1000) / 1000;
+  $('perPass').textContent = per + ' mm × ' + pp1 + ' 次 = ' + p.depth + ' mm';
+  const lp = Math.max(1, Math.round(p.linePasses || 1)); $('linePerPass').textContent = '每次 ' + (Math.round(p.lineDepth / lp * 1000) / 1000) + ' mm';
+  if (!(p.passes >= 1) || p.passes !== Math.round(p.passes)) w.push('「分几次切」要填 1、2、3… 这样的整数，现在按 ' + pp1 + ' 次算。');
   if (p.depth > maxD) w.push('⛔ 切深 ' + p.depth + ' 超过这把刀最深可切的 ' + maxD + ' mm，请改小。');
   if (p.cutterType === 'V') {
     if (p.vWidth > p.cutter) w.push('槽宽 ' + p.vWidth + ' 比刀直径 ' + p.cutter + ' 还大，已按 ' + p.cutter + ' 算。');
@@ -1466,8 +1482,8 @@ $('copy').onclick = async () => {
 
 // ---------- 设计（保存 / 载入 / 导出 / 导入） ----------
 const DKEY = 'cncDesigns_v1';
-const DESIGN_FIELDS = ['design','structure','anchor','spMode','ref','cutterType','tool'].concat(DIAG_IDS, OPT_IDS, TEXT_IDS, ['depth']);
-const FIELD_DEFAULTS = { eqMode:'floor', fW:900, fH:2100, fMode:'width', fScale:1.2, fAlign:'center', freeSegs:'', dDir:'v', dPitch:100, dM0:100, dM1:100, dSeg:300, dGap:60, dStagger:1, dE0:100, dE1:100, sCx:60, sBase:980, sRings:'240,330,420,520,630,750', sPitch:'8,6.5,5.5,4.5,4', sOuterPitch:9, sA0:-100, sA1:100, tCx:0, tBase:300, tN:7, tW:700, tH:1100, tOv:0.62, tShrink:0.84, tSag:0.12, tTrunkW:90, tTrunkH:110, tStar:70, tBauble:16, pStrip:240, pW:110, pH:110, pGx:50, pGy:59, pCols:0, pMinMX:50, pMinMY:50, pClearInset:6, pStep:0, lineCut:6, lineDepth:3, lineTool:4, vPitch:0, vEqLeft:100, vEqRight:100, design:'diag', structure:'two', spMode:'edge', anchor:'left', ref:'edge', cutterType:'U', tool:4, depth:4, gap:38, topH:259, leftMargin:240, spacing:94, c0dist:347.20014,
+const DESIGN_FIELDS = ['design','structure','anchor','spMode','ref','cutterType','tool'].concat(DIAG_IDS, OPT_IDS, TEXT_IDS, ['depth','passes']);
+const FIELD_DEFAULTS = { eqMode:'floor', fW:900, fH:2100, fMode:'width', fScale:1.2, fAlign:'center', freeSegs:'', dDir:'v', dPitch:100, dM0:100, dM1:100, dSeg:300, dGap:60, dStagger:1, dE0:100, dE1:100, sCx:60, sBase:980, sRings:'240,330,420,520,630,750', sPitch:'8,6.5,5.5,4.5,4', sOuterPitch:9, sA0:-100, sA1:100, tCx:0, tBase:300, tN:7, tW:700, tH:1100, tOv:0.62, tShrink:0.84, tSag:0.12, tTrunkW:90, tTrunkH:110, tStar:70, tBauble:16, pStrip:240, pW:110, pH:110, pGx:50, pGy:59, pCols:0, pMinMX:50, pMinMY:50, pClearInset:6, pStep:0, lineCut:6, lineDepth:3, linePasses:1, lineTool:4, vPitch:0, vEqLeft:100, vEqRight:100, design:'diag', structure:'two', spMode:'edge', anchor:'left', ref:'edge', cutterType:'U', tool:4, depth:4, passes:1, gap:38, topH:259, leftMargin:240, spacing:94, c0dist:347.20014,
   vWidth:6, vBotM:0, vTopM:0, hPitch:0, hEqBottom:100, hEqTop:100, hX0:0, hX1:0, frameInset:0, pN:0, pMargin:125, pPW:0, pGap:0, pBottom:125, pTop:125,
   bW:500, bH:300, bBottom:295, bGap:294, bN:0, bMinTop:200, vLeft:'', vRight:'', hBottom:'', hTop:'', bXs:'150,350', customRects:'' };
 const PRESETS = {"★ 横带 + 双竖线（Florence 木纹门）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"200,0,200,2300\n360,0,360,2300\n0,1930,1000,1930\n0,370,1000,370","w":1000,"h":2300},"★ 长竖线 + 底部斜线扇（Florence）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"370,0,370,2300\n0,970,1000,360\n190,0,190,854.1\n620,0,620,591.8\n190,0,370,744.3\n370,0,620,591.8\n620,0,870,439.3\n0,590,560,0","w":1000,"h":2300},"★ 拱门（同心圆弧，高级款）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"165,0,165,1790,165,1790,165.5,1807.5,166.8,1825,169.1,1842.4,172.3,1859.7,176.4,1876.7,181.4,1893.5,187.3,1910.1,194,1926.3,201.5,1942.1,209.9,1957.5,219,1972.5,229,1986.9,239.7,2000.8,251,2014.2,263.1,2026.9,275.8,2039,289.2,2050.3,303.1,2061,317.5,2071,332.5,2080.1,347.9,2088.5,363.7,2096,379.9,2102.7,396.5,2108.6,413.3,2113.6,430.3,2117.7,447.6,2120.9,465,2123.2,482.5,2124.5,500,2125,517.5,2124.5,535,2123.2,552.4,2120.9,569.7,2117.7,586.7,2113.6,603.5,2108.6,620.1,2102.7,636.3,2096,652.1,2088.5,667.5,2080.1,682.5,2071,696.9,2061,710.8,2050.3,724.2,2039,736.9,2026.9,749,2014.2,760.3,2000.8,771,1986.9,781,1972.5,790.1,1957.5,798.5,1942.1,806,1926.3,812.7,1910.1,818.6,1893.5,823.6,1876.7,827.7,1859.7,830.9,1842.4,833.2,1825,834.5,1807.5,835,1790\n835,1790,835,0\n200,0,200,1790,200,1790,200.4,1805.7,201.6,1821.4,203.7,1836.9,206.6,1852.4,210.2,1867.6,214.7,1882.7,219.9,1897.5,225.9,1912,232.7,1926.2,240.2,1940,248.4,1953.4,257.3,1966.3,266.9,1978.8,277.1,1990.7,287.9,2002.1,299.3,2012.9,311.2,2023.1,323.7,2032.7,336.6,2041.6,350,2049.8,363.8,2057.3,378,2064.1,392.5,2070.1,407.3,2075.3,422.4,2079.8,437.6,2083.4,453.1,2086.3,468.6,2088.4,484.3,2089.6,500,2090,515.7,2089.6,531.4,2088.4,546.9,2086.3,562.4,2083.4,577.6,2079.8,592.7,2075.3,607.5,2070.1,622,2064.1,636.2,2057.3,650,2049.8,663.4,2041.6,676.3,2032.7,688.8,2023.1,700.7,2012.9,712.1,2002.1,722.9,1990.7,733.1,1978.8,742.7,1966.3,751.6,1953.4,759.8,1940,767.3,1926.2,774.1,1912,780.1,1897.5,785.3,1882.7,789.8,1867.6,793.4,1852.4,796.3,1836.9,798.4,1821.4,799.6,1805.7,800,1790\n800,1790,800,0\n238,0,238,1790,238,1790,238.4,1803.7,239.4,1817.4,241.2,1831,243.7,1844.5,246.9,1857.8,250.8,1871,255.4,1883.9,260.7,1896.6,266.6,1908.9,273.1,1921,280.3,1932.7,288,1944,296.4,1954.9,305.3,1965.3,314.7,1975.3,324.7,1984.7,335.1,1993.6,346,2002,357.3,2009.7,369,2016.9,381.1,2023.4,393.4,2029.3,406.1,2034.6,419,2039.2,432.2,2043.1,445.5,2046.3,459,2048.8,472.6,2050.6,486.3,2051.6,500,2052,513.7,2051.6,527.4,2050.6,541,2048.8,554.5,2046.3,567.8,2043.1,581,2039.2,593.9,2034.6,606.6,2029.3,618.9,2023.4,631,2016.9,642.7,2009.7,654,2002,664.9,1993.6,675.3,1984.7,685.3,1975.3,694.7,1965.3,703.6,1954.9,712,1944,719.7,1932.7,726.9,1921,733.4,1908.9,739.3,1896.6,744.6,1883.9,749.2,1871,753.1,1857.8,756.3,1844.5,758.8,1831,760.6,1817.4,761.6,1803.7,762,1790\n762,1790,762,0\n273,0,273,1790,273,1790,273.3,1801.9,274.2,1813.7,275.8,1825.5,278,1837.2,280.7,1848.8,284.1,1860.1,288.1,1871.3,292.6,1882.3,297.7,1893.1,303.4,1903.5,309.6,1913.6,316.4,1923.4,323.6,1932.9,331.3,1941.9,339.5,1950.5,348.1,1958.7,357.1,1966.4,366.6,1973.6,376.4,1980.4,386.5,1986.6,396.9,1992.3,407.7,1997.4,418.7,2001.9,429.9,2005.9,441.2,2009.3,452.8,2012,464.5,2014.2,476.3,2015.8,488.1,2016.7,500,2017,511.9,2016.7,523.7,2015.8,535.5,2014.2,547.2,2012,558.8,2009.3,570.1,2005.9,581.3,2001.9,592.3,1997.4,603.1,1992.3,613.5,1986.6,623.6,1980.4,633.4,1973.6,642.9,1966.4,651.9,1958.7,660.5,1950.5,668.7,1941.9,676.4,1932.9,683.6,1923.4,690.4,1913.6,696.6,1903.5,702.3,1893.1,707.4,1882.3,711.9,1871.3,715.9,1860.1,719.3,1848.8,722,1837.2,724.2,1825.5,725.8,1813.7,726.7,1801.9,727,1790\n727,1790,727,0","w":1000,"h":2300},"★ 竖线 + V 形缺口（锁位）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"310,2300,310,1250,385,1150,310,1050,310,0\n310,1210,355,1150,310,1090","w":1000,"h":2300},"★ 双竖线（Triplek 01）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,0,190,2300\n375,0,375,2300","w":1000,"h":2300},"★ L 形（一竖一横，Triplek 02）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,0,190,2300\n0,2100,1000,2100","w":1000,"h":2300},"★ 阶梯线（Triplek 03）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"180,2300,180,1150,820,1150,820,0\n500,0,500,2300","w":1000,"h":2300},"★ 错位方框（Triplek 04）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"375,2300,375,1035,1000,1035\n0,1265,630,1265,630,0","w":1000,"h":2300},"★ 多竖线（Triplek 05）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"375,0,375,2300\n430,0,430,2300\n500,0,500,2300\n570,0,570,2300\n630,0,630,2300","w":1000,"h":2300},"★ 三角竖线（越来越短，Triplek 06）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,270,190,2030\n285,410,285,1890\n380,540,380,1760\n475,670,475,1630\n570,800,570,1500\n665,930,665,1370\n760,1050,760,1250","w":1000,"h":2300},"★ 三横线（Triplek 07）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"40,1225,960,1225\n40,1150,960,1150\n40,1075,960,1075","w":1000,"h":2300},"★ 十字（三竖三横，Triplek 08）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"440,0,440,2300\n500,0,500,2300\n560,0,560,2300\n0,1090,1000,1090\n0,1150,1000,1150\n0,1210,1000,1210","w":1000,"h":2300},"★ 双竖线 + 锁位横线（9104）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"230,0,230,2300\n340,0,340,1080\n0,1080,1000,1080","w":1000,"h":2300},"★ 两条斜线（9109）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"0,1900,1000,1470\n820,1500,0,480","w":1000,"h":2300},"★ 竖线 + 锁位小弧（9110）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"200,0,200,2300\n228.9,1071.2,237.9,1073.4,246.7,1076.5,255,1080.7,262.8,1085.8,269.9,1091.8,276.3,1098.6,281.8,1106,286.5,1114.1,290.2,1122.6,292.8,1131.6,294.5,1140.7,295,1150,294.5,1159.3,292.8,1168.4,290.2,1177.4,286.5,1185.9,281.8,1194,276.3,1201.4,269.9,1208.2,262.8,1214.2,255,1219.3,246.7,1223.5,237.9,1226.6,228.9,1228.8\n232.4,1051.5,243.7,1054.2,254.6,1058.2,265,1063.4,274.7,1069.8,283.6,1077.3,291.6,1085.7,298.5,1095,304.4,1105.1,309,1115.8,312.3,1126.9,314.3,1138.4,315,1150,314.3,1161.6,312.3,1173.1,309,1184.2,304.4,1194.9,298.5,1205,291.6,1214.3,283.6,1222.7,274.7,1230.2,265,1236.6,254.6,1241.8,243.7,1245.8,232.4,1248.5","w":1000,"h":2300},"★ 半月 + 竖线 + 底横线（锁位半圆）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"120,820,141.6,820.7,163.1,822.8,184.4,826.3,205.4,831.2,226.1,837.5,246.3,845.1,266,854,285,864.2,303.3,875.6,320.9,888.2,337.6,901.9,353.3,916.7,368.1,932.4,381.8,949.1,394.4,966.7,405.8,985,416,1004,424.9,1023.7,432.5,1043.9,438.8,1064.6,443.7,1085.6,447.2,1106.9,449.3,1128.4,450,1150,449.3,1171.6,447.2,1193.1,443.7,1214.4,438.8,1235.4,432.5,1256.1,424.9,1276.3,416,1296,405.8,1315,394.4,1333.3,381.8,1350.9,368.1,1367.6,353.3,1383.3,337.6,1398.1,320.9,1411.8,303.3,1424.4,285,1435.8,266,1446,246.3,1454.9,226.1,1462.5,205.4,1468.8,184.4,1473.7,163.1,1477.2,141.6,1479.3,120,1480\n650,2300,650,230\n730,2300,730,230\n810,2300,810,230\n890,2300,890,230\n650,230,890,230\n650,170,890,170\n650,110,890,110","w":1000,"h":2300},"★ 左上嵌套直角线":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"100,1250,100,2200,1000,2200\n145,1250,145,2155,1000,2155\n190,1250,190,2110,1000,2110\n235,1250,235,2065,1000,2065\n280,1250,280,2020,1000,2020","w":1000,"h":2300},"★ 嵌板框 + 叠菱形（isdoor）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"130,130,870,130,870,2170,130,2170,130,130\n250,1805,295,1750,250,1695,205,1750,250,1805\n250,1695,295,1640,250,1585,205,1640,250,1695\n250,1585,295,1530,250,1475,205,1530,250,1585\n750,615,795,560,750,505,705,560,750,615\n750,505,795,450,750,395,705,450,750,505\n750,395,795,340,750,285,705,340,750,395\n640,2170,870,1950\n660,2170,870,1980\n130,130,330,300\n150,130,340,290","w":1000,"h":2300},"★ 希腊回纹条 + 横线":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"180,0,180,2300\n180,430,380,430\n180,860,380,860\n180,1290,380,1290\n180,1720,380,1720\n770,140,770,205,700,205,700,140,755,140,755,188,714,188,714,154,740,154\n770,225,770,290,700,290,700,225,755,225,755,273,714,273,714,239,740,239\n770,310,770,375,700,375,700,310,755,310,755,358,714,358,714,324,740,324\n770,395,770,460,700,460,700,395,755,395,755,443,714,443,714,409,740,409\n770,480,770,545,700,545,700,480,755,480,755,528,714,528,714,494,740,494\n770,565,770,630,700,630,700,565,755,565,755,613,714,613,714,579,740,579\n770,650,770,715,700,715,700,650,755,650,755,698,714,698,714,664,740,664\n770,735,770,800,700,800,700,735,755,735,755,783,714,783,714,749,740,749\n770,820,770,885,700,885,700,820,755,820,755,868,714,868,714,834,740,834\n770,905,770,970,700,970,700,905,755,905,755,953,714,953,714,919,740,919\n770,990,770,1055,700,1055,700,990,755,990,755,1038,714,1038,714,1004,740,1004\n770,1075,770,1140,700,1140,700,1075,755,1075,755,1123,714,1123,714,1089,740,1089\n770,1160,770,1225,700,1225,700,1160,755,1160,755,1208,714,1208,714,1174,740,1174\n770,1245,770,1310,700,1310,700,1245,755,1245,755,1293,714,1293,714,1259,740,1259\n770,1330,770,1395,700,1395,700,1330,755,1330,755,1378,714,1378,714,1344,740,1344\n770,1415,770,1480,700,1480,700,1415,755,1415,755,1463,714,1463,714,1429,740,1429\n770,1500,770,1565,700,1565,700,1500,755,1500,755,1548,714,1548,714,1514,740,1514\n770,1585,770,1650,700,1650,700,1585,755,1585,755,1633,714,1633,714,1599,740,1599\n770,1670,770,1735,700,1735,700,1670,755,1670,755,1718,714,1718,714,1684,740,1684\n770,1755,770,1820,700,1820,700,1755,755,1755,755,1803,714,1803,714,1769,740,1769\n770,1840,770,1905,700,1905,700,1840,755,1840,755,1888,714,1888,714,1854,740,1854\n770,1925,770,1990,700,1990,700,1925,755,1925,755,1973,714,1973,714,1939,740,1939\n770,2010,770,2075,700,2075,700,2010,755,2010,755,2058,714,2058,714,2024,740,2024\n770,2095,770,2160,700,2160,700,2095,755,2095,755,2143,714,2143,714,2109,740,2109\n680,0,680,2300\n870,0,870,2300","w":1000,"h":2300},"★ 透视隧道（消失点在锁位，高级款）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"812,983,1000,983,1000,1300,812,1300,812,983\n0,0,812,983\n0,2300,812,1300\n208,251.8,208,2043.8\n208,251.8,1000,251.8\n208,2043.8,1000,2043.8\n347,420.1,347,1872.7\n347,420.1,1000,420.1\n347,1872.7,1000,1872.7\n475,575,475,1715\n475,575,1000,575\n475,1715,1000,1715\n584,707,584,1580.8\n584,707,1000,707\n584,1580.8,1000,1580.8\n663,802.6,663,1483.5\n663,802.6,1000,802.6\n663,1483.5,1000,1483.5\n724,876.5,724,1408.4\n724,876.5,1000,876.5\n724,1408.4,1000,1408.4\n763,923.7,763,1360.3\n763,923.7,1000,923.7\n763,1360.3,1000,1360.3\n792,958.8,792,1324.6\n792,958.8,1000,958.8\n792,1324.6,1000,1324.6\n0,575,812,1035.8\n0,1150,812,1141.5\n0,1725,812,1247.2","w":1000,"h":2300},"★ 树枝（Vector for Door）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"538,0,543.1,57.5,548.2,115,553.2,172.5,558.2,230,563.1,287.5,567.9,345,572.6,402.5,577.1,460,581.5,517.5,585.7,575,589.8,632.5,593.6,690,597.2,747.5,600.5,805,603.6,862.5,606.5,920,609.1,977.5,611.3,1035,613.3,1092.5,614.9,1150,616.3,1207.5,617.3,1265,617.9,1322.5,618.2,1380,618.2,1437.5,617.8,1495,617.1,1552.5,615.9,1610,614.5,1667.5,612.6,1725,610.4,1782.5,607.9,1840,604.9,1897.5,601.7,1955,598.1,2012.5,594.1,2070,589.8,2127.5,585.2,2185,580.3,2242.5,575,2300\n582,0,587.1,57.5,592.2,115,597.2,172.5,602.2,230,607.1,287.5,611.9,345,616.6,402.5,621.1,460,625.5,517.5,629.7,575,633.8,632.5,637.6,690,641.2,747.5,644.5,805,647.6,862.5,650.5,920,653.1,977.5,655.3,1035,657.3,1092.5,658.9,1150,660.3,1207.5,661.3,1265,661.9,1322.5,662.2,1380,662.2,1437.5,661.8,1495,661.1,1552.5,659.9,1610,658.5,1667.5,656.6,1725,654.4,1782.5,651.9,1840,648.9,1897.5,645.7,1955,642.1,2012.5,638.1,2070,633.8,2127.5,629.2,2185,624.3,2242.5,619,2300\n573.5,414,0,529.6\n573.5,464,0,579.6\n599.2,782,0,924.8\n599.2,832,0,974.8\n614.9,1150,0,1320\n614.9,1200,0,1370\n617.6,1518,0,1715.2\n617.6,1568,0,1765.2\n605.6,1886,0,2110.4\n605.6,1936,0,2160.4\n631.4,598,1000,696.8\n631.4,648,1000,746.8\n658.9,1150,1000,1280\n658.9,1200,1000,1330\n657.4,1702,1000,1863.2\n657.4,1752,1000,1913.2","w":1000,"h":2300},"★ 大三角拼块（斜线分块）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"200,2300,1000,1650\n0,1480,1000,1960\n0,1100,1000,560\n1000,1500,150,0\n0,700,520,0","w":1000,"h":2300}};
