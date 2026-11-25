@@ -16,6 +16,9 @@
   .panel{width:380px}
   .panel h2{font-size:14px;margin:16px 0 8px;color:var(--mute);font-weight:600}
   .panel h2:first-child{margin-top:0}
+  .nboxes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .nboxes input{width:72px}
+  .nboxes button{padding:4px 10px}
   .row{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
   .row small{display:block;color:var(--mute);font-size:11px}
   input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit}
@@ -61,7 +64,6 @@
     <h2>选设计（选了，下面全部自动填好）</h2>
     <div class="designs">
       <select id="designSel"></select>
-      <button class="sec sm" id="designDel">删除</button>
     </div>
     <div style="display:none"><!-- 图案类型：阳阳说不用，藏起来（选设计会自动设定） -->
     <h2>图案类型</h2>
@@ -104,16 +106,28 @@
     </div>
 
     <div class="dsec d-lines">
-    <h2>横竖槽（位置用逗号分开，可填多个）</h2>
-    <div class="row"><label>竖槽：距左边<small>例 200,250,300</small></label><input id="vLeft" type="text" value=""></div>
-    <div class="row"><label>竖槽：距右边<small>例 200</small></label><input id="vRight" type="text" value="200"></div>
+    <h2>横竖槽</h2>
+    <div class="row"><label>竖槽（从左边）：第一条离左边<small>量到槽没切的边</small></label><input id="vLeft_first" type="number" step="0.5"></div>
+    <div class="row"><label>竖槽（从左边）：几条<small>0 = 没有</small></label><input id="vLeft_n" type="number" step="1" min="0"></div>
+    <div class="row"><label>竖槽（从左边）：线与线间隔<small>两条槽之间没切的宽度，例 44</small></label><input id="vLeft_gap" type="number" step="0.5"></div>
+    <input id="vLeft" type="hidden" value="">
+    <div class="row"><label>竖槽（从右边）：第一条离右边<small>量到槽没切的边</small></label><input id="vRight_first" type="number" step="0.5"></div>
+    <div class="row"><label>竖槽（从右边）：几条<small>0 = 没有</small></label><input id="vRight_n" type="number" step="1" min="0"></div>
+    <div class="row"><label>竖槽（从右边）：线与线间隔<small>两条槽之间没切的宽度，例 44</small></label><input id="vRight_gap" type="number" step="0.5"></div>
+    <input id="vRight" type="hidden" value="">
     <div class="row"><label>竖槽等分（竖条纹）：间距<small>0 = 不用；例 60</small></label><input id="vPitch" type="number" value="0"></div>
     <div class="row"><label>等分：第一条离左边</label><input id="vEqLeft" type="number" value="100"></div>
     <div class="row"><label>等分：最后一条离右边</label><input id="vEqRight" type="number" value="100"></div>
     <div class="row"><label>竖槽下端离底边<small>0 = 通到底</small></label><input id="vBotM" type="number" value="0"></div>
     <div class="row"><label>竖槽上端离顶边<small>0 = 通到顶</small></label><input id="vTopM" type="number" value="0"></div>
-    <div class="row"><label>横槽：距底边<small>例 500</small></label><input id="hBottom" type="text" value="500"></div>
-    <div class="row"><label>横槽：距顶边<small>例 500</small></label><input id="hTop" type="text" value="500"></div>
+    <div class="row"><label>横槽（从底边）：第一条离底边<small>量到槽没切的边</small></label><input id="hBottom_first" type="number" step="0.5"></div>
+    <div class="row"><label>横槽（从底边）：几条<small>0 = 没有</small></label><input id="hBottom_n" type="number" step="1" min="0"></div>
+    <div class="row"><label>横槽（从底边）：线与线间隔<small>两条槽之间没切的宽度，例 44</small></label><input id="hBottom_gap" type="number" step="0.5"></div>
+    <input id="hBottom" type="hidden" value="">
+    <div class="row"><label>横槽（从顶边）：第一条离顶边<small>量到槽没切的边</small></label><input id="hTop_first" type="number" step="0.5"></div>
+    <div class="row"><label>横槽（从顶边）：几条<small>0 = 没有</small></label><input id="hTop_n" type="number" step="1" min="0"></div>
+    <div class="row"><label>横槽（从顶边）：线与线间隔<small>两条槽之间没切的宽度，例 44</small></label><input id="hTop_gap" type="number" step="0.5"></div>
+    <input id="hTop" type="hidden" value="">
     <div class="row"><label>横槽等分：间距<small>0 = 不用；例 150</small></label><input id="hPitch" type="number" value="0"></div>
     <div class="row"><label>等分：第一条离底边</label><input id="hEqBottom" type="number" value="100"></div>
     <div class="row"><label>等分：最后一条离顶边</label><input id="hEqTop" type="number" value="100"></div>
@@ -144,7 +158,8 @@
     <div class="row"><label>方块之间的缝</label><input id="bGap" type="number" value="294"></div>
     <div class="row"><label>方块数量<small>0 = 自动放最多</small></label><input id="bN" type="number" step="1" value="0"></div>
     <div class="row"><label>自动时，顶部至少留<small>顶部多出来的高度全留在这里</small></label><input id="bMinTop" type="number" value="200"></div>
-    <div class="row"><label>每一层方块离左边<small>逗号分开，轮流用。例 150,350</small></label><input id="bXs" type="text" value="150,350"></div>
+    <div class="row" style="grid-template-columns:1fr"><label>每一层方块离左边<small>一层一层轮流用；按 + 加一个</small></label><div class="nboxes" data-for="bXs"></div></div>
+    <input id="bXs" type="hidden" value="150,350">
     <div class="row"><label>算出来的</label><b id="blockInfo" style="font-size:13px">-</b></div>
     </div>
 
@@ -201,8 +216,10 @@
     <h2>太阳（同心圆弧 + 放射线）</h2>
     <div class="row"><label>圆心离左边<small>0 = 正好在门边</small></label><input id="sCx" type="number" value="60"></div>
     <div class="row"><label>圆心离底边<small>一般在把手附近</small></label><input id="sBase" type="number" value="980"></div>
-    <div class="row"><label>圆弧半径（里到外）<small>逗号分开；第一个圈里面留空</small></label><input id="sRings" type="text" value="240,330,420,520,630,750"></div>
-    <div class="row"><label>圈与圈之间放射线的角度间隔<small>逗号分开，对应每两圈之间；越小越密</small></label><input id="sPitch" type="text" value="8,6.5,5.5,4.5,4"></div>
+    <div class="row" style="grid-template-columns:1fr"><label>圆弧半径（里到外）<small>第一个圈里面留空；按 + 加一个</small></label><div class="nboxes" data-for="sRings"></div></div>
+    <input id="sRings" type="hidden" value="240,330,420,520,630,750">
+    <div class="row" style="grid-template-columns:1fr"><label>圈与圈之间放射线的角度间隔<small>对应每两圈之间；越小越密</small></label><div class="nboxes" data-for="sPitch"></div></div>
+    <input id="sPitch" type="hidden" value="8,6.5,5.5,4.5,4">
     <div class="row"><label>最外圈以外的长射线角度间隔<small>一直延伸到门边；0 = 不要</small></label><input id="sOuterPitch" type="number" step="0.5" value="9"></div>
     <div class="row"><label>起始角度（°）<small>0° = 朝右，负数往下</small></label><input id="sA0" type="number" value="-100"></div>
     <div class="row"><label>结束角度（°）</label><input id="sA1" type="number" value="100"></div>
@@ -1172,6 +1189,7 @@ function baseParams(){
   p.spMode = $('spMode').value;
   p.backRot = $('boRot').checked;
   p.ref = $('ref').value; p.dDir = $('dDir').value; p.eqMode = $('eqMode').value; p.fMode = $('fMode').value; p.fAlign = $('fAlign').value; p.freeSegs = parseFree($('freeSegs').value); p.sRings = parseNums($('sRings').value); p.sPitch = parseNums($('sPitch').value);
+  ['vLeft','vRight','hBottom','hTop'].forEach(i => { if ($(i + '_first')) $(i).value = runToText(i); });
   ['vLeft','vRight','hBottom','hTop','bXs'].forEach(i => p[i] = parseNums($(i).value));
   p.customRects = parseRects($(  'customRects').value);
   return p;
@@ -1520,6 +1538,7 @@ function applyDesign(o){
   lastAnchor = $('anchor').value;
   fillCutters(false);
   if (o.cutter !== undefined && CUTTERS[$('cutterType').value][o.cutter] !== undefined) $('cutter').value = o.cutter;
+  syncLists();
   refresh();
 }
 $('designSave').onclick = () => {
@@ -1532,7 +1551,7 @@ $('designSave').onclick = () => {
   $('designSave').textContent = '已保存 ✓'; setTimeout(() => $('designSave').textContent = '保存', 1200);
 };
 $('designSel').onchange = () => { const n = $('designSel').value; if (!n) return; const d = loadDesigns(); if (d[n]) { applyDesign(d[n]); $('designName').value = n; } };
-$('designDel').onclick = () => {
+if ($('designDel')) $('designDel').onclick = () => {
   const n = $('designSel').value; if (!n) return;
   if (!confirm('删除设计「' + n + '」？')) return;
   if (BUILTIN[n]) { alert('内置例子不能删除。'); return; }
@@ -1568,7 +1587,41 @@ $('tabF').onclick = () => { face = 'front'; refresh(); };
 $('backOrigin').addEventListener('change', () => refresh());
 $('boRot').addEventListener('change', () => refresh());
 $('tabB').onclick = () => { face = 'back'; refresh(); };
-fillCutters(false); renderSizes(); renderDesigns(); refresh();
+
+// ---------- 线条位置（第一条 + 几条 + 间隔）和一串数字的格子 ----------
+const RUN_IDS = ['vLeft','vRight','hBottom','hTop'];
+const BOX_IDS = ['bXs','sRings','sPitch'];
+function curGW(){ const c = parseFloat($('cutter').value); return $('cutterType').value === 'V' ? Math.min(c, parseFloat($('vWidth').value)) : c; }
+function runToText(id){      // 第一条 + 几条 + 间隔（没切的宽度）→ 每一条的位置
+  const f = parseFloat($(id + '_first').value), n = Math.round(parseFloat($(id + '_n').value)), gap = parseFloat($(id + '_gap').value) || 0, gw = curGW();
+  if (!isFinite(f) || !(n > 0)) return '';
+  const a = []; for (let i = 0; i < n; i++) a.push(Math.round((f + i * (gap + gw)) * 10000) / 10000);
+  return a.join(',');
+}
+function textToRun(id){      // 设计里的位置 → 第一条 + 几条 + 间隔
+  const a = parseNums($(id).value);
+  $(id + '_first').value = a.length ? a[0] : '';
+  $(id + '_n').value = a.length;
+  if (a.length > 1) $(id + '_gap').value = Math.round((a[1] - a[0] - curGW()) * 10000) / 10000;
+  else if ($(id + '_gap').value === '') $(id + '_gap').value = 50;
+}
+function renderBoxes(id){
+  const el = document.querySelector('.nboxes[data-for="' + id + '"]'), a = parseNums($(id).value);
+  el.innerHTML = a.map((v, i) => '<input type="number" step="0.5" data-i="' + i + '" value="' + v + '">').join('') +
+    '<button type="button" class="sec sm" data-add="1">+</button>' + (a.length > 1 ? '<button type="button" class="sec sm" data-rm="1">−</button>' : '');
+}
+function boxesToText(id){ const el = document.querySelector('.nboxes[data-for="' + id + '"]'); $(id).value = [...el.querySelectorAll('input')].map(x => x.value).filter(v => v !== '').join(','); }
+function syncLists(){ RUN_IDS.forEach(textToRun); BOX_IDS.forEach(renderBoxes); }
+RUN_IDS.forEach(id => ['_first','_n','_gap'].forEach(k => $(id + k).addEventListener('input', () => refresh())));
+document.querySelectorAll('.nboxes').forEach(el => {
+  const id = el.dataset.for;
+  el.addEventListener('input', () => { boxesToText(id); refresh(); });
+  el.addEventListener('click', (e) => {
+    if (e.target.dataset.add) { const a = parseNums($(id).value); a.push(a.length ? a[a.length - 1] : 0); $(id).value = a.join(','); renderBoxes(id); refresh(); }
+    if (e.target.dataset.rm) { const a = parseNums($(id).value); a.pop(); $(id).value = a.join(','); renderBoxes(id); refresh(); }
+  });
+});
+fillCutters(false); renderSizes(); renderDesigns(); syncLists(); refresh();
 </script>
 </body>
 </html>
