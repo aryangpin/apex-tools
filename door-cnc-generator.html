@@ -762,6 +762,49 @@ function generateCNC(p) {
 }
 
 // ---------- 局部放大图（所有款式通用）：找出相邻的槽 / 方块，标出「没切的距离」（边到边） ----------
+// 斜线款的局部放大：① 两条不相交的槽最近的地方，量中间没切的宽度；② 都交叉了，就量斜线碰到门边的地方离门角多远（量到槽没切的边）
+function slantDetail(bands, W, Ht) {
+  const segD = (p1, p2, q1, q2) => {   // 两条线段最近的两点
+    const cl = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1; let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2; t = Math.max(0, Math.min(1, t)); return [a[0] + t * dx, a[1] + t * dy]; };
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    if (cross(p1, p2, q1) * cross(p1, p2, q2) < 0 && cross(q1, q2, p1) * cross(q1, q2, p2) < 0) return null;   // 交叉
+    let best = null;
+    [[p1, cl(p1, q1, q2)], [p2, cl(p2, q1, q2)], [cl(q1, p1, p2), q1], [cl(q2, p1, p2), q2]].forEach(([u, v]) => { const d = Math.hypot(u[0] - v[0], u[1] - v[1]); if (!best || d < best.d) best = { u, v, d }; });
+    return best;
+  };
+  let best = null;
+  for (let i = 0; i < bands.length; i++) for (let j = i + 1; j < bands.length; j++) {
+    const A = bands[i], B = bands[j], s = segD(A.a, A.b, B.a, B.b); if (!s || s.d < 0.01) continue;
+    // 两条都在同一条门边上结束（槽切出门外）：沿门边量，槽在门边上的宽 = r / sin(夹角)
+    const onX = (q) => Math.abs(q[0]) < 0.5 ? 0 : Math.abs(q[0] - W) < 0.5 ? W : null, onY = (q) => Math.abs(q[1]) < 0.5 ? 0 : Math.abs(q[1] - Ht) < 0.5 ? Ht : null;
+    const hw = (b, vertEdge) => { const dx = b.b[0] - b.a[0], dy = b.b[1] - b.a[1], L = Math.hypot(dx, dy) || 1, sn = Math.abs(vertEdge ? dx : dy) / L; return sn > 0.05 ? b.r / sn : b.r; };
+    let gap, PA, PB;
+    if (onX(s.u) !== null && onX(s.u) === onX(s.v)) {
+      const lo = s.u[1] < s.v[1] ? [s.u, A] : [s.v, B], hi = s.u[1] < s.v[1] ? [s.v, B] : [s.u, A], x = onX(s.u);
+      PA = [x, lo[0][1] + hw(lo[1], true)]; PB = [x, hi[0][1] - hw(hi[1], true)]; gap = PB[1] - PA[1];
+    } else if (onY(s.u) !== null && onY(s.u) === onY(s.v)) {
+      const lo = s.u[0] < s.v[0] ? [s.u, A] : [s.v, B], hi = s.u[0] < s.v[0] ? [s.v, B] : [s.u, A], y = onY(s.u);
+      PA = [lo[0][0] + hw(lo[1], false), y]; PB = [hi[0][0] - hw(hi[1], false), y]; gap = PB[0] - PA[0];
+    } else {
+      gap = s.d - A.r - B.r; const ux = (s.v[0] - s.u[0]) / s.d, uy = (s.v[1] - s.u[1]) / s.d;
+      PA = [s.u[0] + ux * A.r, s.u[1] + uy * A.r]; PB = [s.v[0] - ux * B.r, s.v[1] - uy * B.r];
+    }
+    if (gap < 0.8 || gap > 450) continue;
+    if (!best || gap < best.gap) best = { gap, A: PA, B: PB };
+  }
+  if (best) { const xc = (best.A[0] + best.B[0]) / 2, yc = (best.A[1] + best.B[1]) / 2; return { xc, yc, size: Math.max(260, Math.min(640, best.gap * 3 + 200)), dim: { A: best.A, B: best.B, v: best.gap } }; }
+  // ② 斜线碰到门边：离最近门角的距离（沿门边，量到槽没切的边）
+  let hit = null;
+  bands.forEach((b) => [b.a, b.b].forEach((e) => {
+    const dx = b.b[0] - b.a[0], dy = b.b[1] - b.a[1], L = Math.hypot(dx, dy) || 1;
+    const edges = [];
+    if (Math.abs(e[1]) < 0.5 || Math.abs(e[1] - Ht) < 0.5) { const s = Math.abs(dy) / L; if (s > 0.05) { const h = b.r / s, y = Math.abs(e[1]) < 0.5 ? 0 : Ht; edges.push({ v: e[0] - h, A: [0, y], B: [e[0] - h, y] }, { v: W - e[0] - h, A: [W, y], B: [e[0] + h, y] }); } }
+    if (Math.abs(e[0]) < 0.5 || Math.abs(e[0] - W) < 0.5) { const s = Math.abs(dx) / L; if (s > 0.05) { const h = b.r / s, x = Math.abs(e[0]) < 0.5 ? 0 : W; edges.push({ v: e[1] - h, A: [x, 0], B: [x, e[1] - h] }, { v: Ht - e[1] - h, A: [x, Ht], B: [x, e[1] + h] }); } }
+    edges.forEach((c) => { if (c.v > 0.8 && c.v <= 600 && (!hit || c.v < hit.v)) hit = c; });
+  }));
+  if (!hit) return null;
+  return { xc: (hit.A[0] + hit.B[0]) / 2, yc: (hit.A[1] + hit.B[1]) / 2, size: Math.max(260, Math.min(640, hit.v * 1.5 + 150)), dim: { A: hit.A, B: hit.B, v: hit.v } };
+}
 function detailOf(p, g, fin) {
   const W = p.width, Ht = p.structure === 'single' || !(g.design === 'diag' || g.design === 'pockets') ? p.height : p.height + p.gap + p.topH;
   const gw = g.grooveW, r = gw / 2, design = g.design;
@@ -822,7 +865,9 @@ function detailOf(p, g, fin) {
         ax.push({ vert, c, r: b.r, t0, t1, gap: lim - (c + b.r), near: c + b.r, far: lim });
       });
       const ok = ax.filter((e) => e.gap > 0.8 && e.gap <= 600).sort((a, b) => a.gap - b.gap);
-      if (!ok.length) { const b0 = bands[0]; if (!b0) return null; xc = (b0.a[0] + b0.b[0]) / 2; yc = (b0.a[1] + b0.b[1]) / 2; size = 300; out.note = '这款没有可以量的距离'; }
+      const sl = slantDetail(bands, W, Ht);
+      if (!ok.length && sl) { xc = sl.xc; yc = sl.yc; size = sl.size; out.dims.push(sl.dim); out.door = [0, 0, W, Ht]; }
+      else if (!ok.length) { const b0 = bands[0]; if (!b0) return null; xc = (b0.a[0] + b0.b[0]) / 2; yc = (b0.a[1] + b0.b[1]) / 2; size = 300; out.note = '这款没有可以量的距离'; }
       else {
         const e = ok[0], P = (n, t) => e.vert ? [n, t] : [t, n];
         // 找跟它垂直、接上它的槽（接头），放大图对准接头；没有就对准中间
