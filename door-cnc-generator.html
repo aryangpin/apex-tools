@@ -282,13 +282,13 @@
     <div class="warn" id="warn"></div>
 
     <div class="btns">
-      <button id="dl">下载 .CNC（全部尺寸，正面+背面）</button>
+      <button id="dl">下载 .CNC（一个 zip，全部尺寸，正面+背面）</button>
       <button id="dlPdf" style="background:#2a6df4">下载 PDF（全部尺寸，两面）</button>
       <button class="sec" id="copy">复制当前面的 G-code</button>
       <button class="sec" id="cncOpen">打开以前的 .CNC（还原设定）</button>
       <input type="file" id="cncFile" accept=".cnc,.CNC,.nc,.txt" style="display:none">
     </div>
-    <div class="note">文件名自动是 <b>宽x高 (槽宽+刀型+切深)</b>，例如 <b>1268x2335 (6U3) FRONT.CNC</b>；V 刀例如 <b>862x2355 (6V3) FRONT.CNC</b>。尺寸表里有几行，就下载几组。浏览器可能会问"允许下载多个文件"，点允许。<br>下次要改：点「打开以前的 .CNC」，选那个 CNC（FRONT 或 BACK 都可以），所有格子和尺寸会自动填回去。</div>
+    <div class="note">文件名自动是 <b>宽x高 (槽宽+刀型+切深)</b>，例如 <b>1268x2335 (6U3) FRONT.CNC</b>；V 刀例如 <b>862x2355 (6V3) FRONT.CNC</b>。全部尺寸的正面、背面都装在<b>一个 zip</b> 里，下载后右键「全部解压缩」就有全部 CNC。<br>下次要改：点「打开以前的 .CNC」，选那个 CNC（FRONT 或 BACK 都可以），所有格子和尺寸会自动填回去。</div>
   </div>
 
   <div class="card" style="flex:1;min-width:360px">
@@ -1540,7 +1540,7 @@ function refresh(keepTable){
 
 // ---------- 下载 ----------
 function save(text, name, type){
-  const blob = new Blob([type === 'application/pdf' ? new Uint8Array([...text].map(ch => ch.charCodeAt(0) & 255)) : text], {type: type || 'text/plain'});
+  const blob = text instanceof Uint8Array ? new Blob([text], {type: type}) : new Blob([type === 'application/pdf' ? new Uint8Array([...text].map(ch => ch.charCodeAt(0) & 255)) : text], {type: type || 'text/plain'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
@@ -1548,24 +1548,57 @@ function save(text, name, type){
 }
 const today = () => new Date().toISOString().slice(0, 10);
 function opSuffix(i, n){ return n > 1 ? ' ' + (i + 1) + 'of' + n : ''; }
-function saveCnc(p){
-  const OPS = allOps(p); let t = 0;
+// 简单 zip（不压缩），把全部 CNC 装进一个文件，浏览器就不会挡多个下载
+function makeZip(files){
+  const enc = new TextEncoder(), T = [];
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
+  const crc = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const d = new Date(), dt = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)), dd = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate());
+  const parts = [], cen = []; let off = 0;
+  const hdr = (size) => { const b = new Uint8Array(size); return [b, new DataView(b.buffer)]; };
+  files.forEach(f => {
+    const nm = enc.encode(f.name), data = f.bytes || enc.encode(f.text), c = crc(data);
+    const [L, l] = hdr(30);
+    l.setUint32(0, 0x04034b50, true); l.setUint16(4, 20, true); l.setUint16(6, 0x0800, true); l.setUint16(8, 0, true);
+    l.setUint16(10, dt, true); l.setUint16(12, dd, true); l.setUint32(14, c, true); l.setUint32(18, data.length, true); l.setUint32(22, data.length, true); l.setUint16(26, nm.length, true);
+    const [C, h] = hdr(46);
+    h.setUint32(0, 0x02014b50, true); h.setUint16(4, 20, true); h.setUint16(6, 20, true); h.setUint16(8, 0x0800, true);
+    h.setUint16(12, dt, true); h.setUint16(14, dd, true); h.setUint32(16, c, true); h.setUint32(20, data.length, true); h.setUint32(24, data.length, true); h.setUint16(28, nm.length, true); h.setUint32(42, off, true);
+    parts.push(L, nm, data); cen.push(C, nm); off += 30 + nm.length + data.length;
+  });
+  const csize = cen.reduce((a, b) => a + b.length, 0), [E, e] = hdr(22);
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  const all = parts.concat(cen, [E]), out = new Uint8Array(all.reduce((a, b) => a + b.length, 0)); let p = 0;
+  all.forEach(b => { out.set(b, p); p += b.length; });
+  return out;
+}
+function cncFiles(p){
+  const OPS = allOps(p), files = [];
   if (isMerged(p)) {
     const base = nameFor(OPS[0].pp);
-    setTimeout(() => save(withCfg(mergeG(OPS.map(O => O.front.gcode))), base + ' FRONT.CNC'), 0);
-    setTimeout(() => save(withCfg(mergeG(OPS.map(O => O.back.gcode))), base + ' BACK.CNC'), 350);
-    return;
-  }
-  OPS.forEach((O, i) => {
+    files.push({ name: base + ' FRONT.CNC', text: withCfg(mergeG(OPS.map(O => O.front.gcode))) });
+    files.push({ name: base + ' BACK.CNC', text: withCfg(mergeG(OPS.map(O => O.back.gcode))) });
+  } else OPS.forEach((O, i) => {
     const base = nameFor(O.pp), suf = opSuffix(i, OPS.length);
-    setTimeout(() => save(withCfg(O.front.gcode), base + ' FRONT' + suf + '.CNC'), t); t += 350;
-    setTimeout(() => save(withCfg(O.back.gcode), base + ' BACK' + suf + '.CNC'), t); t += 350;
+    files.push({ name: base + ' FRONT' + suf + '.CNC', text: withCfg(O.front.gcode) });
+    files.push({ name: base + ' BACK' + suf + '.CNC', text: withCfg(O.back.gcode) });
   });
+  return files;
 }
-function savePdf(p){
+const zipName = (b, ext) => nameFor(allOps(withSize(b, sizes[0]))[0].pp) + (sizes.length > 1 ? ' 等' + sizes.length + '个尺寸' : '') + ext;
+function saveCnc(b){
+  const files = []; sizes.forEach(z => files.push(...cncFiles(withSize(b, z))));
+  save(makeZip(files), zipName(b, '.zip'), 'application/zip');
+}
+function pdfFile(p){
   const OPS = allOps(p), n = OPS.length, base = nameFor(OPS[0].pp), faces = [];
   ['front', 'back'].forEach(f => OPS.forEach((O, i) => faces.push({ name: (f === 'front' ? 'FRONT' : 'BACK') + (n > 1 ? (isMerged(p) ? ' - STEP ' : ' - CNC ') + (i + 1) + ' of ' + n : ''), g: O[f], p: O.pp, fin: p.design === 'pockets' ? finOf(OPS, f) : null })));
-  save(buildPDF(p, faces, base, today()), base + '.pdf', 'application/pdf');
+  return { name: base + '.pdf', bin: buildPDF(p, faces, base, today()) };
+}
+function savePdfs(b){
+  const L = sizes.map(z => pdfFile(withSize(b, z)));
+  if (L.length === 1) { save(L[0].bin, L[0].name, 'application/pdf'); return; }
+  save(makeZip(L.map(f => ({ name: f.name, bytes: new Uint8Array([...f.bin].map(ch => ch.charCodeAt(0) & 255)) }))), zipName(b, ' PDF.zip'), 'application/zip');
 }
 function tooDeep(b){
   for (const O of opsOf(b)) { const m = CUTTERS[O.cutterType][O.cutter]; if (m !== undefined && O.depth > m) { alert('切深 ' + O.depth + ' 超过这把刀（' + O.cutter + 'mm）最深可切的 ' + m + ' mm，请先改小。'); return true; } }
@@ -1574,12 +1607,8 @@ function tooDeep(b){
 function checkSizes(){ if (!sizes.every(z => z.w > 0 && z.h > 0)) { alert('尺寸表里有空的或不对的数字，请先改好。'); return false; } return true; }
 function downloadAll(withPdf, onlyPdf){
   const b = baseParams(); if (!valid(b) || tooDeep(b) || !checkSizes()) return;
-  const nOps = isMerged(b) ? 1 : opsOf(b).length, per = (withPdf && !onlyPdf) ? 1500 : (onlyPdf ? 500 : 900 * nOps);
-  sizes.forEach((z, i) => {
-    const p = withSize(b, z);
-    if (!onlyPdf) setTimeout(() => saveCnc(p), i * per);
-    if (withPdf) setTimeout(() => savePdf(p), i * per + (onlyPdf ? 0 : 800));
-  });
+  if (!onlyPdf) saveCnc(b);
+  if (withPdf) setTimeout(() => savePdfs(b), onlyPdf ? 0 : 800);
 }
 $('dl').onclick = () => downloadAll(false, false);
 $('dlPdf').onclick = () => downloadAll(true, true);
