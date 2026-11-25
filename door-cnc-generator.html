@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>门面图案 CNC 生成器</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--mute:#6b7685;--line:#dfe3e8;--accent:#d93a3a;--warn:#fff4d6;--warnink:#7a5600}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink)}
+  header{padding:18px 24px;background:#1c2430;color:#fff}
+  header h1{margin:0;font-size:20px}
+  header p{margin:4px 0 0;font-size:13px;color:#aab4c2}
+  main{display:flex;gap:20px;padding:20px;flex-wrap:wrap;align-items:flex-start}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .panel{width:380px}
+  .panel h2{font-size:14px;margin:16px 0 8px;color:var(--mute);font-weight:600}
+  .panel h2:first-child{margin-top:0}
+  .row{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+  .row small{display:block;color:var(--mute);font-size:11px}
+  input[type=number],input[type=text],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit}
+  button{padding:10px 14px;border:0;border-radius:8px;font-size:15px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
+  button.sec{background:#e9edf2;color:var(--ink)}
+  button.sm{padding:6px 10px;font-size:13px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .warn{background:var(--warn);color:var(--warnink);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px;display:none}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:#f1f3f6;border-radius:8px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px}
+  .stat span{font-size:11px;color:var(--mute)}
+  canvas{display:block;border-radius:8px;background:#232a33;max-width:100%}
+  .tabs{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .tab{background:#e9edf2;color:var(--ink);padding:8px 16px;font-size:14px}
+  .tab.on{background:#1c2430;color:#fff}
+  .tabnote{font-size:12px;color:var(--mute)}
+  .views{display:flex;gap:14px;flex-wrap:wrap}
+  .rw{position:relative}.rw canvas{max-width:none;transform-origin:center center}
+  .vt{font-size:13px;font-weight:600;margin-bottom:6px;color:var(--mute)}
+  .legend{font-size:12px;color:var(--mute);margin-top:8px}
+  .legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin:0 4px 0 10px}
+  .note{font-size:12px;color:var(--mute);margin-top:12px;line-height:1.6}
+  details{margin-top:8px}summary{cursor:pointer;font-size:13px;color:var(--mute)}
+  table.sizes{width:100%;border-collapse:collapse;font-size:14px}
+  table.sizes th{font-size:11px;color:var(--mute);font-weight:600;text-align:left;padding:2px 4px}
+  table.sizes td{padding:3px 4px}
+  table.sizes tr.sel{background:#fff1f1}
+  table.sizes input[type=number]{padding:5px 6px}
+  table.sizes input[type=radio]{accent-color:var(--accent)}
+  .xbtn{background:#e9edf2;color:#9a3030;padding:4px 9px;font-size:14px}
+  .dsec{}textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit}
+  .designs{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>门面图案 CNC 生成器</h1>
+  <p>先选图案类型 → 填尺寸 → 预览 → 下载 .CNC（正面 + 背面）和 PDF。底部位置固定，多出来的高度加在上面。</p>
+</header>
+<main>
+  <div class="card panel">
+    <h2>选设计（选了，下面全部自动填好）</h2>
+    <div class="designs">
+      <select id="designSel"></select>
+      <button class="sec sm" id="designDel">删除</button>
+    </div>
+    <h2>图案类型</h2>
+    <div class="row"><label>这个门是哪种图案<small>选了上面的设计会自动变；做全新款式才需要自己改</small></label>
+      <select id="design"><option value="diag">斜线（斜线 + 竖槽）</option><option value="lines">横竖槽（横线 / 竖线）</option><option value="rects">方框 / 嵌板</option><option value="blocks">错开方块</option><option value="dash">断线（有缺口的槽）</option><option value="pockets">方格挖槽（3 道工序，3 个文件）</option><option value="free">自由线条（按比例放大，Bina SKK 那种）</option><option value="sun">半个太阳（放射线）</option><option value="tree">圣诞树</option></select></div>
+    <div class="dsec d-diag d-pockets">
+    <h2>门的结构</h2>
+    <div class="row"><label>一块还是上下两块</label>
+      <select id="structure"><option value="single">一块（单扇）</option><option value="two" selected>上下两块</option></select></div>
+    <div id="twoRows">
+      <div class="row"><label>中间缝<small>两块板之间</small></label><input id="gap" type="number" step="1" value="38"></div>
+      <div class="row"><label>上面小块高度</label><input id="topH" type="number" step="1" value="259"></div>
+    </div>
+    </div>
+
+    <h2>门的尺寸 (mm)　<span style="font-weight:400;font-size:12px">点左边圆点 = 预览那一个</span></h2>
+    <table class="sizes"><thead><tr><th></th><th>宽</th><th>高</th><th></th></tr></thead><tbody id="sizeBody"></tbody></table>
+    <div class="btns"><button class="sec sm" id="addSize">＋ 增加一个尺寸</button></div>
+
+    <div class="dsec d-diag">
+    <h2>图案位置（斜线）</h2>
+    <div class="row"><label>留白宽度<small>不开槽的那一条</small></label><input id="leftMargin" type="number" step="1" value="240"></div>
+    <div class="row"><label>斜线间距<small>垂直于斜线量，角度固定 45°</small></label><input id="spacing" type="number" step="1" value="94"></div>
+    <div class="row"><label>间距怎么量<small>边到边 = 两条槽之间留下的实木宽</small></label><select id="spMode"><option value="edge">没切的边 到 没切的边（客人看到的，如 94）</option><option value="center">槽中心 到 槽中心（红线）</option></select></div>
+    <div class="row"><label>第一条斜线碰到<br>底边的位置<small>量到槽没切的边 · 从哪边量起 ↓</small></label><input id="c0dist" type="number" step="0.0001" value="347.20014"></div>
+    <div class="row"><label>从哪边量起<small>门宽变了，斜线跟着这一边</small></label>
+      <select id="anchor"><option value="left" selected>左边（留白那边）</option><option value="right">右边</option></select></div>
+    </div>
+
+    <div class="dsec d-lines d-rects d-blocks d-dash">
+    <h2>尺寸是量到哪里</h2>
+    <div class="row"><label>图上的尺寸量到<small>槽的中心线，或槽靠门边的那条边</small></label>
+      <select id="ref"><option value="edge" selected>没切的边（客人看到的）</option><option value="center">槽的中心（红线）</option></select></div>
+    </div>
+
+    <div class="dsec d-lines d-dash">
+    <h2>等分怎么取整</h2>
+    <div class="row"><label>"间距 150 等分"取整方式<small>向下取整 = 格数少一点，间距 ≥ 填的数（D1 图就是这样：150 → 实际 156）</small></label><select id="eqMode"><option value="floor" selected>向下取整（间距≥填的）</option><option value="round">四舍五入（间距最接近）</option><option value="ceil">向上取整（间距≤填的）</option></select></div>
+    </div>
+
+    <div class="dsec d-lines">
+    <h2>横竖槽（位置用逗号分开，可填多个）</h2>
+    <div class="row"><label>竖槽：距左边<small>例 200,250,300</small></label><input id="vLeft" type="text" value=""></div>
+    <div class="row"><label>竖槽：距右边<small>例 200</small></label><input id="vRight" type="text" value="200"></div>
+    <div class="row"><label>竖槽等分（竖条纹）：间距<small>0 = 不用；例 60</small></label><input id="vPitch" type="number" value="0"></div>
+    <div class="row"><label>等分：第一条离左边</label><input id="vEqLeft" type="number" value="100"></div>
+    <div class="row"><label>等分：最后一条离右边</label><input id="vEqRight" type="number" value="100"></div>
+    <div class="row"><label>竖槽下端离底边<small>0 = 通到底</small></label><input id="vBotM" type="number" value="0"></div>
+    <div class="row"><label>竖槽上端离顶边<small>0 = 通到顶</small></label><input id="vTopM" type="number" value="0"></div>
+    <div class="row"><label>横槽：距底边<small>例 500</small></label><input id="hBottom" type="text" value="500"></div>
+    <div class="row"><label>横槽：距顶边<small>例 500</small></label><input id="hTop" type="text" value="500"></div>
+    <div class="row"><label>横槽等分：间距<small>0 = 不用；例 150</small></label><input id="hPitch" type="number" value="0"></div>
+    <div class="row"><label>等分：第一条离底边</label><input id="hEqBottom" type="number" value="100"></div>
+    <div class="row"><label>等分：最后一条离顶边</label><input id="hEqTop" type="number" value="100"></div>
+    <div class="row"><label>横槽左端离左边<small>0 = 到门边</small></label><input id="hX0" type="number" value="0"></div>
+    <div class="row"><label>横槽右端离右边<small>0 = 到门边</small></label><input id="hX1" type="number" value="200"></div>
+    <div class="row"><label>算出来的<small>等分后的实际间距</small></label><b id="eqInfo" style="font-size:13px">-</b></div>
+    </div>
+
+    <div class="dsec d-rects">
+    <h2>方框 / 嵌板（只切一圈线，不挖空）</h2>
+    <div class="row"><label>整圈外框：离门边<small>0 = 不要</small></label><input id="frameInset" type="number" value="0"></div>
+    <div class="row"><label>嵌板数量<small>0 = 不要</small></label><input id="pN" type="number" step="1" value="3"></div>
+    <div class="row"><label>嵌板：左右各留</label><input id="pMargin" type="number" value="125"></div>
+    <div class="row"><label>每块嵌板的宽<small>填了，缝自动等分</small></label><input id="pPW" type="number" value="170"></div>
+    <div class="row"><label>嵌板之间的缝<small>宽填 0 才用这个</small></label><input id="pGap" type="number" value="0"></div>
+    <div class="row"><label>嵌板：离底边</label><input id="pBottom" type="number" value="125"></div>
+    <div class="row"><label>嵌板：离顶边</label><input id="pTop" type="number" value="125"></div>
+    <div style="font-size:13px;margin-top:6px">自己加的方框（每行一个：<b>左, 底, 宽, 高</b>）</div>
+    <textarea id="customRects" rows="3" placeholder="例如 150, 150, 500, 800"></textarea>
+    <div class="row"><label>算出来的</label><b id="panelInfo" style="font-size:13px">-</b></div>
+    </div>
+
+    <div class="dsec d-blocks">
+    <h2>错开方块（只切一圈线）</h2>
+    <div class="row"><label>方块宽</label><input id="bW" type="number" value="500"></div>
+    <div class="row"><label>方块高</label><input id="bH" type="number" value="300"></div>
+    <div class="row"><label>最下面离底边</label><input id="bBottom" type="number" value="295"></div>
+    <div class="row"><label>方块之间的缝</label><input id="bGap" type="number" value="294"></div>
+    <div class="row"><label>方块数量<small>0 = 自动放最多</small></label><input id="bN" type="number" step="1" value="0"></div>
+    <div class="row"><label>自动时，顶部至少留<small>顶部多出来的高度全留在这里</small></label><input id="bMinTop" type="number" value="200"></div>
+    <div class="row"><label>每一层方块离左边<small>逗号分开，轮流用。例 150,350</small></label><input id="bXs" type="text" value="150,350"></div>
+    <div class="row"><label>算出来的</label><b id="blockInfo" style="font-size:13px">-</b></div>
+    </div>
+
+    <div class="dsec d-free">
+    <h2>固定线条设计（数字已经内置，要改或加新的，叫我改）</h2>
+    <div style="display:none">
+    <div class="row"><label>参考图的门宽</label><input id="fW" type="number" value="900"></div>
+    <div class="row"><label>参考图的门高</label><input id="fH" type="number" value="2100"></div>
+    <div class="row"><label>放大方式<small>自动 = 门宽 ÷ 参考宽</small></label><select id="fMode"><option value="width" selected>自动（按门宽）</option><option value="manual">自己填比例</option><option value="stretch">拉伸到整扇门（线条通到门边的款式用这个）</option></select></div>
+    <div class="row"><label>自己填的比例<small>例 1.2</small></label><input id="fScale" type="number" step="0.001" value="1.2"></div>
+    <div class="row"><label>多出来的高度<small>上下 balance = 平均分到上下</small></label><select id="fAlign"><option value="center" selected>上下 balance（居中）</option><option value="bottom">贴底，余数在上面</option><option value="top">贴顶，余数在下面</option></select></div>
+    <div style="font-size:13px;margin-top:6px">每条线一行：<b>起点x, 起点y, 终点x, 终点y</b>（可以接着写更多点 = 折线，左下角 = 0,0）</div>
+    <textarea id="freeSegs" rows="9"></textarea>
+    </div>
+    <div class="row"><label>算出来的</label><b id="freeInfo" style="font-size:13px">-</b></div>
+    </div>
+
+    <div class="dsec d-dash">
+    <h2>断线（一条槽分成一段一段）</h2>
+    <div class="row"><label>槽的方向</label><select id="dDir"><option value="v" selected>竖着的槽</option><option value="h">横着的槽</option></select></div>
+    <div class="row"><label>槽与槽的间距<small>等分，实际间距看下面</small></label><input id="dPitch" type="number" value="100"></div>
+    <div class="row"><label>第一条离（左边 / 底边）</label><input id="dM0" type="number" value="100"></div>
+    <div class="row"><label>最后一条离（右边 / 顶边）</label><input id="dM1" type="number" value="100"></div>
+    <div class="row"><label>每一段的长度</label><input id="dSeg" type="number" value="300"></div>
+    <div class="row"><label>缺口（段与段之间）长度</label><input id="dGap" type="number" value="60"></div>
+    <div class="row"><label>相邻的槽错开半格</label><select id="dStagger"><option value="1" selected>错开</option><option value="0">对齐</option></select></div>
+    <div class="row"><label>槽沿着方向，起点离（底 / 左）边</label><input id="dE0" type="number" value="100"></div>
+    <div class="row"><label>槽沿着方向，终点离（顶 / 右）边</label><input id="dE1" type="number" value="100"></div>
+    <div class="row"><label>算出来的</label><b id="dashInfo" style="font-size:13px">-</b></div>
+    </div>
+
+    <div class="dsec d-pockets">
+    <h2>方格挖槽（一个面分 3 个文件做）</h2>
+    <div class="row"><label>左边留白（竖线以左）</label><input id="pStrip" type="number" value="240"></div>
+    <div class="row"><label>每个方格的宽（外边缘）</label><input id="pW" type="number" value="110"></div>
+    <div class="row"><label>每个方格的高（外边缘）</label><input id="pH" type="number" value="110"></div>
+    <div class="row"><label>方格之间的横向缝</label><input id="pGx" type="number" value="50"></div>
+    <div class="row"><label>方格之间的竖向缝</label><input id="pGy" type="number" value="59"></div>
+    <div class="row"><label>每排几个<small>0 = 自动放最多</small></label><input id="pCols" type="number" step="1" value="0"></div>
+    <div class="row"><label>左右至少留<small>自动算几个时用</small></label><input id="pMinMX" type="number" value="50"></div>
+    <div class="row"><label>上下至少留<small>自动算几行；多出来的平均分上下</small></label><input id="pMinMY" type="number" value="50"></div>
+    <div class="row"><label>工序2：挖空时离外边缘<small>刀从这里开始来回挖</small></label><input id="pClearInset" type="number" value="6"></div>
+    <div class="row"><label>工序2：每趟间隔<small>0 = 自动（约刀直径的一半）</small></label><input id="pStep" type="number" value="0"></div>
+    <div class="row"><label>工序3：竖直线的刀直径</label><select id="lineCut"><option>3</option><option selected>6</option><option>9.5</option><option>12.5</option></select></div>
+    <div class="row"><label>工序3：竖直线切深</label><input id="lineDepth" type="number" step="0.5" value="3"></div>
+    <div class="row"><label>工序3：刀号 T<div class="hint">6mm刀=T4（照你的6U4）；工序1、2用上面的刀号</div></label><input id="lineTool" type="number" value="4"></div>
+    <div class="row"><label>三道工序合成 1 个文件<div class="hint">打勾 = 正面 1 个、背面 1 个；中间自动换刀</div></label><input id="mergeOps" type="checkbox" checked style="width:auto"></div>
+    <div class="row"><label>算出来的</label><b id="pocketInfo" style="font-size:13px">-</b></div>
+    <div class="note" style="margin-top:4px">工序 1 = 割每个方格的外圈；工序 2 = 把方格里面来回挖空；工序 3 = 画那条竖直线。工序 1、2 用上面"刀"选的刀和切深，工序 3 用这里的刀。</div>
+    </div>
+
+    <div class="dsec d-sun">
+    <h2>太阳（同心圆弧 + 放射线）</h2>
+    <div class="row"><label>圆心离左边<small>0 = 正好在门边</small></label><input id="sCx" type="number" value="60"></div>
+    <div class="row"><label>圆心离底边<small>一般在把手附近</small></label><input id="sBase" type="number" value="980"></div>
+    <div class="row"><label>圆弧半径（里到外）<small>逗号分开；第一个圈里面留空</small></label><input id="sRings" type="text" value="240,330,420,520,630,750"></div>
+    <div class="row"><label>圈与圈之间放射线的角度间隔<small>逗号分开，对应每两圈之间；越小越密</small></label><input id="sPitch" type="text" value="8,6.5,5.5,4.5,4"></div>
+    <div class="row"><label>最外圈以外的长射线角度间隔<small>一直延伸到门边；0 = 不要</small></label><input id="sOuterPitch" type="number" step="0.5" value="9"></div>
+    <div class="row"><label>起始角度（°）<small>0° = 朝右，负数往下</small></label><input id="sA0" type="number" value="-100"></div>
+    <div class="row"><label>结束角度（°）</label><input id="sA1" type="number" value="100"></div>
+    </div>
+
+    <div class="dsec d-tree">
+    <h2>高级圣诞树（弧形裙边的多层树 + 星星 + 挂球）</h2>
+    <div class="row"><label>树中心离左边<small>0 = 门中间</small></label><input id="tCx" type="number" value="0"></div>
+    <div class="row"><label>树干底部离底边</label><input id="tBase" type="number" value="300"></div>
+    <div class="row"><label>层数</label><input id="tN" type="number" step="1" value="7"></div>
+    <div class="row"><label>最下面一层的宽</label><input id="tW" type="number" value="700"></div>
+    <div class="row"><label>树身高度（不含树干和星星）</label><input id="tH" type="number" value="1100"></div>
+    <div class="row"><label>层与层重叠比例<small>0.62 = 重叠 62%</small></label><input id="tOv" type="number" step="0.01" value="0.62"></div>
+    <div class="row"><label>往上每层缩小比例<small>0.84 = 窄到 84%</small></label><input id="tShrink" type="number" step="0.01" value="0.84"></div>
+    <div class="row"><label>裙边弧度<small>0 = 直线，0.12 = 微弯</small></label><input id="tSag" type="number" step="0.01" value="0.12"></div>
+    <div class="row"><label>树干宽</label><input id="tTrunkW" type="number" value="90"></div>
+    <div class="row"><label>树干高</label><input id="tTrunkH" type="number" value="110"></div>
+    <div class="row"><label>顶上星星半径<small>0 = 不要</small></label><input id="tStar" type="number" value="70"></div>
+    <div class="row"><label>挂球半径<small>0 = 不要</small></label><input id="tBauble" type="number" value="16"></div>
+    </div>
+
+    <h2>刀</h2>
+    <div class="row"><label>刀型<small>平刀=U槽，尖刀=V槽</small></label>
+      <select id="cutterType"><option value="U" selected>U 平刀</option><option value="V">V 尖刀</option></select></div>
+    <div class="row"><label>刀直径<small id="maxDepthHint"></small></label><select id="cutter"></select></div>
+    <div class="row" id="vWidthRow" style="display:none"><label>槽宽 (mm)<small>V 刀：文件名里第一个数字，例 6V3 的 6</small></label><input id="vWidth" type="number" step="0.5" value="6"></div>
+    <div class="row"><label>槽宽<small>平刀=刀直径；V 刀=上面填的</small></label><b id="grooveW" style="font-size:15px">-</b></div>
+    <div class="row" id="vAngleRow" style="display:none"><label>刀尖角度（算出来的）<small>由槽宽和深度决定</small></label><b id="vAngleShow" style="font-size:15px">-</b></div>
+    <div class="row"><label>切深<small>文件名里最后那个数字（例 6V3 的 3）</small></label><input id="depth" type="number" step="0.5" value="4"></div>
+
+    <details><summary>机器设定（照 6U4.CNC，一般不用改）</summary>
+      <div class="row"><label>刀号 T</label><input id="tool" type="number" value="4"></div>
+      <div class="row"><label>主轴转速 S</label><input id="spindle" type="number" value="24000"></div>
+      <div class="row"><label>下刀速度 F</label><input id="plunge" type="number" value="4000"></div>
+      <div class="row"><label>走刀速度 F</label><input id="feed" type="number" value="10000"></div>
+      <div class="row"><label>安全抬刀高度 Z</label><input id="safeZ" type="number" value="20"></div>
+    </details>
+
+    <h2>保存这个设计（下次直接选）</h2>
+    <div class="designs" style="margin-top:6px">
+      <input id="designName" type="text" placeholder="给这个设计起个名字，例如 浴室门A">
+      <button class="sec sm" id="designSave">保存</button>
+    </div>
+    <div class="btns">
+      <button class="sec sm" id="designExport">导出设计文件</button>
+      <button class="sec sm" id="designImport">导入设计文件</button>
+      <input type="file" id="designFile" accept=".json" style="display:none">
+    </div>
+    <div class="note" style="margin-top:6px">保存的内容：图案类型、该图案的全部数字、刀、切深（不含门的宽高）。带 ★ 的是内置例子（按你给的设计图，没写出来的数字是我先假设的，请对着真实设计改）。想给同事用，就"导出"一个文件发给他，他"导入"。</div>
+
+    <div class="warn" id="warn"></div>
+
+    <div class="btns">
+      <button id="dl">下载 .CNC（全部尺寸，正面+背面）</button>
+      <button id="dlPdf" style="background:#2a6df4">下载 PDF（全部尺寸，两面）</button>
+      <button class="sec" id="copy">复制当前面的 G-code</button>
+    </div>
+    <div class="note">文件名自动是 <b>宽x高 (槽宽+刀型+切深)</b>，例如 <b>1268x2335 (6U3) FRONT.CNC</b>；V 刀例如 <b>862x2355 (6V3) FRONT.CNC</b>。尺寸表里有几行，就下载几组。浏览器可能会问"允许下载多个文件"，点允许。</div>
+  </div>
+
+  <div class="card" style="flex:1;min-width:360px">
+    <div class="stats">
+      <div class="stat"><b id="sCuts">-</b><span>刀路条数</span></div>
+      <div class="stat"><b id="sLen">-</b><span>总切削长度 (m)</span></div>
+      <div class="stat"><b id="sTotal">-</b><span>总高度 (mm)</span></div>
+    </div>
+    <div class="tabs"><button id="tabF" class="tab on">正面</button><button id="tabB" class="tab">背面（镜像）</button><span class="tabnote">背面 = 正面左右翻转（像翻书一样翻面）</span></div>
+    <div id="boRow" style="display:none;margin:8px 0;font-size:14px">背面原点（基准点）：
+      <select id="backOrigin"><option value="BL">左下角（默认，翻面后朝上那面）</option><option value="BR">右下角（= 正面原点那个角 A）</option><option value="TL">左上角</option><option value="TR">右上角</option></select>
+      <label style="margin-left:10px;font-size:13px"><input type="checkbox" id="boRot" checked> 门也跟着转（原点转到机器左下角，G-code 全是正数）</label> <span id="boNote" style="color:#777;font-size:12px"></span></div>
+    <div class="tabs" id="opTabs" style="display:none"></div>
+    <div class="views">
+      <div><div class="vt" id="vt1">① CNC 路线图（给机器）</div><div class="rw"><canvas id="cv" width="330" height="610"></canvas></div></div>
+      <div><div class="vt" id="vt2">② 效果图（做出来的样子）</div><div class="rw"><canvas id="cv2" width="330" height="610"></canvas></div></div>
+      <div id="dv3"><div class="vt">③ 局部放大（线与线之间的距离）</div><canvas id="cv3" width="440" height="440"></canvas><div class="note" style="max-width:440px;margin-top:6px">红线 = 刀中心，白线 = 槽的边，浅红 = 切掉的槽。绿色尺寸 = 客人看到的距离。</div></div>
+    </div>
+    <div class="legend"><i style="background:#fff"></i>白线 = 门外形<i style="background:#ff4d4d"></i>红线 = 刀中心路线（淡红宽带 = 实际切掉的槽宽）<i style="background:#14171a;border:1px solid #888"></i>效果图里的深色线 = 做出来的槽<i style="background:#ffd24d"></i>黄色 = 尺寸（mm，量的位置看尺寸线）</div>
+    <details class="flip" open style="margin-top:14px"><summary style="font-weight:600;color:var(--ink)">背面怎么做？门要怎么翻（给操作员看）</summary>
+    <svg viewBox="0 0 700 230" style="width:100%;max-width:700px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:8px">
+      <rect x="30" y="30" width="90" height="170" fill="#d6d9dd" stroke="#111" stroke-width="2"/>
+      <text x="75" y="52" text-anchor="middle" font-size="11" fill="#555" font-weight="700">上</text>
+      <text x="36" y="194" font-size="14" fill="#1a4fd6" font-weight="700">A</text><text x="104" y="194" font-size="14" fill="#b00" font-weight="700">B</text>
+      <text x="75" y="20" text-anchor="middle" font-size="12" font-weight="700">① 正面朝上（做完了）</text>
+      <path d="M 135 115 L 245 115" stroke="#d93a3a" stroke-width="4"/><path d="M 245 105 L 262 115 L 245 125 Z" fill="#d93a3a"/>
+      <text x="198" y="100" text-anchor="middle" font-size="12" fill="#d93a3a" font-weight="700">左右翻</text>
+      <text x="198" y="138" text-anchor="middle" font-size="10" fill="#d93a3a">像翻书一样</text>
+      <g id="guideB"><rect x="275" y="30" width="90" height="170" fill="#efe3d0" stroke="#111" stroke-width="2"/>
+      <text x="320" y="52" text-anchor="middle" font-size="11" fill="#555" font-weight="700">上</text>
+      <text x="281" y="194" font-size="14" fill="#1a4fd6" font-weight="700">B</text><text x="349" y="194" font-size="14" fill="#b00" font-weight="700">A</text></g>
+      <text x="320" y="20" text-anchor="middle" font-size="12" font-weight="700">② 背面朝上（现在做）</text>
+      <g id="guideX" stroke="#1a4fd6" stroke-width="2"><line id="gx1" x1="267" y1="200" x2="283" y2="200"/><line id="gx2" x1="275" y1="192" x2="275" y2="208"/></g>
+      <text id="guideO" x="275" y="218" font-size="10" fill="#1a4fd6">原点 X0 Y0</text>
+      <g font-size="12" fill="#1c2430">
+        <text x="420" y="48" font-weight="700">步骤</text>
+        <text x="420" y="70">1. 先做完正面</text>
+        <text x="420" y="90">2. 左右翻（像翻书），"上"还是在上面</text>
+        <text id="guideS3" x="420" y="110">3. 不要上下倒过来翻</text>
+        <text x="420" y="130">4. 翻完：A 在右下，B 在左下</text>
+        <text id="guideS" x="420" y="150">5. 原点放在朝上那面的左下角（B）</text>
+        <text id="guideS6" x="420" y="170">6. 开「… BACK.CNC」那个文件</text>
+        <text id="guideS7" x="420" y="190">7. 先空跑 / 废板试一下</text>
+        <text id="guideS8" x="420" y="210"></text>
+      </g>
+    </svg>
+    <div class="note" id="guideTurn" style="margin-top:6px;display:none;background:#fff4d6;color:#7a4b00;padding:8px 10px;border-radius:8px">⚠ 上面的路线图转了向，只是为了方便看。<b>门不用转</b>，照上面翻书的方式翻就好，原点就设在这张图标的那个角。</div>
+    <div class="note" style="margin-top:6px">PDF 最后一页也有这张图（英文，给操作员）。提示：翻门前在门边用粉笔标 A、B 两个角，翻完马上能核对原点。<br>⚠ "左右翻 + 原点在朝上那面的左下角"是我按"翻书"推算的，还没用真实背面文件核对，第一次请用废板确认。</div>
+    </details>
+    <div class="note">
+      上机前请先空跑（Z 轴抬高）或在废板上试一块。<br>
+      只有"斜线 + 6mm 平刀 + 2335 高 + 1268 宽"用真实文件逐条核对过。其他图案是按你图上的尺寸算的，第一次请先在废板上试。
+    </div>
+  </div>
+</main>
+
+<script>
+// CNC 刀路生成核心（纯函数，HTML 和 node 测试共用）
+// 坐标：X 向右，Y 向上，原点 = 门（下面那块板）的左下角。
+// p.design: 'diag' 斜线 | 'lines' 横竖槽 | 'rects' 方框/嵌板 | 'blocks' 错开方块
+function parseNums(s) {
+  return String(s == null ? '' : s).split(/[,，;；\s]+/).filter((t) => t.length).map(Number).filter((v) => isFinite(v));
+}
+function parseRects(s) {   // 每行一个：x, y, 宽, 高
+  return String(s == null ? '' : s).split(/[\n;；]+/).map((l) => parseNums(l)).filter((a) => a.length === 4);
+}
+function parseFree(s) {   // 每行一条线：x1,y1,x2,y2（也可以更多点 = 折线）
+  return String(s == null ? '' : s).split(/[\n;；]+/).map((l) => parseNums(l)).filter((a) => a.length >= 4 && a.length % 2 === 0);
+}
+const SIDE_ZH = { L: '距左边', R: '距右边', B: '距底边', T: '距顶边' };
+const SIDE_EN = { L: 'LEFT', R: 'RIGHT', B: 'BOTTOM', T: 'TOP' };
+function dimText(d, lang) {      // 尺寸标注的文字：写明是从哪一边量的
+  return String(Math.round(d.v * 100) / 100);   // 只写数字（画的尺寸线位置就说明是从哪边量的）
+}
+function clipSeg(a, b, W, H) {   // Liang-Barsky：线段裁到门的范围里
+  let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+  const P = [-dx, dx, -dy, dy], Q = [a[0], W - a[0], a[1], H - a[1]];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(P[i]) < 1e-12) { if (Q[i] < 0) return null; }
+    else { const t = Q[i] / P[i]; if (P[i] < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; } }
+  }
+  return [[a[0] + t0 * dx, a[1] + t0 * dy], [a[0] + t1 * dx, a[1] + t1 * dy]];
+}
+function clipPoly(pts, W, H) {   // 折线裁到门里，可能变成好几段
+  const out = []; let cur = null;
+  for (let i = 1; i < pts.length; i++) {
+    const c = clipSeg(pts[i - 1], pts[i], W, H);
+    if (!c || Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]) < 0.01) { cur = null; continue; }
+    if (cur && Math.hypot(cur[cur.length - 1][0] - c[0][0], cur[cur.length - 1][1] - c[0][1]) < 0.01) cur.push(c[1]);
+    else { cur = [c[0], c[1]]; out.push(cur); }
+  }
+  return out;
+}
+function arcPts(cx, cy, R, a0, a1) {
+  const st = Math.max(0.5, Math.min(3, Math.acos(Math.max(0, 1 - 0.05 / Math.max(R, 1))) * 180 / Math.PI * 2));
+  const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / st)), pts = [];
+  for (let i = 0; i <= n; i++) { const a = (a0 + (a1 - a0) * i / n) * Math.PI / 180; pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
+  return pts;
+}
+function generateCNC(p) {
+  const SQ2 = Math.SQRT2;
+  const design = p.design || 'diag';
+  // 槽宽：平刀(U) = 刀直径；尖刀(V) = 直接填的槽宽（最大不超过刀直径）
+  const gw = p.cutterType === 'V' ? Math.min(p.cutter, p.vWidth) : p.cutter;
+  const r = gw / 2;
+  const W = p.width, H = p.height;
+  const multi = design === 'diag' || design === 'pockets';
+  const single = !multi || p.structure === 'single';
+  const rects = single
+    ? [{ y0: 0, y1: H, name: 'lower' }]
+    : [{ y0: 0, y1: H, name: 'lower' }, { y0: H + p.gap, y1: H + p.gap + p.topH, name: 'top' }];
+  const info = [], warnings = [];
+  let paths = [];
+  const dims = [];
+  let nDiag = 0, nVert = 0;
+
+  if (design === 'diag') {
+    // 间距可以量「槽中心到中心」（默认，旧做法）或「槽边到槽边」（外层，留下来的实木宽度）；垂直于斜线量
+    const spC = p.spMode === 'edge' ? p.spacing + gw : p.spacing;    // 中心到中心的垂直距离
+    const step = spC * SQ2;                     // 45° 时，x+y 常数每隔 spC*√2 一条线
+    const xL = p.leftMargin + gw;               // 斜线起点（竖槽右边缘）
+    const xR = W;                               // 斜线终点 = 门右边缘（刀中心压边，刀头多出 r）
+    const xV = p.leftMargin + r;                // 竖槽刀中心
+    const kMin = 0;                              // 从第一条（碰到底边的那条）开始，之前的不画（跟 D1 实际图一致）
+    const c0v = p.spMode === 'edge' ? (p.anchor === 'right' ? p.c0 - r * SQ2 : p.c0 + r * SQ2) : p.c0;   // 边模式：p.c0 是「没切的边」的位置，刀中心再多半个槽宽
+    const kMax = Math.ceil((xR + rects[rects.length - 1].y1 - c0v) / step) + 1;
+    for (let k = kMin; k <= kMax; k++) {
+      const c = c0v + k * step;
+      for (const R of rects) {
+        const lo = Math.max(xL, c - R.y1);
+        const hi = Math.min(xR, c - R.y0);
+        if (hi - lo > 0.01) { paths.push([[lo, c - lo], [hi, c - hi]]); nDiag++; }
+      }
+    }
+    for (const R of rects.slice().reverse()) { paths.push([[xV, R.y1], [xV, R.y0]]); nVert++; }
+    info.push(['Plain strip', p.leftMargin + ' mm (' + (p.mirror ? 'RIGHT' : 'LEFT') + ' side)']);
+    info.push(['Groove spacing', p.spacing + ' mm @ 45 deg' + (p.spMode === 'edge' ? ' (edge to edge)' : ' (centre to centre)')]);
+  } else {
+    const off = p.ref === 'edge' ? r : 0;          // 尺寸量到槽的边缘：中心 = 边缘 + 半个槽宽
+    const cL = (v) => v + off, cR = (v) => W - v - off, cB = (v) => v + off, cT = (v) => H - v - off;
+    const rectPath = (x0, y0, x1, y1) => {          // 外边缘尺寸 → 刀中心方框
+      const d = p.ref === 'edge' ? r : 0;
+      const a = x0 + d, b = y0 + d, c = x1 - d, e = y1 - d;
+      if (c - a < 0.5 || e - b < 0.5) { warnings.push('有个方框太小，放不下一把 ' + gw + 'mm 的刀，已跳过。'); return null; }
+      return [[a, b], [c, b], [c, e], [a, e], [a, b]];
+    };
+    const add = (pt) => { if (pt) paths.push(pt); };
+    const eqN = (v) => (p.eqMode === 'round' ? Math.round(v) : p.eqMode === 'ceil' ? Math.ceil(v - 1e-9) : Math.floor(v + 1e-9));   // 默认向下取整：间距 ≥ 填的数（D1 图：2184/150 → 14 格，间距 156）
+
+    const vP = p.ref === 'edge' ? p.vPitch + gw : p.vPitch, hP = p.ref === 'edge' ? p.hPitch + gw : p.hPitch;   // 边模式：填的间距 = 槽与槽之间没切的宽度
+    if (design === 'lines') {
+      const xs = (p.vLeft || []).map(cL).concat((p.vRight || []).map(cR));
+      const yT = H - (p.vTopM || 0), yB = (p.vBotM || 0);
+      xs.slice().sort((a, b) => a - b).forEach((x) => {
+        if (x < -0.01 || x > W + 0.01) warnings.push('有一条竖槽的位置 (' + Math.round(x) + ') 超出门宽。');
+        else { paths.push([[x, yT], [x, yB]]); nVert++; }
+      });
+      if (p.vPitch > 0) {
+        const a = cL(p.vEqLeft || 0), b = cR(p.vEqRight || 0);
+        if (b - a > vP / 2) {
+          const n = Math.max(1, eqN((b - a) / vP)), pitch = (b - a) / n;
+          for (let i = 0; i <= n; i++) { const x = a + i * pitch; paths.push([[x, yT], [x, yB]]); nVert++; xs.push(x); }
+          info.push(['Vertical EQ', (n + 1) + ' lines, pitch ' + (Math.round(pitch * 100) / 100) + ' mm']);
+          p._veq = { n: n + 1, pitch };
+        } else warnings.push('竖槽等分的范围太小。');
+      }
+      let ys = (p.hBottom || []).map(cB).concat((p.hTop || []).map(cT));
+      if (p.hPitch > 0) {
+        const a = cB(p.hEqBottom || 0), b = cT(p.hEqTop || 0);
+        if (b - a > hP / 2) {
+          const n = Math.max(1, eqN((b - a) / hP)), pitch = (b - a) / n;
+          for (let i = 0; i <= n; i++) ys.push(a + i * pitch);
+          info.push(['Horizontal EQ', (n + 1) + ' lines, pitch ' + (Math.round(pitch * 100) / 100) + ' mm']);
+          p._eq = { n: n + 1, pitch };
+        } else warnings.push('横槽等分的范围太小。');
+      }
+      ys = ys.sort((a, b) => a - b).filter((y, i, arr) => i === 0 || y - arr[i - 1] > 0.01);
+      const x0 = p.hX0 || 0, x1 = W - (p.hX1 || 0);
+      ys.forEach((y) => {
+        if (y < -0.01 || y > H + 0.01) warnings.push('有一条横槽的位置 (' + Math.round(y) + ') 超出门高。');
+        else if (x1 - x0 > 0.5) paths.push([[x0, y], [x1, y]]);
+      });
+      info.push(['Vertical lines', String(xs.length)]);
+      info.push(['Horizontal lines', String(ys.length)]);
+      if (p.hX1 > 0) info.push(['Horizontal ends', p.hX1 + ' mm short of right edge']);
+    } else if (design === 'rects') {
+      if (p.frameInset > 0) add(rectPath(p.frameInset, p.frameInset, W - p.frameInset, H - p.frameInset));
+      if (p.pN > 0) {
+        const m = p.pMargin || 0, n = Math.round(p.pN);
+        let pw = p.pPW, gap;
+        if (pw > 0) gap = n > 1 ? (W - 2 * m - n * pw) / (n - 1) : 0;
+        else { gap = p.pGap || 0; pw = (W - 2 * m - (n - 1) * gap) / n; }
+        if (n === 1) pw = pw > 0 && p.pPW > 0 ? p.pPW : W - 2 * m;
+        const startX = n === 1 ? (W - pw) / 2 : m;
+        if (gap < 0) warnings.push('嵌板放不下：门宽不够，缝变成负数 (' + Math.round(gap * 100) / 100 + ')。');
+        else {
+          for (let i = 0; i < n; i++) add(rectPath(startX + i * (pw + gap), p.pBottom || 0, startX + i * (pw + gap) + pw, H - (p.pTop || 0)));
+          info.push(['Panels', n + ' x ' + (Math.round(pw * 100) / 100) + ' wide, gap ' + (Math.round(gap * 100) / 100) + ' mm']);
+          p._panel = { n, pw, gap };
+        }
+      }
+      (p.customRects || []).forEach((a) => add(rectPath(a[0], a[1], a[0] + a[2], a[1] + a[3])));
+      if (p.frameInset > 0) info.push(['Frame inset', p.frameInset + ' mm']);
+    } else if (design === 'blocks') {
+      const bh = p.bH, gp = p.bGap, b0 = p.bBottom, bw = p.bW;
+      let n = Math.round(p.bN);
+      if (!(n > 0)) { n = 0; while (b0 + (n + 1) * bh + n * gp <= H - (p.bMinTop || 0) + 1e-9) n++; }
+      const used = b0 + n * bh + Math.max(0, n - 1) * gp, topGap = H - used;
+      if (topGap < 0) warnings.push('方块放不下：超出门高 ' + Math.round(-topGap) + 'mm。');
+      const xsOff = (p.bXs && p.bXs.length) ? p.bXs : [0];
+      for (let i = 0; i < n && topGap >= 0; i++) {
+        const x = xsOff[i % xsOff.length], y = b0 + i * (bh + gp);
+        if (x + bw > W + 0.01) warnings.push('第 ' + (i + 1) + ' 个方块超出门宽。');
+        add(rectPath(x, y, x + bw, y + bh));
+      }
+      info.push(['Blocks', n + ' x (' + bw + ' x ' + bh + ')']);
+      info.push(['Bottom / gaps / top', b0 + ' / ' + gp + ' / ' + (Math.round(topGap * 100) / 100) + ' mm']);
+      p._blocks = { n, topGap };
+    } else if (design === 'free') {
+      const W0 = p.fW, H0 = p.fH;
+      const stretch = p.fMode === 'stretch';
+      const s = stretch ? W / W0 : p.fMode === 'manual' ? p.fScale : W / W0;
+      const sy = stretch ? H / H0 : s;
+      const ox = stretch ? 0 : (W - W0 * s) / 2;
+      const oyy = stretch ? 0 : p.fAlign === 'bottom' ? 0 : p.fAlign === 'top' ? H - H0 * s : (H - H0 * s) / 2;
+      if (!(s > 0)) warnings.push('比例不对。');
+      if (H0 * sy > H + 0.01) warnings.push('放大后比门还高 ' + Math.round(H0 * sy - H) + 'mm。');
+      if (W0 * s > W + 0.01) warnings.push('放大后比门还宽 ' + Math.round(W0 * s - W) + 'mm。');
+      (p.freeSegs || []).forEach((a) => { const pt = []; for (let i = 0; i + 1 < a.length; i += 2) pt.push([ox + a[i] * s, oyy + a[i + 1] * sy]); paths.push(pt); });
+      info.push(['Scale', stretch ? 'stretch to door size (ref ' + W0 + ' x ' + H0 + ')' : (Math.round(s * 10000) / 10000) + ' (ref ' + W0 + ' x ' + H0 + ')']);
+      info.push(['Vertical balance', (p.fAlign === 'bottom' ? 'bottom' : p.fAlign === 'top' ? 'top' : 'centre') + ', offset ' + (Math.round(oyy * 100) / 100) + ' mm']);
+      p._free = { s, oyy, ox };
+    } else if (design === 'sun') {
+      // 放射太阳：同心圆弧 + 圈与圈之间的放射短线 + 最外圈往门边延伸的长射线（照片那种）
+      const cx = p.sCx, cy = p.sBase, rings = p.sRings || [], pit = p.sPitch || [];
+      const a0 = p.sA0, a1 = p.sA1, W_ = W, H_ = H;
+      const add2 = (pts) => clipPoly(pts, W_, H_).forEach((q) => paths.push(q));
+      const angles = (dth) => { const o = []; if (!(dth > 0)) return o; for (let k = Math.ceil(a0 / dth - 1e-9); k * dth <= a1 + 1e-9; k++) o.push(k * dth); return o; };
+      const pol = (R, a) => [cx + R * Math.cos(a * Math.PI / 180), cy + R * Math.sin(a * Math.PI / 180)];
+      rings.forEach((R) => add2(arcPts(cx, cy, R, a0, a1)));
+      for (let z = 0; z + 1 < rings.length; z++) {
+        const dth = pit[Math.min(z, pit.length - 1)];
+        angles(dth).forEach((a) => add2([pol(rings[z], a), pol(rings[z + 1], a)]));
+      }
+      if (rings.length && p.sOuterPitch > 0) {
+        const far = Math.hypot(W_, H_) * 1.2, Rl = rings[rings.length - 1];
+        angles(p.sOuterPitch).forEach((a) => add2([pol(Rl, a), pol(far, a)]));
+      }
+      if (!rings.length) warnings.push('请填圆弧半径（逗号分开）。');
+      info.push(['Sunburst', rings.length + ' rings, centre X ' + cx + ' Y ' + cy]);
+    } else if (design === 'tree') {
+      // 高级圣诞树：多层带弧形裙边的树 + 树干 + 顶上星星 + 挂球 + 地线
+      const cx = p.tCx > 0 ? p.tCx : W / 2, n = Math.max(2, Math.round(p.tN)), ov = Math.min(0.9, Math.max(0.2, p.tOv)), sh = p.tShrink;
+      const th = p.tH / (1 + (n - 1) * (1 - ov)), step = th * (1 - ov), tw = p.tTrunkW, y0 = p.tBase, yT = y0 + p.tTrunkH;
+      const hb = [], yb = [];
+      for (let i = 0; i < n; i++) { hb.push(p.tW / 2 * Math.pow(sh, i)); yb.push(yT + i * step); }
+      const apex = yT + (n - 1) * step + th, sag = (p.tSag || 0) * th;
+      const hemY = (i, x) => yb[i] + sag * (1 - Math.pow(x / hb[i], 2));
+      for (let i = 0; i < n; i++) {                       // 裙边弧（每层一条）
+        const pts = []; for (let k = 0; k <= 24; k++) { const u = -1 + 2 * k / 24; pts.push([cx + u * hb[i], hemY(i, u * hb[i])]); }
+        paths.push(pts);
+      }
+      for (let i = 0; i < n; i++) {                       // 两边斜边：从裙边尖一直到碰到上一层的裙边
+        let tEnd = 1;
+        if (i < n - 1) {
+          let lo = step / th, hi = 1;
+          const f = (t) => (yb[i] + t * th) - hemY(i + 1, Math.min(hb[i + 1], hb[i] * (1 - t)));
+          for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (f(m) < 0) lo = m; else hi = m; }
+          tEnd = (lo + hi) / 2;
+        }
+        const ex = hb[i] * (1 - tEnd), ey = yb[i] + tEnd * th;
+        paths.push([[cx + hb[i], yb[i]], [cx + ex, ey]]); paths.push([[cx - hb[i], yb[i]], [cx - ex, ey]]);
+      }
+      const hy = hemY(0, tw / 2);                          // 树干
+      paths.push([[cx - tw / 2, hy], [cx - tw / 2, y0], [cx + tw / 2, y0], [cx + tw / 2, hy]]);
+      paths.push([[cx - p.tW * 0.58, y0], [cx - tw / 2 - 20, y0]]); paths.push([[cx + tw / 2 + 20, y0], [cx + p.tW * 0.58, y0]]);
+      if (p.tStar > 0) {                                   // 八角星
+        const rs = p.tStar, sy = apex + rs * 0.95, pts = [];
+        for (let k = 0; k < 16; k++) { const R = k % 2 ? rs * 0.42 : rs, a = (90 + k * 22.5) * Math.PI / 180; pts.push([cx + R * Math.cos(a), sy + R * Math.sin(a)]); }
+        pts.push(pts[0]); paths.push(pts);
+        if (sy + rs > H + 0.01) warnings.push('星星超出门高。');
+      }
+      if (p.tBauble > 0) {                                 // 挂球
+        for (let i = 1; i < n; i++) [-1, 1].forEach((sg) => { paths.push(arcPts(cx + sg * hb[i] * 0.88, yb[i] - p.tBauble * 1.5, p.tBauble, 0, 360)); });
+      }
+      if (cx - hb[0] < -0.01 || cx + hb[0] > W + 0.01) warnings.push('圣诞树比门还宽。');
+      if (apex > H + 0.01) warnings.push('圣诞树超出门高 ' + Math.round(apex - H) + 'mm。');
+      info.push(['Christmas tree', n + ' tiers, width ' + p.tW + ', body height ' + Math.round(apex - yT) + ' mm']);
+      p._tree = { cx, y0, apex };
+    } else if (design === 'pockets') {
+      // 方格挖槽：每个小方块 = 外圈割一圈 + 里面来回挖空 + 另外一条竖直线（分三道工序）
+      const part = p.part || 'ring', lineW = part === 'line' ? gw : (p.lineCut || 6);
+      const x0 = p.pStrip + lineW, cw = p.pW, ch = p.pH, gx = p.pGx, gy = p.pGy;
+      let nc = Math.round(p.pCols);
+      if (!(nc > 0)) nc = Math.max(1, Math.floor((W - x0 - 2 * (p.pMinMX || 0) + gx) / (cw + gx)));
+      const mx = (W - x0 - (nc * cw + (nc - 1) * gx)) / 2;
+      if (mx < 0) warnings.push('方格放不下：一排 ' + nc + ' 个比门宽还宽。');
+      const info0 = { nc, mx, rows: [] };
+      for (const R of rects) {
+        const Hp = R.y1 - R.y0;
+        const nr = Math.max(0, Math.floor((Hp - 2 * (p.pMinMY || 0) + gy) / (ch + gy)));
+        const my = (Hp - (nr * ch + Math.max(0, nr - 1) * gy)) / 2;
+        info0.rows.push({ nr, my, name: R.name });
+        if (part === 'line') { const xv = p.pStrip + gw / 2; paths.push([[xv, R.y1], [xv, R.y0]]); continue; }
+        for (let j = 0; j < nr; j++) for (let i = 0; i < nc; i++) {
+          const ox = x0 + mx + i * (cw + gx), oy = R.y0 + my + j * (ch + gy);
+          if (part === 'ring') {
+            const a = ox + r, b = oy + r, c = ox + cw - r, e = oy + ch - r;
+            paths.push([[a, b], [c, b], [c, e], [a, e], [a, b]]);
+          } else {
+            const ci = p.pClearInset == null ? 6 : p.pClearInset, xa = ox + ci + r, xb = ox + cw - ci - r, ya = oy + ci + r, yb2 = oy + ch - ci - r;
+            const stp = Math.max(0.5, p.pStep || r * 0.96), xsx = []; for (let x = xa; x < xb - 1e-6; x += stp) xsx.push(x); xsx.push(xb);
+            const pts = []; xsx.forEach((x, k) => { if (k % 2 === 0) { pts.push([x, ya]); pts.push([x, yb2]); } else { pts.push([x, yb2]); pts.push([x, ya]); } });
+            paths.push(pts);
+          }
+        }
+      }
+      info.push(['Pocket grid', nc + ' cols x ' + info0.rows.map((q) => q.nr).join('+') + ' rows']);
+      info.push(['Cell size', cw + ' x ' + ch + ' mm']);
+      info.push(['Part', part === 'ring' ? '1/3 outline of squares' : part === 'clear' ? '2/3 clear inside squares' : '3/3 vertical line']);
+      p._pockets = info0;
+    } else if (design === 'dash') {
+      const vert = p.dDir !== 'h', seg = p.dSeg, gap = p.dGap, per = seg + gap, dP = p.ref === 'edge' ? p.dPitch + gw : p.dPitch, ed = p.ref === 'edge';   // 边模式：线段长 = 槽外边到外边，缺口 = 没切的长度
+      const a = vert ? cL(p.dM0 || 0) : cB(p.dM0 || 0), b = vert ? cR(p.dM1 || 0) : cT(p.dM1 || 0);
+      const L = vert ? H : W, lo = p.dE0 || 0, hi = L - (p.dE1 || 0);
+      if (!(dP > 0) || !(seg > 0) || b - a < 0.5) warnings.push('断线的间距 / 线段长度 / 范围不对。');
+      else {
+        const nl = Math.max(1, eqN((b - a) / dP)), pitch = nl > 0 ? (b - a) / nl : 0;
+        let cnt = 0;
+        for (let j = 0; j <= nl; j++) {
+          const c = a + j * pitch, phase = p.dStagger && j % 2 ? per / 2 : 0;
+          for (let t = lo - phase; t < hi - 0.5; t += per) {
+            const t0 = Math.max(t, lo), t1 = Math.min(t + seg, hi);
+            const u0 = ed ? t0 + r : t0, u1 = ed ? t1 - r : t1;      // 边模式：刀中心比外边缩进半个槽宽
+            if (u1 - u0 > 0.5) { paths.push(vert ? [[c, u0], [c, u1]] : [[u0, c], [u1, c]]); cnt++; }
+          }
+        }
+        info.push(['Broken lines', (nl + 1) + ' lines, pitch ' + (Math.round(pitch * 100) / 100) + ', dash ' + seg + ' gap ' + gap]);
+        p._dash = { n: nl + 1, pitch, cnt };
+      }
+    }
+  }
+
+  // ---- 尺寸标注（写明从哪一边量起，预览图和 PDF 都用）----
+  const yl = (i) => H - 110 - 100 * i, xl = (i) => 90 + 110 * i;       // 横向标注的 Y 位置 / 竖向标注的 X 位置（一层一层错开）
+  const hd = (x1, x2, i, v, side, zh, en) => dims.push({ a: [x1, yl(i)], b: [x2, yl(i)], v, side, zh, en, dir: 'h' });
+  const vd = (y1, y2, i, v, side, zh, en) => dims.push({ a: [xl(i), y1], b: [xl(i), y2], v, side, zh, en, dir: 'v' });
+  if (design === 'diag') {
+    hd(0, p.leftMargin, 0, p.leftMargin, 'L', '留白');
+    const dist = p.anchor === 'right' ? W - p.c0 : p.c0;
+    {   // 斜线间距尺寸：垂直于斜线，画在门中间两条相邻斜线之间（槽边到槽边 或 中心到中心，跟选的量法一致）
+      const edge = p.spMode === 'edge', hw = edge ? r * SQ2 : 0;
+      const spC = edge ? p.spacing + gw : p.spacing, step = spC * SQ2;
+      const xm = (p.leftMargin + gw + W) / 2, ym = H / 2;
+      const c0v = edge ? (p.anchor === 'right' ? p.c0 - r * SQ2 : p.c0 + r * SQ2) : p.c0;
+      const k = Math.max(0, Math.round((xm + ym - c0v - hw) / step));
+      const cA = c0v + k * step + hw, len = edge ? p.spacing : spC;
+      const ax = xm, ay = cA - xm;                       // A 在第 k 条线（的上边缘）上
+      const q = len / SQ2;                               // 沿垂直方向 (1,1)/√2 走 len
+      dims.push({ a: [ax, ay], b: [ax + q, ay + q], v: p.spacing, side: null, dir: 'p', zh: '', en: '' });
+    }
+    dims.push(p.anchor === 'right' ? { a: [p.c0, 60], b: [W, 60], v: dist, side: 'R', dir: 'h' } : { a: [0, 60], b: [p.c0, 60], v: dist, side: 'L', dir: 'h', zh: '', en: '' });
+  } else if (design === 'lines') {
+    let i = 0;
+    (p.vLeft || []).forEach((v) => hd(0, v, i++, v, 'L'));
+    (p.vRight || []).forEach((v) => hd(W - v, W, i++, v, 'R'));
+    if (p.hX1 > 0) hd(W - p.hX1, W, i++, p.hX1, 'R', '横槽右端');
+    if (p.hX0 > 0) hd(0, p.hX0, i++, p.hX0, 'L', '横槽左端');
+    if (p.vPitch > 0 && p._veq) { hd(0, p.vEqLeft || 0, i++, p.vEqLeft || 0, 'L'); hd(W - (p.vEqRight || 0), W, i++, p.vEqRight || 0, 'R'); }
+    let j = 0;
+    (p.hBottom || []).forEach((v) => vd(0, v, j++, v, 'B'));
+    (p.hTop || []).forEach((v) => vd(H - v, H, j++, v, 'T'));
+    if (p.hPitch > 0 && p._eq) { vd(0, p.hEqBottom || 0, j++, p.hEqBottom || 0, 'B'); vd(H - (p.hEqTop || 0), H, j++, p.hEqTop || 0, 'T'); const y0 = (p.hEqBottom || 0) + (p.ref === 'edge' ? r : 0); vd(y0, y0 + p._eq.pitch, j++, p._eq.pitch, null, '等分间距', 'pitch'); }
+  } else if (design === 'rects') {
+    let i = 0, j = 0;
+    if (p.frameInset > 0) { hd(0, p.frameInset, i++, p.frameInset, 'L'); vd(0, p.frameInset, j++, p.frameInset, 'B'); }
+    if (p._panel) {
+      const m = p.pMargin || 0, q = p._panel;
+      hd(0, m, i++, m, 'L'); hd(m, m + q.pw, i++, q.pw, null, '板宽', 'panel width'); if (q.n > 1) hd(m + q.pw, m + q.pw + q.gap, i++, q.gap, null, '缝', 'gap');
+      vd(0, p.pBottom || 0, j++, p.pBottom || 0, 'B'); vd(H - (p.pTop || 0), H, j++, p.pTop || 0, 'T');
+    }
+  } else if (design === 'blocks' && p._blocks) {
+    const x0b = ((p.bXs && p.bXs.length) ? p.bXs[0] : 0);
+    hd(0, x0b, 0, x0b, 'L'); hd(x0b, x0b + p.bW, 1, p.bW, null, '方块宽', 'block width');
+    vd(0, p.bBottom, 0, p.bBottom, 'B'); vd(p.bBottom, p.bBottom + p.bH, 1, p.bH, null, '方块高', 'block height');
+    if (p._blocks.n > 1) vd(p.bBottom + p.bH, p.bBottom + p.bH + p.bGap, 2, p.bGap, null, '缝', 'gap');
+    vd(H - p._blocks.topGap, H, 3, p._blocks.topGap, 'T');
+  } else if (design === 'pockets' && p._pockets && (p.part || 'ring') !== 'line') {
+    const q = p._pockets, x0 = p.pStrip + (p.lineCut || 6);
+    hd(0, p.pStrip, 0, p.pStrip, 'L', '留白'); hd(p.pStrip, x0, 1, p.lineCut || 6, null, '竖线宽', 'line width');
+    hd(x0, x0 + q.mx, 2, q.mx, null, '方格离竖线', 'margin'); hd(x0 + q.mx, x0 + q.mx + p.pW, 3, p.pW, null, '方格宽', 'cell width');
+    if (q.nc > 1) hd(x0 + q.mx + p.pW, x0 + q.mx + p.pW + p.pGx, 4, p.pGx, null, '横向缝', 'gap');
+    const r0 = q.rows[0] || { my: 0, nr: 0 };
+    vd(0, r0.my, 0, r0.my, 'B'); vd(r0.my, r0.my + p.pH, 1, p.pH, null, '方格高', 'cell height');
+    if (r0.nr > 1) vd(r0.my + p.pH, r0.my + p.pH + p.pGy, 2, p.pGy, null, '竖向缝', 'gap');
+    vd(H - r0.my, H, 3, r0.my, 'T');
+  } else if (design === 'sun') {
+    dims.push({ a: [xl(0), 0], b: [xl(0), p.sBase], v: p.sBase, side: 'B', dir: 'v', zh: '', en: '' });
+    if (p.sCx > 0) hd(0, p.sCx, 0, p.sCx, 'L');
+    const R = (p.sRings || []);
+    if (R.length) hd(p.sCx, p.sCx + R[0], 1, R[0], null, '中间留空半径', 'plain centre radius');
+    if (R.length > 1) hd(p.sCx, p.sCx + R[R.length - 1], 2, R[R.length - 1], null, '最大圆弧半径', 'outer ring radius');
+  } else if (design === 'tree' && p._tree) {
+    vd(0, p.tBase, 0, p.tBase, 'B'); vd(p._tree.y0, p._tree.apex, 1, Math.round(p._tree.apex - p._tree.y0), null, '树高', 'tree height');
+    hd(p._tree.cx - p.tW / 2, p._tree.cx + p.tW / 2, 0, p.tW, null, '树底宽', 'tree width');
+  } else if (design === 'dash') {
+    hd(0, p.dM0 || 0, 0, p.dM0 || 0, p.dDir === 'h' ? null : 'L', p.dDir === 'h' ? '' : undefined);
+  }
+  // 背面 = 正面左右翻转（门像翻书一样翻面）：X → 门宽 − X
+  if (p.mirror) {
+    paths = paths.map((pt) => pt.map(([x, y]) => [W - x, y]));
+    dims.forEach((d) => { d.a = [W - d.a[0], d.a[1]]; d.b = [W - d.b[0], d.b[1]]; if (d.side === 'L') d.side = 'R'; else if (d.side === 'R') d.side = 'L'; });
+  }
+  // 背面可选原点（以「翻面后朝上那面」来看）：BL 左下(默认) / BR 右下 / TL 左上 / TR 右上
+  // 预览和 segs 一直用「左下角为 0」的画面坐标；只有输出 G-code 时才平移，右边/上面为原点时数字会是负数
+  const bo = p.mirror && ['BL', 'BR', 'TL', 'TR'].includes(p.backOrigin) ? p.backOrigin : 'BL';
+  const totalH = single ? H : H + p.gap + p.topH;
+  // 门真的转过来（默认）：把所选的角转到机器左下角，G-code 全是正数；不转：只平移原点，数字会是负数
+  const rotDoor = p.mirror && bo !== 'BL' && p.backRot !== false;
+  const originX = !rotDoor && bo[1] === 'R' ? W : 0, originY = !rotDoor && bo[0] === 'T' ? totalH : 0;
+  const rotPt = ([x, y]) => bo === 'BR' ? [y, W - x] : bo === 'TR' ? [W - x, totalH - y] : [totalH - y, x];
+  const gpaths = paths.map((pt) => pt.map(rotDoor ? rotPt : ([x, y]) => [x - originX, y - originY]));
+  const segs = [];
+  paths.forEach((pt) => { for (let i = 1; i < pt.length; i++) segs.push({ x1: pt[i - 1][0], y1: pt[i - 1][1], x2: pt[i][0], y2: pt[i][1] }); });
+
+  // 输出 G-code（格式照 6U4.CNC：CRLF、N 行号、模态省略不变的坐标）
+  const fmt = (v) => {
+    let s = (Math.round(v * 10000) / 10000).toFixed(4).replace(/0+$/, '');
+    if (s === '-0.') s = '0.';
+    return s;
+  };
+  const fF = (v) => Number(v).toFixed(1);
+  let n = 0; const out = [];
+  const L = (t) => { n++; out.push('N' + n + ' ' + t); };
+  L('G54');
+  L('G0 X0.0000 Y0.0000');
+  L('M6 T' + p.tool);
+  L(' M3 S' + p.spindle);
+  L(' G43 H' + p.tool);
+  L('G0');
+  let cx = 0, cy = 0, first = true;
+  const move = (x, y, tail) => {
+    const w = [];
+    if (fmt(x) !== fmt(cx) || first) w.push('X' + fmt(x));
+    if (fmt(y) !== fmt(cy) || first) w.push('Y' + fmt(y));
+    cx = x; cy = y;
+    return w.join(' ') + (tail ? ' ' + tail : '');
+  };
+  let cutLen = 0;
+  for (const pt of gpaths) {
+    const a = move(pt[0][0], pt[0][1]);
+    L(first ? 'G0 ' + a : a); first = false;
+    L('Z0.');
+    L('G1 Z' + fmt(-p.depth) + ' F' + fF(p.plunge));
+    for (let i = 1; i < pt.length; i++) {
+      L(move(pt[i][0], pt[i][1], i === 1 ? 'F' + fF(p.feed) : ''));
+      cutLen += Math.hypot(pt[i][0] - pt[i - 1][0], pt[i][1] - pt[i - 1][1]);
+    }
+    L('G0 Z' + fmt(p.safeZ));
+  }
+  L('X0. Y0.');
+  L('M5');
+  L('M30');
+  return {
+    design, grooveW: gw, mirror: !!p.mirror, backOrigin: bo, rotDoor, originX, originY, markX: bo[1] === 'R' ? W : 0, markY: bo[0] === 'T' ? totalH : 0, paths, segs, info, warnings, dims, gcode: out.join('\r\n') + '\r\n',
+    extra: { eq: p._eq, veq: p._veq, panel: p._panel, blocks: p._blocks, dash: p._dash, free: p._free, pockets: p._pockets },
+    stats: { cuts: paths.length, diag: nDiag, vert: nVert, cutLen, minutes: cutLen / p.feed + paths.length * (p.depth / p.plunge + 0.02) }
+  };
+}
+
+// ---------- 局部放大图（所有款式通用）：找出相邻的槽 / 方块，标出「没切的距离」（边到边） ----------
+function detailOf(p, g, fin) {
+  const W = p.width, Ht = p.structure === 'single' || !(g.design === 'diag' || g.design === 'pockets') ? p.height : p.height + p.gap + p.topH;
+  const gw = g.grooveW, r = gw / 2, design = g.design;
+  const bands = [], boxes = [];
+  if (design === 'pockets' && fin) {
+    fin.rings.forEach((pt) => { const xs = pt.map((q) => q[0]), ys = pt.map((q) => q[1]); boxes.push([Math.min(...xs) - fin.r, Math.min(...ys) - fin.r, Math.max(...xs) + fin.r, Math.max(...ys) + fin.r]); });
+    fin.line.forEach((pt) => bands.push({ a: pt[0], b: pt[pt.length - 1], r: fin.lineW / 2 }));
+  } else g.paths.forEach((pt) => { for (let i = 1; i < pt.length; i++) bands.push({ a: pt[i - 1], b: pt[i], r }); });
+  // 每个「实体」放进它所在的方向族里：s = 沿法线的位置（lo~hi），t = 沿线方向的位置（t0~t1）
+  const fams = {};
+  const put = (th, lo, hi, t0, t1, kind) => { const k = Math.round(th * 2) / 2; (fams[k] = fams[k] || []).push({ lo, hi, t0, t1, kind }); };
+  bands.forEach((b) => {
+    const dx = b.b[0] - b.a[0], dy = b.b[1] - b.a[1], L = Math.hypot(dx, dy); if (L < Math.max(3 * gw, 12)) return;
+    let th = Math.atan2(dy, dx) * 180 / Math.PI; th = ((th % 180) + 180) % 180; if (th >= 179.75) th = 0;
+    const rad = th * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad), nx = -uy, ny = ux;
+    const s = nx * b.a[0] + ny * b.a[1], ta = ux * b.a[0] + uy * b.a[1], tb = ux * b.b[0] + uy * b.b[1];
+    put(th, s - b.r, s + b.r, Math.min(ta, tb) - b.r, Math.max(ta, tb) + b.r, 'band');
+  });
+  boxes.forEach((q) => { put(0, q[1], q[3], q[0], q[2], 'box'); put(90, -q[2], -q[0], q[1], q[3], 'box'); });
+  const cands = [];
+  Object.keys(fams).forEach((k) => {
+    const th = +k, rad = th * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad), nx = -uy, ny = ux;
+    const arr = fams[k].sort((a, b) => a.lo - b.lo || a.t0 - b.t0);
+    // 相邻的两条（不同位置）
+    const clusters = []; arr.forEach((e) => { const c = clusters[clusters.length - 1]; if (c && Math.abs(e.lo - c.lo) < 0.6 && Math.abs(e.hi - c.hi) < 0.6) c.items.push(e); else clusters.push({ lo: e.lo, hi: e.hi, items: [e] }); });
+    for (let i = 0; i + 1 < clusters.length; i++) {
+      const A = clusters[i], B = clusters[i + 1], gap = B.lo - A.hi; if (gap < 0.8) continue;
+      if (gap > 450) continue;                         // 太远的不适合放大看（主图里有）
+      A.items.forEach((ea) => B.items.forEach((eb) => {
+        const t0 = Math.max(ea.t0, eb.t0), t1 = Math.min(ea.t1, eb.t1); if (t1 - t0 < 15 || cands.length > 1500) return;
+        const best = { t0, t1, ea, eb }, tm = (t0 + t1) / 2, P = (s, t) => [ux * t + nx * s, uy * t + ny * s];
+        cands.push({ fam: k, gap, t0: best.t0, t1: best.t1, ux, uy, A: P(A.hi, tm), B: P(B.lo, tm), mid: P((A.hi + B.lo) / 2, tm), isBox: ea.kind === 'box',
+          at: (t, ts) => ({ A: P(A.hi, t), B: P(B.lo, t), mid: P((A.hi + B.lo) / 2, t), size: ea.kind === 'box' ? { A: P(A.lo, ts == null ? t : ts), B: P(A.hi, ts == null ? t : ts), v: A.hi - A.lo } : null }) });
+      }));
+    }
+  });
+  const out = { bands: [], boxes: [], dims: [], note: '' };
+  let xc, yc, size;
+  if (design === 'sun') {
+    const R = p.sRings || []; if (R.length < 2) return null;
+    const cx = g.mirror ? W - p.sCx : p.sCx, sg = g.mirror ? -1 : 1, pitch = R[1] - R[0];
+    xc = cx + sg * (R[0] + R[1]) / 2; yc = p.sBase; size = Math.max(260, Math.min(640, 3.4 * (pitch + gw)));
+    for (let i = 0; i + 1 < R.length; i++) {
+      const a = cx + sg * (R[i] + r), b = cx + sg * (R[i + 1] - r);
+      if (Math.abs((a + b) / 2 - xc) < size * 0.42) out.dims.push({ A: [a, yc], B: [b, yc], v: R[i + 1] - R[i] - gw });
+    }
+  } else if (design === 'diag') {
+    const xv = g.mirror ? W - (p.leftMargin + r) : p.leftMargin + r;
+    xc = (g.mirror ? xv - 260 : xv - 40) + 150; yc = p.height / 2; size = 300;
+  } else {
+    if (!cands.length) { const b0 = bands[0]; if (!b0) return null; xc = (b0.a[0] + b0.b[0]) / 2; yc = (b0.a[1] + b0.b[1]) / 2; size = 300; out.note = '这款没有平行的槽可以量'; }
+    else {
+      const cnt = {}; cands.forEach((c) => { const key = c.fam + '|' + Math.round(c.gap * 10); cnt[key] = (cnt[key] || 0) + 1; });
+      const top = Math.max(...Object.values(cnt)), pool = cands.filter((c) => cnt[c.fam + '|' + Math.round(c.gap * 10)] === top);
+      pool.sort((a, b) => Math.hypot(a.mid[0] - W / 2, a.mid[1] - Ht / 2) - Math.hypot(b.mid[0] - W / 2, b.mid[1] - Ht / 2));
+      const c0 = pool[0]; xc = c0.mid[0]; yc = c0.mid[1];
+      const w0 = boxes.length ? (boxes[0][2] - boxes[0][0]) : gw;
+      size = Math.max(260, Math.min(640, 3.4 * (c0.gap + w0)));
+    }
+  }
+  const x0 = xc - size / 2, y0 = yc - size / 2, inWin = (q, m) => q[0] > x0 - m && q[0] < x0 + size + m && q[1] > y0 - m && q[1] < y0 + size + m;
+  out.x0 = x0; out.y0 = y0; out.size = size;
+  bands.forEach((b) => { if (Math.max(b.a[0], b.b[0]) > x0 - 5 && Math.min(b.a[0], b.b[0]) < x0 + size + 5 && Math.max(b.a[1], b.b[1]) > y0 - 5 && Math.min(b.a[1], b.b[1]) < y0 + size + 5) out.bands.push(b); });
+  boxes.forEach((q) => { if (q[2] > x0 && q[0] < x0 + size && q[3] > y0 && q[1] < y0 + size) out.boxes.push(q); });
+  // 每个方向族挑离窗口中心最近的一个距离来标（最多 3 个方向）；尺寸线放在窗口中心附近
+  const byFam = {}; let fi = 0;
+  cands.forEach((c) => {
+    const tc = Math.min(c.t1 - 8, Math.max(c.t0 + 8, c.ux * xc + c.uy * yc)); if (c.t1 - c.t0 < 16) return;
+    const ts = Math.min(c.t1 - 8, Math.max(c.t0 + 8, tc + (fi++ % 2 ? -1 : 1) * size * 0.3)), q = c.at(tc, ts), d = Math.hypot(q.mid[0] - xc, q.mid[1] - yc);
+    if (inWin(q.mid, -size * 0.06) && (!byFam[c.fam] || d < byFam[c.fam].d)) byFam[c.fam] = { q, c, d };
+  });
+  Object.values(byFam).sort((a, b) => a.d - b.d).slice(0, 3).forEach(({ q, c }) => { out.dims.push({ A: q.A, B: q.B, v: c.gap }); if (q.size) out.dims.push({ A: q.size.A, B: q.size.B, v: q.size.v }); });
+  out.dims.forEach((d) => { d.v = Math.round(d.v * 100) / 100; });
+  return out;
+}
+
+// 极简 PDF 生成（纯矢量，不依赖任何库；文字只用英文/数字，避免中文字体问题）
+function buildPDF(p, faces, base, dateStr) {
+  const BO_EN = { BL: 'bottom-left', BR: 'bottom-right', TL: 'top-left', TR: 'top-right' };
+  const boK = ['BL', 'BR', 'TL', 'TR'].includes(p.backOrigin) ? p.backOrigin : 'BL';
+  // faces = [{ name:'FRONT', g }, { name:'BACK', g }]  每个面一页
+  const DNAME = { diag: 'Diagonal grooves', lines: 'Vertical / horizontal grooves', rects: 'Frames / panels', blocks: 'Staggered blocks', dash: 'Broken (dashed) grooves', sun: 'Sunburst (arcs + rays)', tree: 'Christmas tree', free: 'Free lines (scaled)', pockets: 'Pocket grid (3 operations)' };
+  const PW = 841.89, PH = 595.28, M = 26;
+  const n2 = (v) => (Math.round(v * 100) / 100).toString();
+  const esc = (s) => String(s).replace(/[^\x20-\x7E]/g, '?').replace(/([\\()])/g, '\\$1');
+  const diagD = (p.design || 'diag') === 'diag';
+  const single = (!diagD && p.design !== 'pockets') || p.structure === 'single';
+  const total = single ? p.height : p.height + p.gap + p.topH;
+  const panels = single ? [{ a: 0, b: p.height }] : [{ a: 0, b: p.height }, { a: p.height + p.gap, b: total }];
+
+  function pageStream(face, pageNo, pageCount) {
+    const g = face.g, back = !!g.mirror, pp = face.p || p;
+    const c = [];
+    const text = (x, y, size, str, bold, rgb) => c.push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + (rgb || '0 0 0') + ' rg ' + n2(x) + ' ' + n2(y) + ' Td (' + esc(str) + ') Tj ET');
+    const line = (x1, y1, x2, y2, w, rgb) => c.push((rgb || '0 0 0') + ' RG ' + n2(w) + ' w ' + n2(x1) + ' ' + n2(y1) + ' m ' + n2(x2) + ' ' + n2(y2) + ' l S');
+    const rect = (x, y, w, h, lw, rgb) => c.push((rgb || '0 0 0') + ' RG ' + n2(lw) + ' w ' + n2(x) + ' ' + n2(y) + ' ' + n2(w) + ' ' + n2(h) + ' re S');
+    const fillRect = (x, y, w, h, rgb) => c.push(rgb + ' rg ' + n2(x) + ' ' + n2(y) + ' ' + n2(w) + ' ' + n2(h) + ' re f');
+
+    const top = PH - M - 58;
+    const areaH = top - M - 18;
+    // 背面选了别的原点时，整张图转一下，让原点落在左下角（跟网页预览一样；网页里取消「转向看」就不转）
+    const rot = (back && p.backRot !== false) ? ({ BL: 0, BR: 90, TR: 180, TL: 270 })[boK] : 0, sideways = rot % 180 !== 0;
+    const s = sideways ? Math.min((top - M - 146) / (2 * p.width), 520 / total) : Math.min((areaH - 22) / total, 210 / p.width);
+    const dw = p.width * s;
+    const OY0 = M + 28;
+    const ox1 = M + 34, ox2 = ox1 + dw + 66;
+
+    text(M, PH - M - 12, 16, back ? 'DOOR SURFACE GROOVE - BACK FACE (MIRROR OF FRONT)' : 'DOOR SURFACE GROOVE - FRONT FACE', true);
+    text(PW - M - 60, PH - M - 12, 10, 'Page ' + pageNo + '/' + pageCount, true, '0.3 0.3 0.3');
+    text(M, PH - M - 28, 9, 'File: ' + base + ' ' + face.name + '    Date: ' + dateStr + '    Door ' + p.width + ' x ' + p.height + ' mm' + (single ? ' (single panel)' : ' (lower panel)'), false, '0.3 0.3 0.3');
+    line(M, PH - M - 36, PW - M, PH - M - 36, 0.6);
+
+    const drawView = (ox, mode, oyv) => {
+      const oy = oyv == null ? OY0 : oyv;
+      const X = (x) => ox + x * s, Y = (y) => oy + y * s;
+      const cw = Math.max(0.3, g.grooveW * s);
+      if (mode === 'look') {
+        if (!single) fillRect(X(0), Y(p.height), dw, p.gap * s, '0.62 0.64 0.66');
+        panels.forEach((P) => fillRect(X(0), Y(P.a), dw, (P.b - P.a) * s, '0.84 0.85 0.87'));
+      }
+      const strokePath = (pt, w, col) => {
+        let d = col + ' RG ' + n2(w) + ' w 1 j ' + (diagD ? '0 J ' : '1 J ') + n2(X(pt[0][0])) + ' ' + n2(Y(pt[0][1])) + ' m';
+        for (let i = 1; i < pt.length; i++) d += ' ' + n2(X(pt[i][0])) + ' ' + n2(Y(pt[i][1])) + ' l';
+        c.push(d + ' S');
+      };
+      const fin = mode === 'look' && face.fin;
+      if (fin) {
+        const dark = '0.2 0.22 0.25';
+        panels.forEach((P) => {
+          c.push('q ' + n2(X(0)) + ' ' + n2(Y(P.a)) + ' ' + n2(dw) + ' ' + n2((P.b - P.a) * s) + ' re W n');
+          fin.rings.forEach((pt) => {
+            let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; pt.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+            fillRect(X(x0 - fin.r), Y(y0 - fin.r), (x1 - x0 + 2 * fin.r) * s, (y1 - y0 + 2 * fin.r) * s, dark);
+          });
+          fin.line.forEach((pt) => strokePath(pt, Math.max(0.4, fin.lineW * s), dark));
+          c.push('Q');
+        });
+      }
+      if (!fin) panels.forEach((P) => {
+        c.push('q ' + n2(X(0)) + ' ' + n2(Y(P.a)) + ' ' + n2(dw) + ' ' + n2((P.b - P.a) * s) + ' re W n');
+        g.paths.forEach((pt) => strokePath(pt, cw, mode === 'look' ? '0.22 0.24 0.27' : '1 0.78 0.78'));
+        if (mode === 'path') g.paths.forEach((pt) => strokePath(pt, 0.45, '0.85 0 0'));
+        c.push('Q');
+      });
+      panels.forEach((P) => rect(X(0), Y(P.a), dw, (P.b - P.a) * s, 0.9, '0 0 0'));
+      if (mode === 'path' && g.dims) g.dims.forEach((d) => {
+        const x1 = X(d.a[0]), y1 = Y(d.a[1]), x2 = X(d.b[0]), y2 = Y(d.b[1]), txt = dimText(d, 'en');
+        const col = '0.85 0.55 0';
+        line(x1, y1, x2, y2, 0.6, col);
+        if (d.dir === 'p') {
+          const L = Math.hypot(x2 - x1, y2 - y1) || 1, nx = -(y2 - y1) / L * 5, ny = (x2 - x1) / L * 5;
+          line(x1 - nx, y1 - ny, x1 + nx, y1 + ny, 0.6, col); line(x2 - nx, y2 - ny, x2 + nx, y2 + ny, 0.6, col);
+          let ang = Math.atan2(y2 - y1, x2 - x1); if (ang > Math.PI / 2 || ang < -Math.PI / 2) ang += Math.PI;
+          const cs = Math.cos(ang), sn = Math.sin(ang), mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+          c.push('q ' + n2(cs) + ' ' + n2(sn) + ' ' + n2(-sn) + ' ' + n2(cs) + ' ' + n2(mx - sn * -5) + ' ' + n2(my + cs * -5 + 0) + ' cm'); text(-txt.length * 1.7, 4, 6.5, txt, true, '0.7 0.4 0'); c.push('Q');
+        }
+        else if (d.dir === 'h') { line(x1, y1 - 3, x1, y1 + 3, 0.6, col); line(x2, y2 - 3, x2, y2 + 3, 0.6, col); text((x1 + x2) / 2 - txt.length * 1.7, y1 + 3, 6.5, txt, true, '0.7 0.4 0'); }
+        else { line(x1 - 3, y1, x1 + 3, y1, 0.6, col); line(x2 - 3, y2, x2 + 3, y2, 0.6, col); c.push('q 0 1 -1 0 ' + n2(x1 - 3) + ' ' + n2((y1 + y2) / 2 - txt.length * 1.7) + ' cm'); text(0, 0, 6.5, txt, true, '0.7 0.4 0'); c.push('Q'); }
+      });
+      text(X(p.width / 2) - 10, Y(total) + 6, 8, String(p.width), true, '0 0.45 0');
+      text(X(0) - 26, Y(p.height / 2), 8, String(p.height), true, '0 0.45 0');
+      if (!single) {
+        text(X(0) - 26, Y(p.height + p.gap + p.topH / 2), 8, String(p.topH), true, '0 0.45 0');
+        text(X(p.width) + 4, Y(p.height + p.gap / 2) - 3, 7, 'gap ' + p.gap, false, '0.6 0 0.6');
+      }
+      if (diagD) text(back ? X(p.width) - 56 : X(0) + 2, Y(0) - 10, 7, 'plain strip ' + p.leftMargin, false, '0.3 0.3 0.3');
+      if (mode === 'path') {
+        const ox = X(g.markX || 0), oy = Y(g.markY || 0), isT = (g.markY || 0) > 0;
+        line(ox - 8, oy, ox + 8, oy, 0.8, '0 0 0.8'); line(ox, oy - 8, ox, oy + 8, 0.8, '0 0 0.8');
+        text(ox - ((g.markX || 0) > 0 ? 70 : 30), isT ? oy + 12 : oy - 22, 8, 'X0 Y0 (origin' + (g.mirror ? ': ' + BO_EN[g.backOrigin] : '') + ')', true, '0 0 0.8');
+      }
+    };
+    const place = (idx, mode, title) => {
+      const th = -rot * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th), hh = total * s;
+      let cx, cy, ox;
+      if (sideways) {
+        const bh = dw, ry = idx ? top - 46 - bh - 84 - bh : top - 46 - bh;
+        text(M + 34, ry + bh + 40, 11, title, true);
+        cx = M + 34 + hh / 2; cy = ry + bh / 2;
+      } else { ox = idx ? ox2 : ox1; text(ox, top + 4, 11, title, true); cx = ox + dw / 2; cy = OY0 + hh / 2; }
+      if (!rot) { drawView(ox, mode); return; }
+      c.push('q ' + n2(cs) + ' ' + n2(sn) + ' ' + n2(-sn) + ' ' + n2(cs) + ' ' + n2(cx - (cs * cx - sn * cy)) + ' ' + n2(cy - (sn * cx + cs * cy)) + ' cm');
+      drawView(cx - dw / 2, mode, cy - hh / 2);
+      c.push('Q');
+    };
+    place(0, 'path', '1. CNC TOOLPATH (' + face.name + ')');
+    place(1, 'look', '2. FINISHED LOOK (' + face.name + ')');
+
+    const tx = sideways ? M + 34 + total * s + 40 : ox2 + dw + 30;
+    let ty = top - 18;
+    const row = (k, v) => { text(tx, ty, 9, k, false, '0.35 0.35 0.35'); text(tx + 118, ty, 9, v, true); ty -= 15; };
+    text(tx, top + 4, 11, '3. SETTINGS', true);
+    row('Door width', p.width + ' mm');
+    row(single ? 'Door height' : 'Lower panel height', p.height + ' mm');
+    if (!single) { row('Gap (rail)', p.gap + ' mm'); row('Top panel height', p.topH + ' mm'); }
+    row('Pattern', DNAME[p.design || 'diag']);
+    if (face.name.indexOf('CNC') >= 0) row('File', face.name.replace(/^(FRONT|BACK) - /, ''));
+    g.info.forEach((kv) => row(kv[0], kv[1]));
+    ty -= 6;
+    row('Cutter', pp.cutter + ' mm ' + (pp.cutterType === 'V' ? 'V-bit (pointed)' : 'flat (U)'));
+    row('Groove width (top)', (Math.round(g.grooveW * 100) / 100) + ' mm');
+    row('Groove depth', pp.depth + ' mm');
+    if (pp.cutterType === 'V') row('V-bit angle (calc.)', (Math.round(2 * Math.atan(g.grooveW / 2 / pp.depth) * 180 / Math.PI * 10) / 10) + ' deg');
+    ty -= 6;
+    row('Tool no.', 'T' + p.tool);
+    row('Spindle', 'S' + p.spindle);
+    row('Plunge feed', 'F' + p.plunge);
+    row('Cutting feed', 'F' + p.feed);
+    row('Safe Z', 'Z' + p.safeZ);
+    ty -= 6;
+    row('Total cuts', String(g.stats.cuts));
+    row('Cut length', (g.stats.cutLen / 1000).toFixed(1) + ' m');
+    ty -= 10;
+    const notes = back ? [
+      'NOTES (BACK FACE)',
+      '- FLIP the door like turning a page.',
+      '- Pattern is mirrored left-right' + (diagD ? ' (plain strip now RIGHT).' : '.'),
+      '- Origin X0 Y0 = ' + BO_EN[g.backOrigin] + ' corner of face-up door.',
+      rot ? '- Drawing is TURNED = how the door lies on the machine (origin at machine bottom-left). See last page.' : '',
+      (g.originX > 0 || g.originY > 0) ? '- X/Y values in the file are NEGATIVE (normal).' : '',
+      '- Red line = tool CENTRE path. Pale band = groove width.',
+      '- Orange dims = mm, from line start to the edge shown.',
+      '- ALWAYS dry-run (Z raised) or test on scrap first.'
+    ] : [
+      'NOTES (FRONT FACE)',
+      '- Origin X0 Y0 = bottom-left corner of the ' + (single ? 'door.' : 'LOWER panel.'),
+      '- Red line = tool CENTRE path. Pale band = groove width.',
+      '- Orange dims = mm, measured from the edge/line shown.',
+      single ? '- Single panel door.' : '- Grooves run across both panels (same lines).',
+      '- Bottom position is fixed; extra height goes to the top.',
+      diagD ? '' : (face.fin ? '- Finished look = all steps done (squares cleared + line).' : '- Rectangles are groove OUTLINES only (not cleared out).'),
+      '- ALWAYS dry-run (Z raised) or test on scrap first.'
+    ];
+    notes.filter((t) => t).forEach((t, i) => { text(tx, ty, i === 0 ? 10 : 8.5, t, i === 0, i === 0 ? '0 0 0' : '0.2 0.2 0.2'); ty -= i === 0 ? 14 : 12; });
+    return c.join('\n');
+  }
+
+  // 最后一页：背面怎么翻门（给操作员的图解）
+  function guideStream(pageNo, pageCount) {
+    const c = [];
+    const text = (x, y, size, str, bold, rgb) => c.push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + (rgb || '0 0 0') + ' rg ' + n2(x) + ' ' + n2(y) + ' Td (' + esc(str) + ') Tj ET');
+    const line = (x1, y1, x2, y2, w, rgb) => c.push((rgb || '0 0 0') + ' RG ' + n2(w) + ' w ' + n2(x1) + ' ' + n2(y1) + ' m ' + n2(x2) + ' ' + n2(y2) + ' l S');
+    const rect = (x, y, w, h, lw, rgb) => c.push((rgb || '0 0 0') + ' RG ' + n2(lw) + ' w ' + n2(x) + ' ' + n2(y) + ' ' + n2(w) + ' ' + n2(h) + ' re S');
+    const fillRect = (x, y, w, h, rgb) => c.push(rgb + ' rg ' + n2(x) + ' ' + n2(y) + ' ' + n2(w) + ' ' + n2(h) + ' re f');
+    text(M, PH - M - 12, 16, 'HOW TO TURN THE DOOR OVER FOR THE BACK FACE', true);
+    text(PW - M - 60, PH - M - 12, 10, 'Page ' + pageNo + '/' + pageCount, true, '0.3 0.3 0.3');
+    line(M, PH - M - 22, PW - M, PH - M - 22, 0.6);
+    const dw = 120, dh = 250, oy = 150, x1 = M + 40, x2 = x1 + dw + 190;
+    const rotMode = boK !== 'BL' && p.backRot !== false, ang = ({ BL: 0, BR: 90, TR: 180, TL: 270 })[boK];
+    const door = (x, label, aTxt, bTxt, aRight, face) => {
+      const turned = !face && rotMode, sw = turned && ang % 180 !== 0, kk = sw ? 0.6 : 1, cxm = x + dw / 2, cym = oy + dh / 2;
+      // 门内的点 (u,v)（左下角为 0）-> 页面坐标；turned 时顺时针转 ang 度
+      const rp = (u, v) => { const dx = u - dw / 2, dy = v - dh / 2; let rx = dx, ry = dy; if (turned) { if (ang === 90) { rx = dy; ry = -dx; } else if (ang === 180) { rx = -dx; ry = -dy; } else { rx = -dy; ry = dx; } } return [cxm + rx * kk, cym + ry * kk]; };
+      const bw = (sw ? dh : dw) * kk, bh = (sw ? dw : dh) * kk, bx = cxm - bw / 2, by = cym - bh / 2;
+      fillRect(bx, by, bw, bh, face ? '0.84 0.85 0.87' : '0.93 0.88 0.80');
+      rect(bx, by, bw, bh, 1.5);
+      // TOP 记号：贴着门的上边（转了就贴到对应的那一边）
+      const [t1x, t1y] = rp(dw / 2 - 12, dh - 24), [t2x, t2y] = rp(dw / 2 + 12, dh - 24), [tx0, ty0] = rp(dw / 2, dh - 38);
+      line(t1x, t1y, t2x, t2y, 1.2, '0.4 0.4 0.4');
+      text(tx0 - 9, ty0 - 3, 9, 'TOP', true, '0.3 0.3 0.3');
+      text(x, oy + dh + 14, 12, label, true);
+      const [ax0, ay0] = rp(10, 10), [bx0, by0] = rp(dw - 18, 10);
+      text(ax0 - 2, ay0 - 2, 11, aTxt, true, '0 0 0.8');
+      text(bx0, by0 - 2, 11, bTxt, true, '0.6 0 0');
+      // 原点：转了 = 页面左下角（机器左下角）；没转 = 所选的角
+      let ox, oyy;
+      if (face) { ox = x; oyy = oy; } else if (turned) { ox = bx; oyy = by; } else { ox = x + (boK[1] === 'R' ? dw : 0); oyy = oy + (boK[0] === 'T' ? dh : 0); }
+      line(ox - 8, oyy, ox + 8, oyy, 1, '0 0 0.8'); line(ox, oyy - 8, ox, oyy + 8, 1, '0 0 0.8');
+      const isRr = !face && !turned && boK[1] === 'R', isTt = !face && !turned && boK[0] === 'T';
+      text(ox - (isRr ? 58 : -6), isTt ? oyy - 34 : oyy - 22, 8, 'X0 Y0 (origin' + (turned ? ' = machine bottom-left' : '') + ')', true, '0 0 0.8');
+    };
+    door(x1, 'A. FRONT face up (done)', 'A', 'B', false, true);
+    door(x2, 'B. BACK face up (now)', 'B', 'A', true, false);
+    // 箭头（翻面方向：绕竖边翻）
+    const ax = x1 + dw + 20, ay = oy + dh / 2;
+    line(ax, ay, ax + 130, ay, 2.5, '0.85 0 0');
+    c.push('0.85 0 0 rg ' + n2(ax + 130) + ' ' + n2(ay + 8) + ' m ' + n2(ax + 146) + ' ' + n2(ay) + ' l ' + n2(ax + 130) + ' ' + n2(ay - 8) + ' l f');
+    text(ax + 6, ay + 12, 10, 'TURN OVER', true, '0.85 0 0');
+    text(ax + 6, ay - 22, 8, 'like turning a page', false, '0.85 0 0');
+    text(ax + 6, ay - 33, 8, '(left <-> right)', false, '0.85 0 0');
+    const tx = x2 + dw + 40;
+    let ty = oy + dh;
+    const steps = [
+      'STEPS',
+      '1. Finish the FRONT face first.',
+      '2. Turn the door over LEFT-TO-RIGHT, like',
+      '   turning a page of a book. The TOP of the',
+      '   door stays at the TOP.',
+      '3. Do NOT flip it upside down (top <-> bottom).',
+      '4. Corner A (bottom-left in the front) is now',
+      '   bottom-RIGHT. Corner B is now bottom-LEFT.',
+      ...(rotMode ? [
+        '5. Now TURN the door on the table: ' + ({ 90: 'a quarter turn', 180: 'a half turn (180 deg)', 270: 'a quarter turn' })[ang],
+        '   ' + ({ 90: 'CLOCKWISE', 180: '(either way)', 270: 'ANTI-CLOCKWISE' })[ang] + '. The ' + BO_EN[boK].toUpperCase() + ' corner must end at',
+        '   the machine BOTTOM-LEFT. TOP now points ' + ({ 90: 'RIGHT', 180: 'DOWN', 270: 'LEFT' })[ang] + '.',
+        '6. Set origin X0 Y0 at the machine bottom-left',
+        '   (the drawing pages show the door like this).',
+      ] : [
+        '5. Set origin X0 Y0 at the ' + BO_EN[boK].toUpperCase() + ' corner',
+        '   of the face-up door' + ({ BL: ' (= corner B).', BR: ' (= corner A).', TL: '.', TR: '.' })[boK],
+      ]),
+      (rotMode ? '7' : '6') + '. Load the file named "... BACK.CNC".',
+      (rotMode ? '8' : '7') + '. Dry-run (Z raised) or test on scrap first.'
+    ];
+    steps.filter((t) => t).forEach((t, i) => { text(tx, ty, i === 0 ? 11 : 9, t, i === 0, '0 0 0'); ty -= i === 0 ? 18 : 13; });
+    text(M, M + 6, 8, 'Mark corner A and corner B on the door edge with chalk before turning, so you can check the origin quickly.', false, '0.3 0.3 0.3');
+    return c.join('\n');
+  }
+
+
+  // 放大图那一页：正面 + 背面各一张，标出槽与槽之间「没切的距离」
+  function detailStream(pageNo, pageCount) {
+    const c = [];
+    const text = (x, y, size, str, bold, rgb) => c.push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + (rgb || '0 0 0') + ' rg ' + n2(x) + ' ' + n2(y) + ' Td (' + esc(str) + ') Tj ET');
+    const line = (x1, y1, x2, y2, w, rgb) => c.push((rgb || '0 0 0') + ' RG ' + n2(w) + ' w ' + n2(x1) + ' ' + n2(y1) + ' m ' + n2(x2) + ' ' + n2(y2) + ' l S');
+    text(M, PH - M - 12, 16, 'CLOSE-UP: DISTANCE BETWEEN GROOVES (uncut wood, mm)', true);
+    text(PW - M - 60, PH - M - 12, 10, 'Page ' + pageNo + '/' + pageCount, true, '0.3 0.3 0.3');
+    line(M, PH - M - 22, PW - M, PH - M - 22, 0.6);
+    const SZ = 330, by = 120, bx = [M + 20, M + 20 + SZ + 50];
+    [[faces[0], 'FRONT'], [faces[Math.floor(faces.length / 2)], 'BACK (mirror)']].forEach(([f, label], idx) => {
+      const D = detailOf(f.p || p, f.g, f.fin); const x0 = bx[idx];
+      text(x0, by + SZ + 10, 12, label, true);
+      c.push('q ' + n2(x0) + ' ' + n2(by) + ' ' + SZ + ' ' + SZ + ' re W n');
+      if (D) {
+        const S = SZ / D.size, X = (v) => x0 + (v - D.x0) * S, Y = (v) => by + (v - D.y0) * S;
+        D.boxes.forEach((q) => c.push('1 0.88 0.88 rg 0 0 0 RG 0.8 w ' + n2(X(q[0])) + ' ' + n2(Y(q[1])) + ' ' + n2((q[2] - q[0]) * S) + ' ' + n2((q[3] - q[1]) * S) + ' re B'));
+        D.bands.forEach((b) => {
+          const a = b.a, e = b.b, L = Math.hypot(e[0] - a[0], e[1] - a[1]) || 1, nx = -(e[1] - a[1]) / L * b.r, ny = (e[0] - a[0]) / L * b.r;
+          const P = (px, py) => n2(X(px)) + ' ' + n2(Y(py));
+          c.push('1 0.88 0.88 rg ' + P(a[0] + nx, a[1] + ny) + ' m ' + P(e[0] + nx, e[1] + ny) + ' l ' + P(e[0] - nx, e[1] - ny) + ' l ' + P(a[0] - nx, a[1] - ny) + ' l f');
+          c.push('0 0 0 RG 0.8 w ' + P(a[0] + nx, a[1] + ny) + ' m ' + P(e[0] + nx, e[1] + ny) + ' l S ' + P(a[0] - nx, a[1] - ny) + ' m ' + P(e[0] - nx, e[1] - ny) + ' l S');
+          if (!(f.fin && p.design === 'pockets')) c.push('0.85 0 0 RG 0.5 w ' + P(a[0], a[1]) + ' m ' + P(e[0], e[1]) + ' l S');
+        });
+        D.dims.forEach((d) => {
+          const ax = X(d.A[0]), ay = Y(d.A[1]), bx2 = X(d.B[0]), by2 = Y(d.B[1]), L = Math.hypot(bx2 - ax, by2 - ay) || 1, tx = -(by2 - ay) / L * 16, ty = (bx2 - ax) / L * 16;
+          line(ax, ay, bx2, by2, 0.8, '0.1 0.75 0.2');
+          line(ax - tx, ay - ty, ax + tx, ay + ty, 3.2, '0.1 0.75 0.2'); line(bx2 - tx, by2 - ty, bx2 + tx, by2 + ty, 3.2, '0.1 0.75 0.2');
+          let ang = Math.atan2(by2 - ay, bx2 - ax); if (ang > Math.PI / 2 || ang < -Math.PI / 2) ang += Math.PI;
+          const cs = Math.cos(ang), sn = Math.sin(ang), mx = (ax + bx2) / 2, my = (ay + by2) / 2, s = String(d.v);
+          c.push('q ' + n2(cs) + ' ' + n2(sn) + ' ' + n2(-sn) + ' ' + n2(cs) + ' ' + n2(mx) + ' ' + n2(my) + ' cm'); text(-s.length * 3.4, 6, 12, s, true, '0.75 0 0.75'); c.push('Q');
+        });
+        if (D.note) text(x0 + 8, by + 8, 9, D.note, false, '0.4 0.4 0.4');
+      }
+      c.push('Q');
+      c.push('0 0 0 RG 1 w ' + n2(x0) + ' ' + n2(by) + ' ' + SZ + ' ' + SZ + ' re S');
+    });
+    text(M, M + 6, 8.5, 'Red = tool centre line.  Black = groove edge.  Pink = cut away.  Green = distance between grooves (the uncut wood the customer sees).', false, '0.3 0.3 0.3');
+    return c.join('\n');
+  }
+
+  const objs = [];
+  const streams = faces.map((f, i) => pageStream(f, i + 1, faces.length + 2));
+  streams.push(detailStream(faces.length + 1, faces.length + 2));
+  streams.push(guideStream(faces.length + 2, faces.length + 2));
+  const n = streams.length;
+  const kids = streams.map((_, i) => (5 + 2 * i) + ' 0 R').join(' ');
+  objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+  objs.push('<< /Type /Pages /Kids [' + kids + '] /Count ' + n + ' >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+  streams.forEach((stream, i) => {
+    objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + (6 + 2 * i) + ' 0 R >>');
+    objs.push('<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream');
+  });
+  let out = '%PDF-1.4\n'; const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += (i + 1) + ' 0 obj\n' + o + '\nendobj\n'; });
+  const xr = out.length;
+  out += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n';
+  offs.forEach((o) => { out += String(o).padStart(10, '0') + ' 00000 n \n'; });
+  out += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF\n';
+  return out;
+}
+
+
+const $ = (id) => document.getElementById(id);
+const CORE_IDS = ['cutter','depth','tool','spindle','plunge','feed','safeZ'];
+const DIAG_IDS = ['gap','topH','leftMargin','spacing','c0dist'];
+const OPT_IDS = ['fW','fH','fScale','vPitch','vEqLeft','vEqRight','sCx','sBase','sOuterPitch','sA0','sA1','tCx','tBase','tN','tW','tH','tOv','tShrink','tSag','tTrunkW','tTrunkH','tStar','tBauble','pStrip','pW','pH','pGx','pGy','pCols','pMinMX','pMinMY','pClearInset','pStep','lineCut','lineDepth','lineTool','dPitch','dM0','dM1','dSeg','dGap','dStagger','dE0','dE1','vWidth','vBotM','vTopM','hPitch','hEqBottom','hEqTop','hX0','hX1','frameInset','pN','pMargin','pPW','pGap','pBottom','pTop','bW','bH','bBottom','bGap','bN','bMinTop'];
+const TEXT_IDS = ['sRings','sPitch','vLeft','vRight','hBottom','hTop','bXs','customRects','dDir','eqMode','fMode','fAlign','freeSegs'];
+const NUM_IDS = CORE_IDS.concat(DIAG_IDS, OPT_IDS);
+const DNAMES = { diag: '斜线', lines: '横竖槽', rects: '方框/嵌板', blocks: '错开方块', dash: '断线', free: '自由线条', sun: '太阳', tree: '圣诞树', pockets: '方格挖槽' };
+const CUTTERS = {
+  U: {3:20, 6:19, 9.5:21, 12.5:10, 19.5:10, 22:20, 32:15, 50:12},   // 直径 : 最深可切 (mm)
+  V: {9.5:8, 22:12}
+};
+let sizes = [{ w: 1268, h: 2335 }], sel = 0, face = 'front', lastAnchor = 'left', opSel = 0;
+
+function fillCutters(keep){
+  const type = $('cutterType').value, s = $('cutter');
+  const prev = keep ? s.value : null;
+  s.innerHTML = Object.keys(CUTTERS[type]).map(d => '<option value="' + d + '">' + d + ' mm</option>').join('');
+  s.value = (prev && CUTTERS[type][prev] !== undefined) ? prev : (type === 'U' ? '6' : '22');
+  $('vAngleRow').style.display = type === 'V' ? 'grid' : 'none'; $('vWidthRow').style.display = type === 'V' ? 'grid' : 'none';
+}
+
+// ---------- 尺寸表 ----------
+function renderSizes(){
+  $('sizeBody').innerHTML = sizes.map((z, i) =>
+    '<tr class="' + (i === sel ? 'sel' : '') + '">' +
+    '<td><input type="radio" name="selsize" data-i="' + i + '"' + (i === sel ? ' checked' : '') + '></td>' +
+    '<td><input type="number" step="1" data-k="w" data-i="' + i + '" value="' + z.w + '"></td>' +
+    '<td><input type="number" step="1" data-k="h" data-i="' + i + '" value="' + z.h + '"></td>' +
+    '<td><button class="xbtn" data-del="' + i + '"' + (sizes.length === 1 ? ' disabled style="opacity:.3"' : '') + '>×</button></td></tr>').join('');
+}
+$('sizeBody').addEventListener('input', (e) => {
+  const t = e.target, i = +t.dataset.i;
+  if (t.dataset.k) { const v = parseFloat(t.value); if (isFinite(v)) { sizes[i][t.dataset.k] = v; sel = i; refresh(true); } }
+});
+$('sizeBody').addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.type === 'radio') { sel = +t.dataset.i; renderSizes(); refresh(); }
+});
+$('sizeBody').addEventListener('click', (e) => {
+  const i = e.target.dataset && e.target.dataset.del;
+  if (i !== undefined && sizes.length > 1) { sizes.splice(+i, 1); sel = Math.min(sel, sizes.length - 1); renderSizes(); refresh(); }
+});
+$('addSize').onclick = () => { const last = sizes[sizes.length - 1]; sizes.push({ w: last.w, h: last.h }); sel = sizes.length - 1; renderSizes(); refresh(); };
+
+// ---------- 读参数 ----------
+function baseParams(){
+  const p = {};
+  NUM_IDS.forEach(i => p[i] = parseFloat($(i).value));
+  OPT_IDS.forEach(i => { if (!isFinite(p[i])) p[i] = 0; });
+  p.design = $('design').value;
+  p.cutterType = $('cutterType').value;
+  p.structure = (p.design === 'diag' || p.design === 'pockets') ? $('structure').value : 'single';
+  p.anchor = $('anchor').value;
+  p.backOrigin = $('backOrigin').value;
+  p.spMode = $('spMode').value;
+  p.backRot = $('boRot').checked;
+  p.ref = $('ref').value; p.dDir = $('dDir').value; p.eqMode = $('eqMode').value; p.fMode = $('fMode').value; p.fAlign = $('fAlign').value; p.freeSegs = parseFree($('freeSegs').value); p.sRings = parseNums($('sRings').value); p.sPitch = parseNums($('sPitch').value);
+  ['vLeft','vRight','hBottom','hTop','bXs'].forEach(i => p[i] = parseNums($(i).value));
+  p.customRects = parseRects($(  'customRects').value);
+  return p;
+}
+function withSize(b, z){
+  const p = Object.assign({}, b, { width: z.w, height: z.h });
+  p.c0 = b.anchor === 'left' ? b.c0dist : z.w - b.c0dist;   // 从右边量起：距离固定，门宽变了线就跟着右边走
+  return p;
+}
+function valid(b){
+  const req = CORE_IDS.concat(b.design === 'diag' ? DIAG_IDS : [], b.cutterType === 'V' ? ['vWidth'] : []);
+  return req.every(i => isFinite(b[i]) && (i !== 'vWidth' || b[i] > 0));
+}
+// 一个设计可能分几道工序（几个文件）：方格挖槽 = 外圈 / 挖空 / 竖线
+function opsOf(p){
+  if (p.design !== 'pockets') return [Object.assign({}, p, { part: undefined })];
+  return [
+    Object.assign({}, p, { part: 'ring' }),
+    Object.assign({}, p, { part: 'clear' }),
+    Object.assign({}, p, { part: 'line', cutterType: 'U', cutter: p.lineCut, depth: p.lineDepth, tool: p.lineTool })
+  ];
+}
+const BO_ZH = { BL: '翻面后朝上的左下角', BR: '翻面后朝上的右下角', TL: '翻面后朝上的左上角', TR: '翻面后朝上的右上角' };
+
+function drawDetail(p, g, fin){
+  const wrap = $('dv3'), cv = $('cv3');
+  const D = detailOf(p, g, fin);
+  if (!D) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const ctx = cv.getContext('2d'), P = cv.width, S = P / D.size;
+  const X = (v) => (v - D.x0) * S, Y = (v) => P - (v - D.y0) * S;
+  ctx.clearRect(0, 0, P, P); ctx.fillStyle = '#232a33'; ctx.fillRect(0, 0, P, P);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, P, P); ctx.clip();
+  D.boxes.forEach((q) => {
+    ctx.fillStyle = 'rgba(255,90,90,0.16)'; ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.rect(X(q[0]), Y(q[3]), (q[2] - q[0]) * S, (q[3] - q[1]) * S); ctx.fill(); ctx.stroke();
+  });
+  D.bands.forEach((b) => {
+    const a = b.a, c = b.b, L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L, nx = -uy, ny = ux, r = b.r;
+    const q = (px, py) => [X(px), Y(py)];
+    const A1 = q(a[0] + nx * r, a[1] + ny * r), B1 = q(c[0] + nx * r, c[1] + ny * r), A2 = q(a[0] - nx * r, a[1] - ny * r), B2 = q(c[0] - nx * r, c[1] - ny * r);
+    ctx.fillStyle = 'rgba(255,90,90,0.16)'; ctx.beginPath(); ctx.moveTo(...A1); ctx.lineTo(...B1); ctx.lineTo(...B2); ctx.lineTo(...A2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(...A1); ctx.lineTo(...B1); ctx.moveTo(...A2); ctx.lineTo(...B2); ctx.stroke();
+    if (!(fin && p.design === 'pockets')) { ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...q(a[0], a[1])); ctx.lineTo(...q(c[0], c[1])); ctx.stroke(); }
+  });
+  D.dims.forEach((d) => {
+    const ax = X(d.A[0]), ay = Y(d.A[1]), bx = X(d.B[0]), by = Y(d.B[1]), L = Math.hypot(bx - ax, by - ay) || 1, tx = -(by - ay) / L * 26, ty = (bx - ax) / L * 26;
+    ctx.strokeStyle = '#19ff3c'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(ax - tx, ay - ty); ctx.lineTo(ax + tx, ay + ty); ctx.moveTo(bx - tx, by - ty); ctx.lineTo(bx + tx, by + ty); ctx.stroke();
+    let ang = Math.atan2(by - ay, bx - ax); if (ang > Math.PI / 2 || ang < -Math.PI / 2) ang += Math.PI;
+    ctx.save(); ctx.translate((ax + bx) / 2, (ay + by) / 2); ctx.rotate(ang); ctx.translate(0, -16);
+    ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = '#ff5cff'; ctx.textAlign = 'center'; ctx.fillText(String(d.v), 0, 0); ctx.restore();
+  });
+  ctx.restore();
+  if (D.note) { ctx.fillStyle = '#aab4c2'; ctx.font = '13px sans-serif'; ctx.fillText(D.note, 12, P - 12); }
+}
+function both(p, opi){
+  const pp = opsOf(p)[opi || 0];
+  return { pp, front: generateCNC(Object.assign({}, pp, { mirror: false })), back: generateCNC(Object.assign({}, pp, { mirror: true })) };
+}
+function allOps(p){ return opsOf(p).map((_, i) => both(p, i)); }
+const isMerged = (p) => p.design === 'pockets' && $('mergeOps') && $('mergeOps').checked;
+function mergeG(list){
+  let n = 0; const out = [];
+  list.forEach((g, i) => g.split('\r\n').filter(Boolean).forEach(l => {
+    const tx = l.replace(/^N\d+ /, '');
+    if (tx === 'M30' && i < list.length - 1) return;
+    if (tx === 'G54' && i > 0) return;
+    n++; out.push('N' + n + ' ' + tx);
+  }));
+  return out.join('\r\n') + '\r\n';
+}
+function finOf(O, f){   // 方格门的成品图：外圈的方块（整个挖空）+ 竖线
+  return { rings: O[0][f].paths, r: O[0].pp.cutter / 2, line: O[2][f].paths, lineW: O[2][f].grooveW };
+}
+const OPNAMES = ['① 外圈', '② 挖空', '③ 竖线'];
+
+// ---------- 提示 ----------
+function validate(p, g, ops){
+  const w = [];
+  (ops || []).slice(1).forEach((O, i) => { const m2 = CUTTERS[O.pp.cutterType][O.pp.cutter]; if (m2 !== undefined && O.pp.depth > m2) w.push('⛔ 工序 ' + (i + 2) + ' 的切深 ' + O.pp.depth + ' 超过这把刀最深可切的 ' + m2 + ' mm。'); });
+  const maxD = CUTTERS[p.cutterType][p.cutter];
+  $('maxDepthHint').textContent = '最深可切 ' + maxD + ' mm';
+  $('grooveW').textContent = (Math.round(g.grooveW * 100) / 100) + ' mm';
+  $('vAngleShow').textContent = Math.round(2 * Math.atan(g.grooveW / 2 / p.depth) * 180 / Math.PI * 10) / 10 + '°';
+  if (p.depth > maxD) w.push('⛔ 切深 ' + p.depth + ' 超过这把刀最深可切的 ' + maxD + ' mm，请改小。');
+  if (p.cutterType === 'V') {
+    if (p.vWidth > p.cutter) w.push('槽宽 ' + p.vWidth + ' 比刀直径 ' + p.cutter + ' 还大，已按 ' + p.cutter + ' 算。');
+    w.push('V 槽的刀路（刀号 T、尖刀角度）还没用真实文件核对过，请确认刀号。');
+  } else if (p.cutter !== 6) {
+    w.push('只有 6mm 平刀用真实文件核对过。' + p.cutter + 'mm 的位置是按刀直径推算的，刀号 T 也请确认。');
+  }
+  if (p.design !== 'diag') w.push('这种图案是按你图上的尺寸算的，还没用真实 CNC 文件核对过，第一次请先在废板上试。');
+  new Set([].concat(...(ops || [{ front: g }]).map(O => O.front.warnings))).forEach(t => w.push('⚠ ' + t));
+  if (ops && ops.length > 1) w.push('分 ' + ops.length + ' 道工序，每面出 ' + ops.length + ' 个文件；每道工序刀号 T 请确认（现在都用 T' + p.tool + '）。');
+  sizes.forEach((z, i) => {
+    if (z.h < 1500 || z.h > 2700) w.push('第 ' + (i + 1) + ' 个尺寸：门高 ' + z.h + ' 看起来不太正常，请再确认。');
+  });
+  if (p.design === 'diag' && sizes.some(z => z.w !== 1268)) w.push('门宽不是 1268：斜线位置完全由"第一条斜线碰到底边的位置"决定（1350x2400 的 D1 图用 518.597 已核对过）。每个设计、每个宽度这个数可能不一样，请照图填。');
+  const el = $('warn');
+  el.style.display = w.length ? 'block' : 'none';
+  el.innerHTML = w.join('<br>');
+  const e = g.extra, r2 = (v) => Math.round(v * 100) / 100;
+  $('pocketInfo').textContent = e.pockets ? e.pockets.nc + ' 个 × ' + e.pockets.rows.map(q => q.nr).join(' + ') + ' 行，左右各留 ' + r2(e.pockets.mx) + '，上下各留 ' + e.pockets.rows.map(q => r2(q.my)).join(' / ') : '-';
+  $('eqInfo').textContent = e.eq ? e.eq.n + ' 条，间距 ' + r2(e.eq.pitch) : '-';
+  $('panelInfo').textContent = e.panel ? e.panel.n + ' 块，宽 ' + r2(e.panel.pw) + '，缝 ' + r2(e.panel.gap) : '-';
+  $('freeInfo').textContent = e.free ? '比例 ' + Math.round(e.free.s * 10000) / 10000 + '，上下各留 ' + r2(e.free.oyy) : '-';
+  $('dashInfo').textContent = e.dash ? e.dash.n + ' 条，间距 ' + r2(e.dash.pitch) + '，共 ' + e.dash.cnt + ' 段' : '-';
+  $('eqInfo').textContent = e.eq || e.veq ? [e.veq ? '竖 ' + e.veq.n + ' 条/间距 ' + r2(e.veq.pitch) : '', e.eq ? '横 ' + e.eq.n + ' 条/间距 ' + r2(e.eq.pitch) : ''].filter(Boolean).join('；') : '-';
+  $('blockInfo').textContent = e.blocks ? e.blocks.n + ' 个，顶部剩 ' + r2(e.blocks.topGap) : '-';
+}
+
+// ---------- 画图 ----------
+function draw(p, g, cv, mode, fin){
+  const ctx = cv.getContext('2d');
+  const single = p.structure === 'single';
+  const total = single ? p.height : p.height + p.gap + p.topH;
+  const padL = 44, padR = 40, padT = 30, padB = 40;
+  const s = Math.min((cv.width - padL - padR) / p.width, (cv.height - padT - padB) / total);
+  const X = (x) => padL + x * s;
+  const Y = (y) => cv.height - padB - y * s;
+  const panels = single ? [[0, p.height]] : [[0, p.height], [p.height + p.gap, total]];
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const stroke = (pt, dx) => { ctx.beginPath(); ctx.moveTo(X(pt[0][0]) + (dx || 0), Y(pt[0][1])); for (let i = 1; i < pt.length; i++) ctx.lineTo(X(pt[i][0]) + (dx || 0), Y(pt[i][1])); ctx.stroke(); };
+  if (mode === 'look') {
+    if (!single) { ctx.fillStyle = '#3d444b'; ctx.fillRect(X(0), Y(p.height + p.gap), p.width * s, p.gap * s); }
+    ctx.fillStyle = '#566069';
+    panels.forEach(([a, b]) => ctx.fillRect(X(0), Y(b), p.width * s, (b - a) * s));
+  }
+  ctx.save();
+  ctx.beginPath(); panels.forEach(([a, b]) => ctx.rect(X(0), Y(b), p.width * s, (b - a) * s)); ctx.clip();
+  ctx.lineCap = p.design === 'diag' ? 'butt' : 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, g.grooveW * s);
+  ctx.strokeStyle = mode === 'look' ? '#14171a' : 'rgba(255,60,60,0.35)';
+  if (fin) {
+    fin.rings.forEach(pt => {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; pt.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+      x0 -= fin.r; y0 -= fin.r; x1 += fin.r; y1 += fin.r;
+      ctx.fillStyle = '#262c32'; ctx.fillRect(X(x0), Y(y1), (x1 - x0) * s, (y1 - y0) * s);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(X(x0), Y(y1), (x1 - x0) * s, 2); ctx.fillRect(X(x0), Y(y1), 2, (y1 - y0) * s);
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(X(x0), Y(y0) - 1, (x1 - x0) * s, 1); ctx.fillRect(X(x1) - 1, Y(y1), 1, (y1 - y0) * s);
+    });
+    ctx.lineCap = 'butt'; ctx.lineWidth = Math.max(1.5, fin.lineW * s); ctx.strokeStyle = '#262c32';
+    fin.line.forEach(pt => stroke(pt));
+  } else g.paths.forEach(pt => stroke(pt));
+  if (mode === 'look' && !fin) {
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    g.paths.forEach(pt => stroke(pt, 2));
+  } else if (mode !== 'look') {
+    ctx.lineWidth = 1; ctx.strokeStyle = '#ff4d4d'; g.paths.forEach(pt => stroke(pt));
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+  panels.forEach(([a, b]) => ctx.strokeRect(X(0), Y(b), p.width * s, (b - a) * s));
+  ctx.font = '12px sans-serif'; ctx.fillStyle = '#4cff7a'; ctx.textAlign = 'center';
+  ctx.fillText(p.width, X(p.width / 2), Y(total) - 10);
+  ctx.save(); ctx.translate(X(0) - 10, Y(p.height / 2)); ctx.rotate(-Math.PI / 2); ctx.fillText(p.height, 0, 0); ctx.restore();
+  if (!single) {
+    ctx.save(); ctx.translate(X(0) - 10, Y(p.height + p.gap + p.topH / 2)); ctx.rotate(-Math.PI / 2); ctx.fillText(p.topH, 0, 0); ctx.restore();
+    ctx.fillStyle = '#ff7bff'; ctx.textAlign = 'left';
+    ctx.fillText(p.gap, X(p.width) + 5, Y(p.height + p.gap / 2) + 4);
+  }
+  if (mode === 'path' && g.dims) {
+    ctx.font = '11px sans-serif'; ctx.strokeStyle = '#ffd24d'; ctx.fillStyle = '#ffd24d'; ctx.lineWidth = 1;
+    g.dims.forEach((d) => {
+      const x1 = X(d.a[0]), y1 = Y(d.a[1]), x2 = X(d.b[0]), y2 = Y(d.b[1]), txt = dimText(d, 'zh');
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      if (d.dir === 'p') { const L = Math.hypot(x2 - x1, y2 - y1) || 1, nx = -(y2 - y1) / L * 7, ny = (x2 - x1) / L * 7; ctx.moveTo(x1 - nx, y1 - ny); ctx.lineTo(x1 + nx, y1 + ny); ctx.moveTo(x2 - nx, y2 - ny); ctx.lineTo(x2 + nx, y2 + ny); }
+      else if (d.dir === 'h') { ctx.moveTo(x1, y1 - 4); ctx.lineTo(x1, y1 + 4); ctx.moveTo(x2, y2 - 4); ctx.lineTo(x2, y2 + 4); }
+      else { ctx.moveTo(x1 - 4, y1); ctx.lineTo(x1 + 4, y1); ctx.moveTo(x2 - 4, y2); ctx.lineTo(x2 + 4, y2); }
+      ctx.stroke();
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, tw = ctx.measureText(txt).width;
+      ctx.save();
+      if (d.dir === 'p') {
+        let ang = Math.atan2(y2 - y1, x2 - x1); if (ang > Math.PI / 2 || ang < -Math.PI / 2) ang += Math.PI;
+        ctx.translate(mx, my); ctx.rotate(ang); ctx.translate(0, -9); ctx.fillStyle = 'rgba(35,42,51,0.85)'; ctx.fillRect(-tw / 2 - 2, -11, tw + 4, 13); ctx.fillStyle = '#ffd24d'; ctx.textAlign = 'center'; ctx.fillText(txt, 0, 0);
+      } else if (d.dir === 'h') {
+        ctx.translate(mx, my - 5); ctx.fillStyle = 'rgba(35,42,51,0.85)'; ctx.fillRect(-tw / 2 - 2, -11, tw + 4, 13); ctx.fillStyle = '#ffd24d'; ctx.textAlign = 'center'; ctx.fillText(txt, 0, 0);
+      } else {
+        ctx.translate(x1 - 5, my); ctx.rotate(-Math.PI / 2); ctx.fillStyle = 'rgba(35,42,51,0.85)'; ctx.fillRect(-tw / 2 - 2, -11, tw + 4, 13); ctx.fillStyle = '#ffd24d'; ctx.textAlign = 'center'; ctx.fillText(txt, 0, 0);
+      }
+      ctx.restore();
+    });
+  }
+  ctx.textAlign = 'left';
+  if (mode === 'path') {
+    ctx.strokeStyle = '#6aa0ff'; ctx.lineWidth = 1.5;
+    const ox = X(g.markX || 0), oy = Y(g.markY || 0), isR = (g.markX || 0) > 0, isT = (g.markY || 0) > 0;
+    ctx.beginPath(); ctx.moveTo(ox - 10, oy); ctx.lineTo(ox + 10, oy); ctx.moveTo(ox, oy - 10); ctx.lineTo(ox, oy + 10); ctx.stroke();
+    ctx.fillStyle = '#6aa0ff'; ctx.textAlign = isR ? 'right' : 'left';
+    ctx.fillText(g.mirror ? '原点 X0 Y0（' + BO_ZH[g.backOrigin] + '）' : '原点 X0 Y0', isR ? ox - 8 : ox + 8, isT ? oy + 18 : oy + 22);
+    ctx.textAlign = 'left';
+  } else if (p.design === 'diag') {
+    ctx.fillStyle = '#aab4c2';
+    if (g.mirror) { ctx.textAlign = 'right'; ctx.fillText('右边留 ' + p.leftMargin + ' 不开槽', X(p.width), Y(0) + 22); }
+    else ctx.fillText('左边留 ' + p.leftMargin + ' 不开槽', X(0), Y(0) + 22);
+  }
+}
+
+// ---------- 刷新 ----------
+const dstr = (v) => String(Math.round(v * 100) / 100);
+function nameFor(p){ return p.width + 'x' + p.height + ' (' + dstr(p.cutterType === 'V' ? p.vWidth : p.cutter) + p.cutterType + dstr(p.depth) + ')'; }
+function refresh(keepTable){
+  $('twoRows').style.display = $('structure').value === 'two' ? 'block' : 'none';
+  const dz = $('design').value;
+  document.querySelectorAll('.dsec').forEach(el => el.style.display = el.classList.contains('d-' + dz) ? '' : 'none');
+  const b = baseParams();
+  if (!valid(b) || !sizes.every(z => isFinite(z.w) && isFinite(z.h))) return;
+  const p = withSize(b, sizes[sel]);
+  const OPS = allOps(p); if (opSel >= OPS.length) opSel = 0;
+  const G = OPS[opSel], g = G[face], pp = G.pp;
+  validate(OPS[0].pp, OPS[0].front, OPS);
+  $('opTabs').style.display = OPS.length > 1 ? 'flex' : 'none';
+  $('opTabs').innerHTML = OPS.map((O, i) => '<button class="tab' + (i === opSel ? ' on' : '') + '" data-op="' + i + '">工序 ' + OPNAMES[i] + '　' + dstr(O.pp.cutterType === 'V' ? O.pp.vWidth : O.pp.cutter) + O.pp.cutterType + dstr(O.pp.depth) + '</button>').join('');
+  draw(pp, g, $('cv'), 'path'); draw(pp, g, $('cv2'), 'look', p.design === 'pockets' ? finOf(OPS, face) : null);
+  drawDetail(pp, g, p.design === 'pockets' ? finOf(OPS, face) : null);
+  const fl = face === 'front' ? '正面' : '背面（镜像）';
+  $('vt1').textContent = '① CNC 路线图 · ' + fl; $('vt2').textContent = (p.design === 'pockets' ? '② 成品效果图（3 道工序做完）· ' : '② 效果图 · ') + fl;
+  { const ang = (face === 'back' && $('boRot').checked) ? ({ BL: 0, BR: 90, TR: 180, TL: 270 })[$('backOrigin').value] : 0;
+    ['cv', 'cv2'].forEach(id => { const c = $(id), w = c.width, h = c.height, sw = ang % 180 ? h : w, sh = ang % 180 ? w : h, r = c.parentNode;
+      r.style.width = sw + 'px'; r.style.height = sh + 'px'; c.style.position = 'absolute'; c.style.left = (sw - w) / 2 + 'px'; c.style.top = (sh - h) / 2 + 'px'; c.style.transform = 'rotate(' + ang + 'deg)'; }); }
+  $('boRow').style.display = face === 'back' ? 'block' : 'none';
+  $('boNote').textContent = (g.originX > 0 || g.originY > 0) ? '⚠ 门不转的话，G-code 里的' + ((g.originX > 0 ? 'X' : '') + (g.originX > 0 && g.originY > 0 ? '、' : '') + (g.originY > 0 ? 'Y' : '')) + '会是负数（正常）' : '';
+  { const k = $('backOrigin').value, ang = ({ BL: 0, BR: 90, TR: 180, TL: 270 })[k], rotMode = $('boRot').checked && k !== 'BL';
+    const gb = $('guideB'); gb.setAttribute('transform', rotMode ? 'rotate(' + ang + ' 320 115)' : '');
+    // 画面上原点十字的位置：转了就在可见的左下角，没转就在所选的那个角
+    const sw = rotMode && ang % 180, bx0 = sw ? 235 : 275, bx1 = sw ? 405 : 365, by0 = sw ? 70 : 30, by1 = sw ? 160 : 200;
+    const cx = rotMode ? bx0 : (k[1] === 'R' ? 365 : 275), cy = rotMode ? by1 : (k[0] === 'T' ? 30 : 200), isR = !rotMode && k[1] === 'R', isT = !rotMode && k[0] === 'T';
+    $('gx1').setAttribute('x1', cx - 8); $('gx1').setAttribute('x2', cx + 8); $('gx1').setAttribute('y1', cy); $('gx1').setAttribute('y2', cy);
+    $('gx2').setAttribute('x1', cx); $('gx2').setAttribute('x2', cx); $('gx2').setAttribute('y1', cy - 8); $('gx2').setAttribute('y2', cy + 8);
+    const o = $('guideO'); o.textContent = '原点 X0 Y0' + (rotMode ? '（机器左下角）' : '：' + BO_ZH[k].replace('翻面后朝上的', ''));
+    o.setAttribute('text-anchor', isR ? 'end' : 'start'); o.setAttribute('x', isR ? cx : cx + (isT ? 0 : -13)); o.setAttribute('y', isT ? cy - 12 : cy + 18);
+    const topDir = ({ 90: '右', 180: '下', 270: '左' })[ang], turn = ({ 90: '顺时针转 90°（四分之一圈）', 180: '转 180°（半圈，上变成朝下）', 270: '逆时针转 90°（四分之一圈）' })[ang];
+    if (rotMode) {
+      $('guideS3').textContent = '3. 翻的时候不要上下倒过来翻';
+      $('guideS').textContent = '5. 再把门在台面上' + turn;
+      $('guideS6').textContent = '   转完：门的"上"朝' + topDir + '，' + BO_ZH[k].replace('翻面后朝上的', '') + '到了机器左下角';
+      $('guideS7').textContent = '6. 原点 X0 Y0 = 机器左下角，开「… BACK.CNC」';
+      $('guideS8').textContent = '7. 先空跑 / 废板试一下';
+    } else {
+      $('guideS').textContent = '5. 原点放在：' + BO_ZH[k];
+      $('guideS6').textContent = '6. 开「… BACK.CNC」那个文件';
+      $('guideS7').textContent = '7. 先空跑 / 废板试一下'; $('guideS8').textContent = '';
+    }
+    $('guideTurn').style.display = 'none'; }
+  $('tabF').classList.toggle('on', face === 'front'); $('tabB').classList.toggle('on', face === 'back');
+  $('sCuts').textContent = g.stats.cuts;
+  $('sLen').textContent = (g.stats.cutLen / 1000).toFixed(1);
+  $('sTotal').textContent = p.structure === 'single' ? p.height : p.height + p.gap + p.topH;
+  if (!keepTable) document.querySelectorAll('#sizeBody tr').forEach((tr, i) => tr.classList.toggle('sel', i === sel));
+}
+
+// ---------- 下载 ----------
+function save(text, name, type){
+  const blob = new Blob([type === 'application/pdf' ? new Uint8Array([...text].map(ch => ch.charCodeAt(0) & 255)) : text], {type: type || 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const today = () => new Date().toISOString().slice(0, 10);
+function opSuffix(i, n){ return n > 1 ? ' ' + (i + 1) + 'of' + n : ''; }
+function saveCnc(p){
+  const OPS = allOps(p); let t = 0;
+  if (isMerged(p)) {
+    const base = nameFor(OPS[0].pp);
+    setTimeout(() => save(mergeG(OPS.map(O => O.front.gcode)), base + ' FRONT.CNC'), 0);
+    setTimeout(() => save(mergeG(OPS.map(O => O.back.gcode)), base + ' BACK.CNC'), 350);
+    return;
+  }
+  OPS.forEach((O, i) => {
+    const base = nameFor(O.pp), suf = opSuffix(i, OPS.length);
+    setTimeout(() => save(O.front.gcode, base + ' FRONT' + suf + '.CNC'), t); t += 350;
+    setTimeout(() => save(O.back.gcode, base + ' BACK' + suf + '.CNC'), t); t += 350;
+  });
+}
+function savePdf(p){
+  const OPS = allOps(p), n = OPS.length, base = nameFor(OPS[0].pp), faces = [];
+  ['front', 'back'].forEach(f => OPS.forEach((O, i) => faces.push({ name: (f === 'front' ? 'FRONT' : 'BACK') + (n > 1 ? (isMerged(p) ? ' - STEP ' : ' - CNC ') + (i + 1) + ' of ' + n : ''), g: O[f], p: O.pp, fin: p.design === 'pockets' ? finOf(OPS, f) : null })));
+  save(buildPDF(p, faces, base, today()), base + '.pdf', 'application/pdf');
+}
+function tooDeep(b){
+  for (const O of opsOf(b)) { const m = CUTTERS[O.cutterType][O.cutter]; if (m !== undefined && O.depth > m) { alert('切深 ' + O.depth + ' 超过这把刀（' + O.cutter + 'mm）最深可切的 ' + m + ' mm，请先改小。'); return true; } }
+  return false;
+}
+function checkSizes(){ if (!sizes.every(z => z.w > 0 && z.h > 0)) { alert('尺寸表里有空的或不对的数字，请先改好。'); return false; } return true; }
+function downloadAll(withPdf, onlyPdf){
+  const b = baseParams(); if (!valid(b) || tooDeep(b) || !checkSizes()) return;
+  const nOps = isMerged(b) ? 1 : opsOf(b).length, per = (withPdf && !onlyPdf) ? 1500 : (onlyPdf ? 500 : 900 * nOps);
+  sizes.forEach((z, i) => {
+    const p = withSize(b, z);
+    if (!onlyPdf) setTimeout(() => saveCnc(p), i * per);
+    if (withPdf) setTimeout(() => savePdf(p), i * per + (onlyPdf ? 0 : 800));
+  });
+}
+$('dl').onclick = () => downloadAll(false, false);
+$('dlPdf').onclick = () => downloadAll(true, true);
+$('copy').onclick = async () => {
+  const b = baseParams(); if (!valid(b)) return; const btn = $('copy'), old = btn.textContent;
+  try { await navigator.clipboard.writeText(both(withSize(b, sizes[sel]), opSel)[face].gcode); btn.textContent = '已复制 ✓'; }
+  catch(e){ btn.textContent = '复制失败，请用下载'; }
+  setTimeout(() => btn.textContent = old, 1500);
+};
+
+// ---------- 设计（保存 / 载入 / 导出 / 导入） ----------
+const DKEY = 'cncDesigns_v1';
+const DESIGN_FIELDS = ['design','structure','anchor','spMode','ref','cutterType','tool'].concat(DIAG_IDS, OPT_IDS, TEXT_IDS, ['depth']);
+const FIELD_DEFAULTS = { eqMode:'floor', fW:900, fH:2100, fMode:'width', fScale:1.2, fAlign:'center', freeSegs:'', dDir:'v', dPitch:100, dM0:100, dM1:100, dSeg:300, dGap:60, dStagger:1, dE0:100, dE1:100, sCx:60, sBase:980, sRings:'240,330,420,520,630,750', sPitch:'8,6.5,5.5,4.5,4', sOuterPitch:9, sA0:-100, sA1:100, tCx:0, tBase:300, tN:7, tW:700, tH:1100, tOv:0.62, tShrink:0.84, tSag:0.12, tTrunkW:90, tTrunkH:110, tStar:70, tBauble:16, pStrip:240, pW:110, pH:110, pGx:50, pGy:59, pCols:0, pMinMX:50, pMinMY:50, pClearInset:6, pStep:0, lineCut:6, lineDepth:3, lineTool:4, vPitch:0, vEqLeft:100, vEqRight:100, design:'diag', structure:'two', spMode:'edge', anchor:'left', ref:'edge', cutterType:'U', tool:4, depth:4, gap:38, topH:259, leftMargin:240, spacing:94, c0dist:347.20014,
+  vWidth:6, vBotM:0, vTopM:0, hPitch:0, hEqBottom:100, hEqTop:100, hX0:0, hX1:0, frameInset:0, pN:0, pMargin:125, pPW:0, pGap:0, pBottom:125, pTop:125,
+  bW:500, bH:300, bBottom:295, bGap:294, bN:0, bMinTop:200, vLeft:'', vRight:'', hBottom:'', hTop:'', bXs:'150,350', customRects:'' };
+const PRESETS = {"★ 横带 + 双竖线（Florence 木纹门）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"200,0,200,2300\n360,0,360,2300\n0,1930,1000,1930\n0,370,1000,370","w":1000,"h":2300},"★ 长竖线 + 底部斜线扇（Florence）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"370,0,370,2300\n0,970,1000,360\n190,0,190,854.1\n620,0,620,591.8\n190,0,370,744.3\n370,0,620,591.8\n620,0,870,439.3\n0,590,560,0","w":1000,"h":2300},"★ 拱门（同心圆弧，高级款）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"165,0,165,1790,165,1790,165.5,1807.5,166.8,1825,169.1,1842.4,172.3,1859.7,176.4,1876.7,181.4,1893.5,187.3,1910.1,194,1926.3,201.5,1942.1,209.9,1957.5,219,1972.5,229,1986.9,239.7,2000.8,251,2014.2,263.1,2026.9,275.8,2039,289.2,2050.3,303.1,2061,317.5,2071,332.5,2080.1,347.9,2088.5,363.7,2096,379.9,2102.7,396.5,2108.6,413.3,2113.6,430.3,2117.7,447.6,2120.9,465,2123.2,482.5,2124.5,500,2125,517.5,2124.5,535,2123.2,552.4,2120.9,569.7,2117.7,586.7,2113.6,603.5,2108.6,620.1,2102.7,636.3,2096,652.1,2088.5,667.5,2080.1,682.5,2071,696.9,2061,710.8,2050.3,724.2,2039,736.9,2026.9,749,2014.2,760.3,2000.8,771,1986.9,781,1972.5,790.1,1957.5,798.5,1942.1,806,1926.3,812.7,1910.1,818.6,1893.5,823.6,1876.7,827.7,1859.7,830.9,1842.4,833.2,1825,834.5,1807.5,835,1790\n835,1790,835,0\n200,0,200,1790,200,1790,200.4,1805.7,201.6,1821.4,203.7,1836.9,206.6,1852.4,210.2,1867.6,214.7,1882.7,219.9,1897.5,225.9,1912,232.7,1926.2,240.2,1940,248.4,1953.4,257.3,1966.3,266.9,1978.8,277.1,1990.7,287.9,2002.1,299.3,2012.9,311.2,2023.1,323.7,2032.7,336.6,2041.6,350,2049.8,363.8,2057.3,378,2064.1,392.5,2070.1,407.3,2075.3,422.4,2079.8,437.6,2083.4,453.1,2086.3,468.6,2088.4,484.3,2089.6,500,2090,515.7,2089.6,531.4,2088.4,546.9,2086.3,562.4,2083.4,577.6,2079.8,592.7,2075.3,607.5,2070.1,622,2064.1,636.2,2057.3,650,2049.8,663.4,2041.6,676.3,2032.7,688.8,2023.1,700.7,2012.9,712.1,2002.1,722.9,1990.7,733.1,1978.8,742.7,1966.3,751.6,1953.4,759.8,1940,767.3,1926.2,774.1,1912,780.1,1897.5,785.3,1882.7,789.8,1867.6,793.4,1852.4,796.3,1836.9,798.4,1821.4,799.6,1805.7,800,1790\n800,1790,800,0\n238,0,238,1790,238,1790,238.4,1803.7,239.4,1817.4,241.2,1831,243.7,1844.5,246.9,1857.8,250.8,1871,255.4,1883.9,260.7,1896.6,266.6,1908.9,273.1,1921,280.3,1932.7,288,1944,296.4,1954.9,305.3,1965.3,314.7,1975.3,324.7,1984.7,335.1,1993.6,346,2002,357.3,2009.7,369,2016.9,381.1,2023.4,393.4,2029.3,406.1,2034.6,419,2039.2,432.2,2043.1,445.5,2046.3,459,2048.8,472.6,2050.6,486.3,2051.6,500,2052,513.7,2051.6,527.4,2050.6,541,2048.8,554.5,2046.3,567.8,2043.1,581,2039.2,593.9,2034.6,606.6,2029.3,618.9,2023.4,631,2016.9,642.7,2009.7,654,2002,664.9,1993.6,675.3,1984.7,685.3,1975.3,694.7,1965.3,703.6,1954.9,712,1944,719.7,1932.7,726.9,1921,733.4,1908.9,739.3,1896.6,744.6,1883.9,749.2,1871,753.1,1857.8,756.3,1844.5,758.8,1831,760.6,1817.4,761.6,1803.7,762,1790\n762,1790,762,0\n273,0,273,1790,273,1790,273.3,1801.9,274.2,1813.7,275.8,1825.5,278,1837.2,280.7,1848.8,284.1,1860.1,288.1,1871.3,292.6,1882.3,297.7,1893.1,303.4,1903.5,309.6,1913.6,316.4,1923.4,323.6,1932.9,331.3,1941.9,339.5,1950.5,348.1,1958.7,357.1,1966.4,366.6,1973.6,376.4,1980.4,386.5,1986.6,396.9,1992.3,407.7,1997.4,418.7,2001.9,429.9,2005.9,441.2,2009.3,452.8,2012,464.5,2014.2,476.3,2015.8,488.1,2016.7,500,2017,511.9,2016.7,523.7,2015.8,535.5,2014.2,547.2,2012,558.8,2009.3,570.1,2005.9,581.3,2001.9,592.3,1997.4,603.1,1992.3,613.5,1986.6,623.6,1980.4,633.4,1973.6,642.9,1966.4,651.9,1958.7,660.5,1950.5,668.7,1941.9,676.4,1932.9,683.6,1923.4,690.4,1913.6,696.6,1903.5,702.3,1893.1,707.4,1882.3,711.9,1871.3,715.9,1860.1,719.3,1848.8,722,1837.2,724.2,1825.5,725.8,1813.7,726.7,1801.9,727,1790\n727,1790,727,0","w":1000,"h":2300},"★ 竖线 + V 形缺口（锁位）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"310,2300,310,1250,385,1150,310,1050,310,0\n310,1210,355,1150,310,1090","w":1000,"h":2300},"★ 双竖线（Triplek 01）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,0,190,2300\n375,0,375,2300","w":1000,"h":2300},"★ L 形（一竖一横，Triplek 02）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,0,190,2300\n0,2100,1000,2100","w":1000,"h":2300},"★ 阶梯线（Triplek 03）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"180,2300,180,1150,820,1150,820,0\n500,0,500,2300","w":1000,"h":2300},"★ 错位方框（Triplek 04）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"375,2300,375,1035,1000,1035\n0,1265,630,1265,630,0","w":1000,"h":2300},"★ 多竖线（Triplek 05）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"375,0,375,2300\n430,0,430,2300\n500,0,500,2300\n570,0,570,2300\n630,0,630,2300","w":1000,"h":2300},"★ 三角竖线（越来越短，Triplek 06）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"190,270,190,2030\n285,410,285,1890\n380,540,380,1760\n475,670,475,1630\n570,800,570,1500\n665,930,665,1370\n760,1050,760,1250","w":1000,"h":2300},"★ 三横线（Triplek 07）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"40,1225,960,1225\n40,1150,960,1150\n40,1075,960,1075","w":1000,"h":2300},"★ 十字（三竖三横，Triplek 08）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"440,0,440,2300\n500,0,500,2300\n560,0,560,2300\n0,1090,1000,1090\n0,1150,1000,1150\n0,1210,1000,1210","w":1000,"h":2300},"★ 双竖线 + 锁位横线（9104）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"230,0,230,2300\n340,0,340,1080\n0,1080,1000,1080","w":1000,"h":2300},"★ 两条斜线（9109）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"0,1900,1000,1470\n820,1500,0,480","w":1000,"h":2300},"★ 竖线 + 锁位小弧（9110）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"200,0,200,2300\n228.9,1071.2,237.9,1073.4,246.7,1076.5,255,1080.7,262.8,1085.8,269.9,1091.8,276.3,1098.6,281.8,1106,286.5,1114.1,290.2,1122.6,292.8,1131.6,294.5,1140.7,295,1150,294.5,1159.3,292.8,1168.4,290.2,1177.4,286.5,1185.9,281.8,1194,276.3,1201.4,269.9,1208.2,262.8,1214.2,255,1219.3,246.7,1223.5,237.9,1226.6,228.9,1228.8\n232.4,1051.5,243.7,1054.2,254.6,1058.2,265,1063.4,274.7,1069.8,283.6,1077.3,291.6,1085.7,298.5,1095,304.4,1105.1,309,1115.8,312.3,1126.9,314.3,1138.4,315,1150,314.3,1161.6,312.3,1173.1,309,1184.2,304.4,1194.9,298.5,1205,291.6,1214.3,283.6,1222.7,274.7,1230.2,265,1236.6,254.6,1241.8,243.7,1245.8,232.4,1248.5","w":1000,"h":2300},"★ 半月 + 竖线 + 底横线（锁位半圆）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"120,820,141.6,820.7,163.1,822.8,184.4,826.3,205.4,831.2,226.1,837.5,246.3,845.1,266,854,285,864.2,303.3,875.6,320.9,888.2,337.6,901.9,353.3,916.7,368.1,932.4,381.8,949.1,394.4,966.7,405.8,985,416,1004,424.9,1023.7,432.5,1043.9,438.8,1064.6,443.7,1085.6,447.2,1106.9,449.3,1128.4,450,1150,449.3,1171.6,447.2,1193.1,443.7,1214.4,438.8,1235.4,432.5,1256.1,424.9,1276.3,416,1296,405.8,1315,394.4,1333.3,381.8,1350.9,368.1,1367.6,353.3,1383.3,337.6,1398.1,320.9,1411.8,303.3,1424.4,285,1435.8,266,1446,246.3,1454.9,226.1,1462.5,205.4,1468.8,184.4,1473.7,163.1,1477.2,141.6,1479.3,120,1480\n650,2300,650,230\n730,2300,730,230\n810,2300,810,230\n890,2300,890,230\n650,230,890,230\n650,170,890,170\n650,110,890,110","w":1000,"h":2300},"★ 左上嵌套直角线":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"100,1250,100,2200,1000,2200\n145,1250,145,2155,1000,2155\n190,1250,190,2110,1000,2110\n235,1250,235,2065,1000,2065\n280,1250,280,2020,1000,2020","w":1000,"h":2300},"★ 嵌板框 + 叠菱形（isdoor）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"130,130,870,130,870,2170,130,2170,130,130\n250,1805,295,1750,250,1695,205,1750,250,1805\n250,1695,295,1640,250,1585,205,1640,250,1695\n250,1585,295,1530,250,1475,205,1530,250,1585\n750,615,795,560,750,505,705,560,750,615\n750,505,795,450,750,395,705,450,750,505\n750,395,795,340,750,285,705,340,750,395\n640,2170,870,1950\n660,2170,870,1980\n130,130,330,300\n150,130,340,290","w":1000,"h":2300},"★ 希腊回纹条 + 横线":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"width","fAlign":"center","freeSegs":"180,0,180,2300\n180,430,380,430\n180,860,380,860\n180,1290,380,1290\n180,1720,380,1720\n770,140,770,205,700,205,700,140,755,140,755,188,714,188,714,154,740,154\n770,225,770,290,700,290,700,225,755,225,755,273,714,273,714,239,740,239\n770,310,770,375,700,375,700,310,755,310,755,358,714,358,714,324,740,324\n770,395,770,460,700,460,700,395,755,395,755,443,714,443,714,409,740,409\n770,480,770,545,700,545,700,480,755,480,755,528,714,528,714,494,740,494\n770,565,770,630,700,630,700,565,755,565,755,613,714,613,714,579,740,579\n770,650,770,715,700,715,700,650,755,650,755,698,714,698,714,664,740,664\n770,735,770,800,700,800,700,735,755,735,755,783,714,783,714,749,740,749\n770,820,770,885,700,885,700,820,755,820,755,868,714,868,714,834,740,834\n770,905,770,970,700,970,700,905,755,905,755,953,714,953,714,919,740,919\n770,990,770,1055,700,1055,700,990,755,990,755,1038,714,1038,714,1004,740,1004\n770,1075,770,1140,700,1140,700,1075,755,1075,755,1123,714,1123,714,1089,740,1089\n770,1160,770,1225,700,1225,700,1160,755,1160,755,1208,714,1208,714,1174,740,1174\n770,1245,770,1310,700,1310,700,1245,755,1245,755,1293,714,1293,714,1259,740,1259\n770,1330,770,1395,700,1395,700,1330,755,1330,755,1378,714,1378,714,1344,740,1344\n770,1415,770,1480,700,1480,700,1415,755,1415,755,1463,714,1463,714,1429,740,1429\n770,1500,770,1565,700,1565,700,1500,755,1500,755,1548,714,1548,714,1514,740,1514\n770,1585,770,1650,700,1650,700,1585,755,1585,755,1633,714,1633,714,1599,740,1599\n770,1670,770,1735,700,1735,700,1670,755,1670,755,1718,714,1718,714,1684,740,1684\n770,1755,770,1820,700,1820,700,1755,755,1755,755,1803,714,1803,714,1769,740,1769\n770,1840,770,1905,700,1905,700,1840,755,1840,755,1888,714,1888,714,1854,740,1854\n770,1925,770,1990,700,1990,700,1925,755,1925,755,1973,714,1973,714,1939,740,1939\n770,2010,770,2075,700,2075,700,2010,755,2010,755,2058,714,2058,714,2024,740,2024\n770,2095,770,2160,700,2160,700,2095,755,2095,755,2143,714,2143,714,2109,740,2109\n680,0,680,2300\n870,0,870,2300","w":1000,"h":2300},"★ 透视隧道（消失点在锁位，高级款）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"812,983,1000,983,1000,1300,812,1300,812,983\n0,0,812,983\n0,2300,812,1300\n208,251.8,208,2043.8\n208,251.8,1000,251.8\n208,2043.8,1000,2043.8\n347,420.1,347,1872.7\n347,420.1,1000,420.1\n347,1872.7,1000,1872.7\n475,575,475,1715\n475,575,1000,575\n475,1715,1000,1715\n584,707,584,1580.8\n584,707,1000,707\n584,1580.8,1000,1580.8\n663,802.6,663,1483.5\n663,802.6,1000,802.6\n663,1483.5,1000,1483.5\n724,876.5,724,1408.4\n724,876.5,1000,876.5\n724,1408.4,1000,1408.4\n763,923.7,763,1360.3\n763,923.7,1000,923.7\n763,1360.3,1000,1360.3\n792,958.8,792,1324.6\n792,958.8,1000,958.8\n792,1324.6,1000,1324.6\n0,575,812,1035.8\n0,1150,812,1141.5\n0,1725,812,1247.2","w":1000,"h":2300},"★ 树枝（Vector for Door）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"538,0,543.1,57.5,548.2,115,553.2,172.5,558.2,230,563.1,287.5,567.9,345,572.6,402.5,577.1,460,581.5,517.5,585.7,575,589.8,632.5,593.6,690,597.2,747.5,600.5,805,603.6,862.5,606.5,920,609.1,977.5,611.3,1035,613.3,1092.5,614.9,1150,616.3,1207.5,617.3,1265,617.9,1322.5,618.2,1380,618.2,1437.5,617.8,1495,617.1,1552.5,615.9,1610,614.5,1667.5,612.6,1725,610.4,1782.5,607.9,1840,604.9,1897.5,601.7,1955,598.1,2012.5,594.1,2070,589.8,2127.5,585.2,2185,580.3,2242.5,575,2300\n582,0,587.1,57.5,592.2,115,597.2,172.5,602.2,230,607.1,287.5,611.9,345,616.6,402.5,621.1,460,625.5,517.5,629.7,575,633.8,632.5,637.6,690,641.2,747.5,644.5,805,647.6,862.5,650.5,920,653.1,977.5,655.3,1035,657.3,1092.5,658.9,1150,660.3,1207.5,661.3,1265,661.9,1322.5,662.2,1380,662.2,1437.5,661.8,1495,661.1,1552.5,659.9,1610,658.5,1667.5,656.6,1725,654.4,1782.5,651.9,1840,648.9,1897.5,645.7,1955,642.1,2012.5,638.1,2070,633.8,2127.5,629.2,2185,624.3,2242.5,619,2300\n573.5,414,0,529.6\n573.5,464,0,579.6\n599.2,782,0,924.8\n599.2,832,0,974.8\n614.9,1150,0,1320\n614.9,1200,0,1370\n617.6,1518,0,1715.2\n617.6,1568,0,1765.2\n605.6,1886,0,2110.4\n605.6,1936,0,2160.4\n631.4,598,1000,696.8\n631.4,648,1000,746.8\n658.9,1150,1000,1280\n658.9,1200,1000,1330\n657.4,1702,1000,1863.2\n657.4,1752,1000,1913.2","w":1000,"h":2300},"★ 大三角拼块（斜线分块）":{"design":"free","ref":"center","cutterType":"U","cutter":6,"depth":3,"fW":1000,"fH":2300,"fMode":"stretch","fAlign":"center","freeSegs":"200,2300,1000,1650\n0,1480,1000,1960\n0,1100,1000,560\n1000,1500,150,0\n0,700,520,0","w":1000,"h":2300}};
+const BUILTIN = {
+  '★ 斜线 6U4（1268x2335，上下两块）': { design:'diag', structure:'two', cutterType:'U', cutter:6, depth:4, w:1268, h:2335 },
+  '★ 6V3 横竖槽（950x2100：右边留200，横槽距上下500，量到槽边）': { design:'lines', ref:'edge', cutterType:'V', cutter:9.5, vWidth:6, depth:3, vRight:'200', hBottom:'500', hTop:'500', hX1:203, w:950, h:2100 },
+  '★ 竖线 200 / 50 / 50（6V3，990x2340）': { design:'lines', ref:'edge', cutterType:'V', cutter:9.5, vWidth:6, depth:3, vLeft:'197,247,297', w:990, h:2340 },
+  '★ 横槽 6U4（1300x2400：留白240，上下108，间距≈150 等分）': { design:'lines', ref:'edge', cutterType:'U', cutter:6, depth:4, vLeft:'240', hPitch:144, hEqBottom:105, hEqTop:105, hX0:246, hX1:0, w:1300, h:2400 },
+  '★ 斜线 6U4（1350x2400，第一条斜线从底边518.597起）': { design:'diag', structure:'single', cutterType:'U', cutter:6, depth:4, leftMargin:240, spacing:94, spMode:'edge', c0dist:514.35436, anchor:'left', w:1350, h:2400 },
+  '★ Bina SKK 自由线条（900x2100，按比例放大 + 上下 balance）': { design:'free', ref:'edge', cutterType:'U', cutter:6, depth:3, fW:900, fH:2100, fMode:'width', fAlign:'center', freeSegs:'315,0,315,227\n0,227,900,227\n0,537,680,537\n680,537,680,227\n900,1042,220,1042\n680,1042,680,537\n220,1042,220,537\n0,1767,450,1767\n220,1767,220,1042\n220,1247,900,1247\n450,2100,450,1247', w:989, h:2337 },
+  '★ 竖条纹（间距60，左右留100）': { design:'lines', w:1000, h:2100, cutterType:'U', cutter:6, depth:3, vPitch:60, vEqLeft:100, vEqRight:100 },
+  '★ 断线竖槽（段300 / 缺口60，错开）': { design:'dash', w:1000, h:2100, cutterType:'U', cutter:6, depth:3, dDir:'v', dPitch:100, dM0:100, dM1:100, dSeg:300, dGap:60, dStagger:1, dE0:100, dE1:100 },
+  '★ 太阳（照片那种：同心圆弧 + 放射线，1268x2335）': { design:'sun', w:1268, h:2335, cutterType:'V', cutter:9.5, vWidth:4, depth:2, sCx:60, sBase:980, sRings:'240,330,420,520,630,750', sPitch:'8,6.5,5.5,4.5,4', sOuterPitch:9, sA0:-100, sA1:100 },
+  '★ 高级圣诞树（7层、弧形裙边、星星、挂球）': { design:'tree', w:1268, h:2335, cutterType:'V', cutter:9.5, vWidth:4, depth:2, tBase:300, tN:7, tW:700, tH:1100, tOv:0.62, tShrink:0.84, tSag:0.12, tTrunkW:90, tTrunkH:110, tStar:70, tBauble:16 },
+  '★ 方格挖槽 12.5U3（1268x2330，6 列 × 13 行 + 上面 2 行，3 道工序）': { design:'pockets', structure:'two', cutterType:'U', cutter:12.5, depth:3, w:1268, h:2330, gap:50, topH:410, pStrip:240, pW:110, pH:110, pGx:50, pGy:59, pCols:0, pMinMX:50, pMinMY:50, pClearInset:6, pStep:0, lineCut:6, lineDepth:3, lineTool:4, tool:5 },
+  '★ 内框（离门边150）': { design:'rects', cutterType:'U', cutter:6, depth:3, frameInset:150 },
+  '★ 3 块嵌板（左右留125，每块170宽，缝等分）': { design:'rects', cutterType:'U', cutter:6, depth:3, pN:3, pMargin:125, pPW:170, pBottom:125, pTop:125 },
+  '★ 错开方块（底295 / 缝294 / 高300，顶部吃余数）': { design:'blocks', cutterType:'U', cutter:6, depth:3, bW:500, bH:300, bBottom:295, bGap:294, bXs:'150,350' }
+};
+Object.assign(BUILTIN, PRESETS);
+let memDesigns = {};
+function loadDesigns(){ try { return Object.assign({}, BUILTIN, JSON.parse(localStorage.getItem(DKEY) || '{}'), memDesigns); } catch(e){ return Object.assign({}, BUILTIN, memDesigns); } }
+function loadUserDesigns(){ const d = loadDesigns(); Object.keys(BUILTIN).forEach(k => { if (d[k] === BUILTIN[k]) delete d[k]; }); return d; }
+function storeDesigns(d){ memDesigns = d; try { localStorage.setItem(DKEY, JSON.stringify(d)); } catch(e){} }
+function renderDesigns(selected){
+  const d = loadDesigns(), names = Object.keys(d);
+  $('designSel').innerHTML = '<option value="">— 选择内置例子 / 已保存的设计 —</option>' + names.map(n => '<option>' + n.replace(/</g, '&lt;') + '</option>').join('');
+  if (selected && d[selected]) $('designSel').value = selected;
+}
+function applyDesign(o){
+  if (!Object.values(BUILTIN).includes(o)) { o = Object.assign({}, o); if (o.spMode === undefined) o.spMode = 'center'; if (o.ref === undefined) o.ref = 'center'; }   // 以前自己保存的设计：保持原来的量法（中心）
+  DESIGN_FIELDS.forEach(k => { const v = o[k] !== undefined ? o[k] : FIELD_DEFAULTS[k]; if (v !== undefined) $(k).value = v; });
+  if (o.w > 0 && o.h > 0) { sizes[sel] = { w: o.w, h: o.h }; renderSizes(); }
+  lastAnchor = $('anchor').value;
+  fillCutters(false);
+  if (o.cutter !== undefined && CUTTERS[$('cutterType').value][o.cutter] !== undefined) $('cutter').value = o.cutter;
+  refresh();
+}
+$('designSave').onclick = () => {
+  const name = $('designName').value.trim();
+  if (!name) { alert('请先给这个设计起个名字。'); return; }
+  const o = {}; DESIGN_FIELDS.forEach(k => o[k] = $(k).value);
+  if (BUILTIN[name]) { alert('这个名字是内置例子，请换一个名字。'); return; }
+  o.cutter = $('cutter').value;
+  const d = loadUserDesigns(); d[name] = o; storeDesigns(d); renderDesigns(name);
+  $('designSave').textContent = '已保存 ✓'; setTimeout(() => $('designSave').textContent = '保存', 1200);
+};
+$('designSel').onchange = () => { const n = $('designSel').value; if (!n) return; const d = loadDesigns(); if (d[n]) { applyDesign(d[n]); $('designName').value = n; } };
+$('designDel').onclick = () => {
+  const n = $('designSel').value; if (!n) return;
+  if (!confirm('删除设计「' + n + '」？')) return;
+  if (BUILTIN[n]) { alert('内置例子不能删除。'); return; }
+  const d = loadUserDesigns(); delete d[n]; memDesigns = d; try { localStorage.setItem(DKEY, JSON.stringify(d)); } catch(e){} renderDesigns();
+};
+$('designExport').onclick = () => { const d = loadUserDesigns(); if (!Object.keys(d).length) { alert('还没有保存任何自己的设计。'); return; } save(JSON.stringify(d, null, 2), 'cnc_designs.json', 'application/json'); };
+$('designImport').onclick = () => $('designFile').click();
+$('designFile').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { const inc = JSON.parse(r.result); const d = loadUserDesigns(); Object.assign(d, inc); storeDesigns(d); renderDesigns(); alert('已导入 ' + Object.keys(inc).length + ' 个设计。'); } catch(err){ alert('这个文件读不出来，请确认是导出的设计文件。'); } };
+  r.readAsText(f); e.target.value = '';
+};
+
+// ---------- 事件 ----------
+NUM_IDS.concat(TEXT_IDS).forEach(i => $(i).addEventListener('input', () => refresh()));
+$('design').addEventListener('change', () => refresh());
+$('ref').addEventListener('change', () => refresh());
+$('cutter').addEventListener('change', () => refresh());
+$('structure').addEventListener('change', () => refresh());
+$('cutterType').addEventListener('change', () => { fillCutters(false); refresh(); });
+$('anchor').addEventListener('change', () => {          // 换边时，把数字换算成"同一个位置"
+  const z = sizes[sel], v = parseFloat($('c0dist').value), now = $('anchor').value;
+  if (isFinite(v) && now !== lastAnchor) {
+    const gw = $('cutterType').value === 'V' ? Math.min(parseFloat($('cutter').value), parseFloat($('vWidth').value)) : parseFloat($('cutter').value);
+    const k = ($('spMode').value === 'edge' && isFinite(gw)) ? gw * Math.SQRT2 : 0;   // 量到槽边：左边的边和右边的边，差一个槽的水平宽度
+    $('c0dist').value = Math.round((z.w - v - k) * 10000) / 10000;
+  }
+  lastAnchor = now; refresh();
+});
+$('opTabs').addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.op; if (i !== undefined) { opSel = +i; refresh(); } });
+$('tabF').onclick = () => { face = 'front'; refresh(); };
+$('backOrigin').addEventListener('change', () => refresh());
+$('boRot').addEventListener('change', () => refresh());
+$('tabB').onclick = () => { face = 'back'; refresh(); };
+fillCutters(false); renderSizes(); renderDesigns(); refresh();
+</script>
+</body>
+</html>
