@@ -16,6 +16,7 @@
   .panel{width:380px}
   .panel h2{font-size:14px;margin:16px 0 8px;color:var(--mute);font-weight:600}
   .panel h2:first-child{margin-top:0}
+  .off{display:none!important}
   .nboxes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .nboxes input{width:72px}
   .nboxes button{padding:4px 10px}
@@ -88,19 +89,21 @@
     <h2>图案位置（斜线）</h2>
     <div class="row"><label>留白宽度<small>不开槽的那一条</small></label><input id="leftMargin" type="number" step="1" value="240"></div>
     <div class="row"><label>斜线间距<small>垂直于斜线量，角度固定 45°</small></label><input id="spacing" type="number" step="1" value="94"></div>
-    <div class="row"><label>间距怎么量<small>边到边 = 两条槽之间留下的实木宽</small></label><select id="spMode"><option value="edge">没切的边 到 没切的边（客人看到的，如 94）</option><option value="center">槽中心 到 槽中心（红线）</option></select></div>
+    <div class="row off"><label>间距怎么量<small>边到边 = 两条槽之间留下的实木宽</small></label><select id="spMode"><option value="edge">没切的边 到 没切的边（客人看到的，如 94）</option><option value="center">槽中心 到 槽中心（红线）</option></select></div>
     <div class="row"><label>第一条斜线碰到<br>底边的位置<small>量到槽没切的边 · 从哪边量起 ↓</small></label><input id="c0dist" type="number" step="0.0001" value="347.20014"></div>
     <div class="row"><label>从哪边量起<small>门宽变了，斜线跟着这一边</small></label>
       <select id="anchor"><option value="left" selected>左边（留白那边）</option><option value="right">右边</option></select></div>
     </div>
 
     <div class="dsec d-lines d-rects d-blocks d-dash">
+    <div class="off"><!-- 量法：阳阳规定一律量到没切的边，不用显示 -->
     <h2>尺寸是量到哪里</h2>
     <div class="row"><label>图上的尺寸量到<small>槽的中心线，或槽靠门边的那条边</small></label>
       <select id="ref"><option value="edge" selected>没切的边（客人看到的）</option><option value="center">槽的中心（红线）</option></select></div>
     </div>
+    </div>
 
-    <div class="dsec d-lines d-dash">
+    <div class="dsec d-lines d-dash" id="eqSec">
     <h2>等分怎么取整</h2>
     <div class="row"><label>"间距 150 等分"取整方式<small>向下取整 = 格数少一点，间距 ≥ 填的数（D1 图就是这样：150 → 实际 156）</small></label><select id="eqMode"><option value="floor" selected>向下取整（间距≥填的）</option><option value="round">四舍五入（间距最接近）</option><option value="ceil">向上取整（间距≤填的）</option></select></div>
     </div>
@@ -131,8 +134,10 @@
     <div class="row"><label>横槽等分：间距<small>0 = 不用；例 150</small></label><input id="hPitch" type="number" value="0"></div>
     <div class="row"><label>等分：第一条离底边</label><input id="hEqBottom" type="number" value="100"></div>
     <div class="row"><label>等分：最后一条离顶边</label><input id="hEqTop" type="number" value="100"></div>
-    <div class="row"><label>横槽左端离左边<small>0 = 到门边</small></label><input id="hX0" type="number" value="0"></div>
-    <div class="row"><label>横槽右端离右边<small>0 = 到门边</small></label><input id="hX1" type="number" value="200"></div>
+    <div class="row"><label>横槽左端<small>接到竖槽 = 横槽切到最靠里那条竖槽就停</small></label><select id="hX0Mode"><option value="edge">到门边</option><option value="join">接到左边的竖槽</option><option value="custom">自己填</option></select></div>
+    <div class="row"><label>横槽左端离左边</label><input id="hX0" type="number" value="0"></div>
+    <div class="row"><label>横槽右端<small>接到竖槽 = 横槽切到最靠里那条竖槽就停</small></label><select id="hX1Mode"><option value="edge">到门边</option><option value="join">接到右边的竖槽</option><option value="custom">自己填</option></select></div>
+    <div class="row"><label>横槽右端离右边</label><input id="hX1" type="number" value="0"></div>
     <div class="row"><label>算出来的<small>等分后的实际间距</small></label><b id="eqInfo" style="font-size:13px">-</b></div>
     </div>
 
@@ -466,7 +471,7 @@ function generateCNC(p) {
       });
       info.push(['Vertical lines', String(xs.length)]);
       info.push(['Horizontal lines', String(ys.length)]);
-      if (p.hX1 > 0) info.push(['Horizontal ends', p.hX1 + ' mm short of right edge']);
+      if (p.hX1 > 0) info.push(['Horizontal ends', p.hX1Auto ? 'at the right vertical groove' : p.hX1 + ' mm short of right edge']);
     } else if (design === 'rects') {
       if (p.frameInset > 0) add(rectPath(p.frameInset, p.frameInset, W - p.frameInset, H - p.frameInset));
       if (p.pN > 0) {
@@ -648,8 +653,8 @@ function generateCNC(p) {
     let i = 0;
     (p.vLeft || []).forEach((v) => hd(0, v, i++, v, 'L'));
     (p.vRight || []).forEach((v) => hd(W - v, W, i++, v, 'R'));
-    if (p.hX1 > 0) hd(W - p.hX1, W, i++, p.hX1, 'R', '横槽右端');
-    if (p.hX0 > 0) hd(0, p.hX0, i++, p.hX0, 'L', '横槽左端');
+    if (p.hX1 > 0 && !p.hX1Auto) hd(W - p.hX1, W, i++, p.hX1, 'R', '横槽右端');   // 接到竖槽时不标（那是机器停刀的位置，不是客人看到的尺寸）
+    if (p.hX0 > 0 && !p.hX0Auto) hd(0, p.hX0, i++, p.hX0, 'L', '横槽左端');
     if (p.vPitch > 0 && p._veq) { hd(0, p.vEqLeft || 0, i++, p.vEqLeft || 0, 'L'); hd(W - (p.vEqRight || 0), W, i++, p.vEqRight || 0, 'R'); }
     let j = 0;
     (p.hBottom || []).forEach((v) => vd(0, v, j++, v, 'B'));
@@ -807,7 +812,36 @@ function detailOf(p, g, fin) {
     const xv = g.mirror ? W - (p.leftMargin + r) : p.leftMargin + r;
     xc = (g.mirror ? xv - 260 : xv - 40) + 150; yc = p.height / 2; size = 300;
   } else {
-    if (!cands.length) { const b0 = bands[0]; if (!b0) return null; xc = (b0.a[0] + b0.b[0]) / 2; yc = (b0.a[1] + b0.b[1]) / 2; size = 300; out.note = '这款没有平行的槽可以量'; }
+    if (!cands.length) {
+      // 没有平行的槽：改成量「槽到门边」，挑最近门边的那条槽，最好连横竖槽接头一起看到
+      const ax = []; bands.forEach((b) => {
+        const vert = Math.abs(b.a[0] - b.b[0]) < 0.01, hor = Math.abs(b.a[1] - b.b[1]) < 0.01; if (!vert && !hor) return;
+        const c = vert ? b.a[0] : b.a[1], lim = vert ? W : Ht, t0 = Math.min(vert ? b.a[1] : b.a[0], vert ? b.b[1] : b.b[0]) - b.r, t1 = Math.max(vert ? b.a[1] : b.a[0], vert ? b.b[1] : b.b[0]) + b.r;
+        if (t1 - t0 < 30) return;
+        ax.push({ vert, c, r: b.r, t0, t1, gap: c - b.r, near: c - b.r, far: 0 });
+        ax.push({ vert, c, r: b.r, t0, t1, gap: lim - (c + b.r), near: c + b.r, far: lim });
+      });
+      const ok = ax.filter((e) => e.gap > 0.8 && e.gap <= 600).sort((a, b) => a.gap - b.gap);
+      if (!ok.length) { const b0 = bands[0]; if (!b0) return null; xc = (b0.a[0] + b0.b[0]) / 2; yc = (b0.a[1] + b0.b[1]) / 2; size = 300; out.note = '这款没有可以量的距离'; }
+      else {
+        const e = ok[0], P = (n, t) => e.vert ? [n, t] : [t, n];
+        // 找跟它垂直、接上它的槽（接头），放大图对准接头；没有就对准中间
+        const js = ax.filter((o) => o.vert !== e.vert && o.t0 <= Math.max(e.near, e.c) + 1 && o.t1 >= Math.min(e.near, e.c) - 1).map((o) => o.c).filter((t) => t > e.t0 && t < e.t1);
+        const mid = e.vert ? Ht / 2 : W / 2, tj = js.length ? js.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0] : Math.min(e.t1 - 60, Math.max(e.t0 + 60, mid));
+        size = Math.max(260, Math.min(640, e.gap * 1.7 + 120));
+        const nc = (e.near + e.far) / 2; [xc, yc] = P(nc, tj);
+        const tDim = Math.min(e.t1 - 10, Math.max(e.t0 + 10, tj + (js.length ? size * 0.28 : 0)));
+        out.dims.push({ A: P(e.near, tDim), B: P(e.far, tDim), v: e.gap });
+        // 接头那条横（竖）槽到门边的距离，如果放得进窗口也标出来
+        ok.slice(1).forEach((o) => {
+          if (out.dims.length >= 3 || o.vert === e.vert) return;
+          const Q = (n, t) => o.vert ? [n, t] : [t, n], tc = e.vert ? xc : yc, t = Math.min(o.t1 - 10, Math.max(o.t0 + 10, tc - size * 0.2));
+          const A = Q(o.near, t), B = Q(o.far, t), x0w = xc - size / 2, y0w = yc - size / 2, inn = (q) => q[0] >= x0w - 1 && q[0] <= x0w + size + 1 && q[1] >= y0w - 1 && q[1] <= y0w + size + 1;
+          if (inn(A) && inn(B)) out.dims.push({ A, B, v: o.gap });
+        });
+        out.door = [0, 0, W, Ht];
+      }
+    }
     else {
       const cnt = {}; cands.forEach((c) => { const key = c.fam + '|' + Math.round(c.gap * 10); cnt[key] = (cnt[key] || 0) + 1; });
       const top = Math.max(...Object.values(cnt)), pool = cands.filter((c) => cnt[c.fam + '|' + Math.round(c.gap * 10)] === top);
@@ -1083,6 +1117,7 @@ function buildPDF(p, faces, base, dateStr) {
       c.push('q ' + n2(x0) + ' ' + n2(by) + ' ' + SZ + ' ' + SZ + ' re W n');
       if (D) {
         const S = SZ / D.size, X = (v) => x0 + (v - D.x0) * S, Y = (v) => by + (v - D.y0) * S;
+        if (D.door) { const q = D.door; c.push('0.82 0.82 0.82 rg ' + n2(x0) + ' ' + n2(by) + ' ' + SZ + ' ' + SZ + ' re f 1 1 1 rg ' + n2(X(q[0])) + ' ' + n2(Y(q[1])) + ' ' + n2((q[2] - q[0]) * S) + ' ' + n2((q[3] - q[1]) * S) + ' re f 0 0 0 RG 1.6 w ' + n2(X(q[0])) + ' ' + n2(Y(q[1])) + ' ' + n2((q[2] - q[0]) * S) + ' ' + n2((q[3] - q[1]) * S) + ' re S'); }
         D.boxes.forEach((q) => c.push('1 0.88 0.88 rg 0 0 0 RG 0.8 w ' + n2(X(q[0])) + ' ' + n2(Y(q[1])) + ' ' + n2((q[2] - q[0]) * S) + ' ' + n2((q[3] - q[1]) * S) + ' re B'));
         D.bands.forEach((b) => {
           const a = b.a, e = b.b, L = Math.hypot(e[0] - a[0], e[1] - a[1]) || 1, nx = -(e[1] - a[1]) / L * b.r, ny = (e[0] - a[0]) / L * b.r;
@@ -1191,6 +1226,11 @@ function baseParams(){
   p.ref = $('ref').value; p.dDir = $('dDir').value; p.eqMode = $('eqMode').value; p.fMode = $('fMode').value; p.fAlign = $('fAlign').value; p.freeSegs = parseFree($('freeSegs').value); p.sRings = parseNums($('sRings').value); p.sPitch = parseNums($('sPitch').value);
   ['vLeft','vRight','hBottom','hTop'].forEach(i => { if ($(i + '_first')) $(i).value = runToText(i); });
   ['vLeft','vRight','hBottom','hTop','bXs'].forEach(i => p[i] = parseNums($(i).value));
+  [['hX0','vLeft'],['hX1','vRight']].forEach(([k, v]) => {   // 横槽端点：到门边 / 接到竖槽（停在最靠里那条竖槽的中心）/ 自己填
+    const m = $(k + 'Mode').value, a = p[v];
+    if (m === 'edge' || (m === 'join' && !a.length)) p[k] = 0;
+    else if (m === 'join') { p[k] = Math.max(...a) + (p.ref === 'edge' ? curGW() / 2 : 0); p[k + 'Auto'] = true; }
+  });
   p.customRects = parseRects($(  'customRects').value);
   return p;
 }
@@ -1223,6 +1263,11 @@ function drawDetail(p, g, fin){
   const X = (v) => (v - D.x0) * S, Y = (v) => P - (v - D.y0) * S;
   ctx.clearRect(0, 0, P, P); ctx.fillStyle = '#232a33'; ctx.fillRect(0, 0, P, P);
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, P, P); ctx.clip();
+  if (D.door) {   // 门外面涂深色，门边画白线
+    const q = D.door; ctx.fillStyle = '#0e1217'; ctx.fillRect(0, 0, P, P); ctx.fillStyle = '#232a33'; ctx.fillRect(X(q[0]), Y(q[3]), (q[2] - q[0]) * S, (q[3] - q[1]) * S);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.strokeRect(X(q[0]), Y(q[3]), (q[2] - q[0]) * S, (q[3] - q[1]) * S);
+    ctx.fillStyle = '#aab4c2'; ctx.font = '13px sans-serif'; const lx = Math.min(P - 60, Math.max(8, X(q[2]) + 8)); if (X(q[2]) < P - 20) ctx.fillText('门边', lx, 22); else if (Y(q[1]) < P - 20) ctx.fillText('门边', 12, Math.min(P - 8, Y(q[1]) + 20));
+  }
   D.boxes.forEach((q) => {
     ctx.fillStyle = 'rgba(255,90,90,0.16)'; ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.rect(X(q[0]), Y(q[3]), (q[2] - q[0]) * S, (q[3] - q[1]) * S); ctx.fill(); ctx.stroke();
@@ -1611,8 +1656,42 @@ function renderBoxes(id){
     '<button type="button" class="sec sm" data-add="1">+</button>' + (a.length > 1 ? '<button type="button" class="sec sm" data-rm="1">−</button>' : '');
 }
 function boxesToText(id){ const el = document.querySelector('.nboxes[data-for="' + id + '"]'); $(id).value = [...el.querySelectorAll('input')].map(x => x.value).filter(v => v !== '').join(','); }
-function syncLists(){ RUN_IDS.forEach(textToRun); BOX_IDS.forEach(renderBoxes); }
-RUN_IDS.forEach(id => ['_first','_n','_gap'].forEach(k => $(id + k).addEventListener('input', () => refresh())));
+function detectEnds(){   // 载入设计时：看横槽端点是「到门边」「接到竖槽」还是自己填的数
+  [['hX0','vLeft'],['hX1','vRight']].forEach(([k, v]) => {
+    const x = parseFloat($(k).value) || 0, a = parseNums($(v).value), gw = curGW(), rr = $('ref').value === 'edge' ? gw / 2 : 0;
+    let m = 'custom';
+    if (x < 0.01) m = 'edge';
+    else if (a.length && [rr, rr + gw / 2].some(d => Math.abs(Math.max(...a) + d - x) < 0.01)) m = 'join';
+    $(k + 'Mode').value = m;
+  });
+}
+const rowOf = (id) => $(id).closest('.row');
+let usedSnap = null;    // 载入设计那一刻用到了哪些格子（只显示这些，阳阳要简单）
+function snapUsed(){
+  const n = (id) => Math.round(parseFloat($(id).value) || 0), f = (id) => parseFloat($(id).value) || 0;
+  usedSnap = { one: Object.fromEntries(RUN_IDS.map(id => [id, n(id + '_n') === 1])), vLeft: n('vLeft_n') > 0, vRight: n('vRight_n') > 0, hBottom: n('hBottom_n') > 0, hTop: n('hTop_n') > 0,
+    vEq: f('vPitch') > 0, hEq: f('hPitch') > 0, vM: f('vBotM') > 0 || f('vTopM') > 0 };
+}
+function updateVis(){
+  if (!usedSnap) snapUsed();
+  const u = usedSnap, show = (id, on) => rowOf(id).classList.toggle('off', !on);
+  const SIDE = { vLeft: ['竖槽', '左边'], vRight: ['竖槽', '右边'], hBottom: ['横槽', '底边'], hTop: ['横槽', '顶边'] };
+  RUN_IDS.forEach(id => {
+    const one = u.one[id], lab = rowOf(id + '_first').querySelector('label').childNodes[0];
+    lab.textContent = one ? SIDE[id][0] + '离' + SIDE[id][1] : SIDE[id][0] + '（从' + SIDE[id][1] + '）：第一条离' + SIDE[id][1];
+    show(id + '_first', u[id]); show(id + '_n', u[id] && !one); show(id + '_gap', u[id] && !one && Math.round(parseFloat($(id + '_n').value) || 0) >= 2);
+  });
+  ['vPitch','vEqLeft','vEqRight'].forEach(id => show(id, u.vEq));
+  ['hPitch','hEqBottom','hEqTop','eqInfo'].forEach(id => show(id, u.hEq));
+  ['vBotM','vTopM'].forEach(id => show(id, u.vM));
+  const hasH = u.hBottom || u.hTop || u.hEq;
+  show('hX0Mode', hasH && $('hX0Mode').value === 'custom'); show('hX0', hasH && $('hX0Mode').value === 'custom');
+  show('hX1Mode', hasH && $('hX1Mode').value === 'custom'); show('hX1', hasH && $('hX1Mode').value === 'custom');
+  $('eqSec').classList.toggle('off', $('design').value === 'lines' && !u.vEq && !u.hEq);
+}
+function syncLists(){ RUN_IDS.forEach(textToRun); BOX_IDS.forEach(renderBoxes); detectEnds(); snapUsed(); updateVis(); }
+['hX0Mode','hX1Mode'].forEach(id => $(id).addEventListener('change', () => { updateVis(); refresh(); }));
+RUN_IDS.forEach(id => ['_first','_n','_gap'].forEach(k => $(id + k).addEventListener('input', () => { updateVis(); refresh(); })));
 document.querySelectorAll('.nboxes').forEach(el => {
   const id = el.dataset.for;
   el.addEventListener('input', () => { boxesToText(id); refresh(); });
